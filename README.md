@@ -210,39 +210,6 @@ lbp_manager.run_evaluation("test", exp_nrs=[1],
                           recompute_flag=True)   # Force recomputation
 ```
 
-## Next Steps
-
-### Customization Roadmap
-
-| Step | Component | Action | Purpose |
-|------|-----------|--------|---------|
-| 1 | **Feature Models** | Modify `PathDeviationFeature` and `EnergyFeature` | Load your domain-specific data formats |
-| 2 | **Evaluation Logic** | Adjust dimensions, target values and scaling factors | Match your performance requirements |
-| 3 | **Database Integration** | Replace `MockDataInterface` | Connect to your actual data sources |
-| 4 | **ML Models** | Experiment with different algorithms | Improve prediction accuracy |
-| 5 | **Optimization** | Implement domain-specific algorithms | Optimize for your process constraints |
-
-### Development Workflow
-
-1. **Start with Examples**: Run the complete example to understand the workflow
-2. **Adapt Incrementally**: Modify one component at a time while keeping others working
-3. **Test Frequently**: Use the provided test data to validate each change
-4. **Scale Gradually**: Add complexity (dimensions, models, algorithms) progressively
-
-## Key Features
-
-- **Complete Working Examples**: Real implementations demonstrating all framework interfaces
-- **Multi-Dimensional Analysis**: Compare 0D (scalar) vs. 2D (layered) evaluation patterns
-- **Database Independence**: Works with mock data interface, easily replaceable
-- **ML Integration**: Random Forest prediction with performance metric forecasting  
-- **Multiple Optimizers**: Random search and differential evolution implementations
-- **Visualization Support**: Built-in plotting for geometric and thermal analysis
-
-## Support
-
-- **LBP Framework Documentation**: [Main Repository](https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package) - Core framework APIs and concepts
-- **Framework Installation**: See installation instructions in the main LBP package repository
-
 ## Implementation Examples
 
 ### MockDataInterface
@@ -522,13 +489,35 @@ The examples include helper utilities in the `utils/` directory:
 - `visualize.visualize_geometry()` - Visualization tools for path analysis
 - `visualize.plot_temperature_data()` - Temperature data visualization
 
+
 ## Next Steps
 
-1. **Customize Data Interface**: Replace `MockDataInterface` with your actual data source (database, API, files)
-2. **Implement Domain Models**: Create evaluation and feature models for your specific use case
-3. **Customize Data Loading**: Modify `_load_data()` methods to handle your data formats
-4. **Add Prediction Models**: Implement ML models suited for your performance metrics
-5. **Setup Calibration**: Choose and configure optimization algorithms for your parameter spaces
-6. **Scale Dimensionality**: Extend dimension configuration to match your analysis structure
+### Customization Roadmap
 
-For detailed framework documentation, see the [LBP Package Framework](https://github.com/your-org/lbp-package) repository.
+| Step | Component | Action | Purpose |
+|------|-----------|--------|---------|
+| 1 | **Feature Models** | Modify `PathDeviationFeature` and `EnergyFeature` | Load your domain-specific data formats |
+| 2 | **Evaluation Logic** | Adjust dimensions, target values and scaling factors | Match your performance requirements |
+| 3 | **Database Integration** | Replace `MockDataInterface` | Connect to your actual data sources |
+| 4 | **ML Models** | Experiment with different algorithms | Improve prediction accuracy |
+| 5 | **Optimization** | Implement domain-specific algorithms | Optimize for your process constraints |
+
+### Development Workflow
+
+1. **Start with Examples**: Run the complete example to understand the workflow
+2. **Adapt Incrementally**: Modify one component at a time while keeping others working
+3. **Test Frequently**: Use the provided test data to validate each change
+4. **Scale Gradually**: Add complexity (dimensions, models, algorithms) progressively
+
+## Key Features
+
+- **Complete Working Examples**: Real implementations demonstrating all framework interfaces
+- **Multi-Dimensional Analysis**: Compare 0D (scalar) vs. 2D (layered) evaluation patterns
+- **Database Independence**: Works with mock data interface, easily replaceable
+- **ML Integration**: Random Forest prediction with performance metric forecasting  
+- **Multiple Optimizers**: Random search and differential evolution implementations
+- **Visualization Support**: Built-in plotting for geometric and thermal analysis
+
+## Support
+
+For detailed framework documentation, see the [LBP Package Framework](https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package) repository.
