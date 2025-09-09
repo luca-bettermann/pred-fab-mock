@@ -90,7 +90,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 2. Clone this repository:
 ```bash
-git clone https://gitlab.lrz.de/luca_bettermann/lbp_package_example.git
+git clone https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package_example
 cd lbp_package_example
 ```
 
@@ -101,15 +101,12 @@ uv sync
 
 4. Install the LBP Package framework:
 ```bash
-uv add git+https://gitlab.lrz.de/luca_bettermann/lbp_package.git
+uv add git+https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package_example
 ```
 
 ### Run the Example
 
 ```bash
-# Navigate to examples directory
-cd examples
-
 # Run the complete workflow
 python main.py
 ```
