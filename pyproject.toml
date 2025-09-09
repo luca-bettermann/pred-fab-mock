@@ -1,0 +1,15 @@
+[project]
+name = "lbp-package-example"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.9"
+dependencies = [
+    "lbp-package",
+    "matplotlib>=3.9.4",
+    "numpy>=2.0.2",
+    "scikit-learn>=1.6.1",
+    "scipy>=1.13.1",
+]
+
+[tool.uv.sources]
+lbp-package = { git = "https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package.git" }

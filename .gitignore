@@ -1,0 +1,6 @@
+.venv/
+build
+
+# Ignore all local data
+logs/
+local/
