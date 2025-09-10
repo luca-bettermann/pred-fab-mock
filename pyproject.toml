@@ -12,4 +12,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-lbp-package = { git = "https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package.git" }
+lbp-package = { git = "https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package" }

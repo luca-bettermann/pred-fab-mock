@@ -101,7 +101,7 @@ uv sync
 
 4. Install the LBP Package framework:
 ```bash
-uv add git+https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package_example
+uv add git+https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package
 ```
 
 ### Run the Example
