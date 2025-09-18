@@ -1,21 +1,28 @@
 # Import all implementations from the organized structure
 from .implementations import (
+    # External Data Interface
     MockDataInterface,
-    PathEvaluation,
+    # Feature Models
     PathDeviationFeature,
-    EnergyConsumption,
     EnergyFeature,
+    TemperatureExtraction,
+    # Evaluation Models
+    PathEvaluation,
+    EnergyConsumption,
+    # Prediction Models
     PredictExample,
+    # Calibration Models
     RandomSearchCalibration,
     DifferentialEvolutionCalibration
 )
 
 __all__ = [
     "MockDataInterface",
-    "PathEvaluation", 
     "PathDeviationFeature",
-    "EnergyConsumption",
     "EnergyFeature",
+    "TemperatureExtraction",
+    "PathEvaluation",
+    "EnergyConsumption",
     "PredictExample",
     "RandomSearchCalibration",
     "DifferentialEvolutionCalibration"

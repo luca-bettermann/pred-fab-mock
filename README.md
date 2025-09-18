@@ -39,24 +39,25 @@ This examples repository demonstrates concrete implementations of the LBP Framew
 
 ```
 lbp_package_example/
-├── main.py                    # Main execution script - complete workflow
-├── implementations/           # Interface implementations
-│   ├── __init__.py           # Package initialization with clean imports
+├── main.py                   # Main execution script - complete workflow
+├── implementations/          # Interface implementations
 │   ├── external_data.py      # MockDataInterface (IExternalData)
-│   ├── evaluation/           # Evaluation models and their feature models
-│   │   ├── __init__.py
-│   │   ├── geometry.py       # PathEvaluation + PathDeviationFeature
-│   │   └── energy.py         # EnergyConsumption + EnergyFeature
+│   ├── evaluation/           # Evaluation models
+│   │   ├── geometry.py       # PathEvaluation
+│   │   └── energy.py         # EnergyConsumption
+│   ├── features/             # Feature models
+│   │   ├── path_deviation.py # PathDeviationFeature
+│   │   └── energy.py         # EnergyFeature
 │   ├── prediction.py         # PredictExample (IPredictionModel)
 │   └── calibration.py        # Optimization models (ICalibrationModel)
 ├── utils/                    # Utility functions
 │   ├── mock_data.py          # Test data generation utilities
 │   └── visualize.py          # Visualization helper functions
-└── UML_diagram.png          # Architecture diagram
+└── UML_diagram.png           # Architecture diagram
 
 # Created at runtime when executing main.py:
 # ├── local/                  # Data storage directory
-# │   └── test/               # Study data (JSON files and arrays)
+# │   └── test/               # Study end exp data (JSON files and arrays)
 # └── logs/                   # Execution logs
 ```
 

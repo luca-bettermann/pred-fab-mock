@@ -1,10 +1,8 @@
 # Evaluation implementations package
-from .geometry import PathEvaluation, PathDeviationFeature
-from .energy import EnergyConsumption, EnergyFeature
+from .geometry import PathEvaluation
+from .energy import EnergyConsumption
 
 __all__ = [
     'PathEvaluation',
-    'PathDeviationFeature', 
-    'EnergyConsumption',
-    'EnergyFeature',
+    'EnergyConsumption'
 ]
