@@ -41,14 +41,16 @@ def main():
         
     # Initialize the study and run evaluation
     # Sleeper is added to simulate computation time
-    lbp_manager.initialize_for_study(study_code); time.sleep(1)
+    delay = 10 # seconds
+    lbp_manager.initialize_for_study(study_code); time.sleep(delay)
 
     # Run evaluations for each experiment (single or in batches)
-    lbp_manager.run_evaluation(study_code, exp_nr=1); time.sleep(1)
-    lbp_manager.run_evaluation(study_code, exp_nrs=[2, 3]); time.sleep(1)
+    lbp_manager.run_evaluation(study_code, exp_nr=1); time.sleep(delay)
+    lbp_manager.run_evaluation(study_code, exp_nr=2); time.sleep(delay)
+    lbp_manager.run_evaluation(study_code, exp_nr=3); time.sleep(delay)
 
     # Run predictions for all experiments (run in batches)
-    lbp_manager.run_training(study_code, exp_nrs=[1, 2, 3]); time.sleep(1)
+    lbp_manager.run_training(study_code, exp_nrs=[1, 2, 3]); time.sleep(delay)
 
     # Calibrate the upcoming experiment
     param_ranges = {
@@ -58,11 +60,11 @@ def main():
 
     # Calibrate using Random Search
     lbp_manager.set_calibration_model(RandomSearchCalibration, n_evaluations=100)
-    lbp_manager.run_calibration(exp_nr=4, param_ranges=param_ranges); time.sleep(1)
+    lbp_manager.run_calibration(exp_nr=4, param_ranges=param_ranges); time.sleep(delay)
     
     # Calibrate using Differential Evolution
     lbp_manager.set_calibration_model(DifferentialEvolutionCalibration, maxiter=10, seed=42)
-    lbp_manager.run_calibration(exp_nr=4, param_ranges=param_ranges); time.sleep(1)
+    lbp_manager.run_calibration(exp_nr=4, param_ranges=param_ranges); time.sleep(delay)
 
 
 if __name__ == "__main__":
