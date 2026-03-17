@@ -1,15 +1,13 @@
 [project]
-name = "lbp-package-example"
+name = "pred-fab-mock"
 version = "0.1.0"
-description = "Add your description here"
 requires-python = ">=3.9"
 dependencies = [
-    "lbp-package",
+    "pred-fab",
     "matplotlib>=3.9.4",
-    "numpy>=2.0.2",
-    "scikit-learn>=1.6.1",
-    "scipy>=1.13.1",
+    "numpy>=1.24",
+    "scikit-learn>=1.3",
 ]
 
 [tool.uv.sources]
-lbp-package = { git = "https://gitlab.lrz.de/cms/dev/robotlab/learning-by-printing/lbp_package" }
+pred-fab = { path = "../pred-fab", editable = true }
