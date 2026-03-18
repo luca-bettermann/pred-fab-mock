@@ -69,14 +69,14 @@ def main() -> None:
             "water_ratio": (0.30, 0.50),
             "print_speed": (20.0, 60.0),
         },
-        performance_weights={"path_accuracy": 1.0, "energy_efficiency": 0.8},
+        performance_weights={"path_accuracy": 0.75, "energy_efficiency": 0.25},
     )
 
     dataset = Dataset(schema=schema)
 
     # ── Phase 1: Baseline ─────────────────────────────────────────────────────
     print("\n[PHASE 1] Baseline — 8 experiments")
-    baseline_specs = agent.baseline_step(n=8)
+    baseline_specs = agent.baseline_step(n=5)
 
     baseline_exps = []
     for i, spec in enumerate(baseline_specs):
