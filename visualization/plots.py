@@ -97,21 +97,20 @@ def plot_parameter_space(
     all_params: List[Dict[str, Any]],
     phases: List[str],
 ) -> None:
-    """2D scatter of layer_time vs print_speed, color-coded by phase."""
-    layer_times = [p["layer_time"] for p in all_params]
+    """2D scatter of water_ratio vs print_speed, color-coded by phase."""
+    water_ratios = [p["water_ratio"] for p in all_params]
     print_speeds = [p["print_speed"] for p in all_params]
-    colors = [_PHASE_COLORS.get(ph, "gray") for ph in phases]
 
     fig, ax = plt.subplots(figsize=(8, 5))
     for phase, color in _PHASE_COLORS.items():
         idx = [i for i, ph in enumerate(phases) if ph == phase]
         if idx:
             ax.scatter(
-                [layer_times[i] for i in idx],
+                [water_ratios[i] for i in idx],
                 [print_speeds[i] for i in idx],
                 c=color, label=phase.capitalize(), alpha=0.85, s=60,
             )
-    ax.set_xlabel("Layer Time [s]")
+    ax.set_xlabel("Water Ratio")
     ax.set_ylabel("Print Speed [mm/s]")
     ax.set_title("Parameter Space Exploration")
     ax.legend()

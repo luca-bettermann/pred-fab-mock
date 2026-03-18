@@ -5,7 +5,7 @@ Phases:
   1 — Baseline (8 experiments)
   2 — Initial Training
   3 — Exploration (4 rounds)
-  4 — Inference (3 rounds)
+  4 — Inference (3 rounds, with design intent fixed)
   5 — Online Adaptation (layer-by-layer)
 """
 
@@ -42,6 +42,12 @@ def _run_and_evaluate(
     return exp_data
 
 
+def _with_dimensions(params: Dict[str, Any], fab: FabricationSystem) -> Dict[str, Any]:
+    """Return params with n_layers and n_segments derived from the design choice."""
+    n_layers, n_segments = fab.get_dimensions(params["design"])
+    return {**params, "n_layers": n_layers, "n_segments": n_segments}
+
+
 def main() -> None:
     # Clean up previous run artefacts so schema registry stays consistent
     if os.path.exists("./pfab_data"):
@@ -56,7 +62,6 @@ def main() -> None:
 
     agent.configure_calibration(
         bounds={
-            "layer_time":   (20.0, 70.0),
             "layer_height": (0.005, 0.010),
             "water_ratio":  (0.30, 0.50),
             "print_speed":  (20.0, 60.0),
@@ -72,9 +77,7 @@ def main() -> None:
 
     baseline_exps = []
     for i, spec in enumerate(baseline_specs):
-        params = params_from_spec(spec)
-        params["n_layers"] = 5
-        params["n_segments"] = 4
+        params = _with_dimensions(params_from_spec(spec), fab)
         exp_code = f"baseline_{i+1:02d}"
         exp_data = _run_and_evaluate(dataset, agent, fab, params, exp_code)
         baseline_exps.append(exp_data)
@@ -99,14 +102,13 @@ def main() -> None:
     ]
 
     # ── Phase 3: Exploration ───────────────────────────────────────────────────
+    # design and material are free — exploration discovers the best system configuration.
     print("\n[PHASE 3] Exploration — 4 rounds")
-    # Pass current_params so categorical values propagate into proposals
-    prev_params: Dict[str, Any] = params_from_spec(baseline_specs[-1])
-    prev_params["n_layers"] = 5
-    prev_params["n_segments"] = 4
+    prev_params: Dict[str, Any] = _with_dimensions(params_from_spec(baseline_specs[-1]), fab)
+    explore_exps = []
     for i in range(4):
         spec = agent.exploration_step(datamodule, w_explore=0.7, current_params=prev_params)
-        params = {**prev_params, **params_from_spec(spec), "n_layers": 5, "n_segments": 4}
+        params = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
         exp_code = f"explore_{i+1:02d}"
         exp_data = _run_and_evaluate(dataset, agent, fab, params, exp_code)
         datamodule.update()
@@ -115,17 +117,25 @@ def main() -> None:
         all_params.append(params)
         all_phases.append("exploration")
         perf_history.append((params, perf))
+        explore_exps.append(exp_data)
         prev_params = params
         print(f"  {exp_code}: {perf}")
 
     plot_parameter_space(all_params, all_phases)
 
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
+    # Fix design intent: pick the best-performing design + material from exploration,
+    # then optimise only the continuous parameters (layer_height, water_ratio, print_speed).
     print("\n[PHASE 4] Inference — 3 rounds")
+    best_entry = max(perf_history, key=lambda x: x[1].get("path_accuracy", 0.0))
+    design_intent = {k: best_entry[0][k] for k in ("design", "material")}
+    print(f"  Design intent (fixed): {design_intent}")
+    agent.configure_calibration(fixed_params=design_intent)
+
     for i in range(3):
         last_exp = list(dataset.get_all_experiments())[-1]
         spec = agent.inference_step(last_exp, datamodule, w_explore=0.0, current_params=prev_params)
-        params = {**prev_params, **params_from_spec(spec), "n_layers": 5, "n_segments": 4}
+        params = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
         exp_code = f"infer_{i+1:02d}"
         exp_data = _run_and_evaluate(dataset, agent, fab, params, exp_code)
         datamodule.update()
@@ -144,7 +154,7 @@ def main() -> None:
     agent.configure_step_parameter("print_speed", "n_layers")
     agent.configure_calibration(adaptation_delta={"print_speed": 5.0})
 
-    adapt_params: Dict[str, Any] = {**prev_params, "n_layers": 5, "n_segments": 4}
+    adapt_params: Dict[str, Any] = _with_dimensions(prev_params, fab)
     adapt_exp = dataset.create_experiment("adapt_01", parameters=adapt_params)
     agent.set_active_experiment(adapt_exp)
 

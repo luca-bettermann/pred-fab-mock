@@ -17,7 +17,8 @@ SCHEMA_NAME = "extrusion_printing_v1"
 def build_schema() -> DatasetSchema:
     """Construct and return the DatasetSchema for the extrusion printing simulation."""
     # --- Parameters ---
-    layer_time   = Parameter.real("layer_time",   min_val=20.0,  max_val=70.0)
+    # layer_time is a fabrication-process constant owned by FabricationSystem, not an optimization parameter.
+    # n_layers and n_segments are derived from the chosen design (via FabricationSystem.get_dimensions).
     layer_height = Parameter.real("layer_height", min_val=0.005, max_val=0.010)
     water_ratio  = Parameter.real("water_ratio",  min_val=0.30,  max_val=0.50)
     design       = Parameter.categorical("design",   ["A", "B", "C"])
@@ -27,7 +28,7 @@ def build_schema() -> DatasetSchema:
     n_segments   = Parameter.dimension("n_segments", iterator_code="segment_idx", level=2, min_val=4, max_val=4)
 
     params = Parameters()
-    for p in [layer_time, layer_height, water_ratio, design, material, print_speed, n_layers, n_segments]:
+    for p in [layer_height, water_ratio, design, material, print_speed, n_layers, n_segments]:
         params.add(p.code, p)
 
     # --- Features ---

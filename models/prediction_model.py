@@ -26,7 +26,7 @@ class PrintingPredictionModel(IPredictionModel):
     @property
     def input_parameters(self) -> List[str]:
         return [
-            "layer_time", "layer_height", "water_ratio", "print_speed",
+            "layer_height", "water_ratio", "print_speed",
             "design", "material", "n_layers", "n_segments",
         ]
 

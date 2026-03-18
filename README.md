@@ -29,7 +29,7 @@ Each experiment = one print run: **5 layers × 4 segments = 20 evaluation steps*
 cd pred-fab-mock
 uv venv
 uv sync
-python main.py
+uv run python main.py
 ```
 
 Plots are saved to `./plots/`.
