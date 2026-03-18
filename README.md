@@ -17,22 +17,20 @@ A self-contained showcase of the full [PFAB](../pred-fab) journey using a simula
 
 Each experiment = one print run: **5 layers × 4 segments = 20 evaluation steps**.
 
+- `FabricationSystem` coordinates `CameraSystem` + `EnergySensor`, iterating layer by layer
 - `CameraSystem` → `PrintingFeatureModel` → `layer_width`, `path_deviation`
 - `EnergySensor` → `EnergyFeatureModel` → `energy_per_segment`
 - `PathAccuracyModel` + `EnergyConsumptionModel` → `path_accuracy`, `energy_efficiency`
-- `PrintingPredictionModel` (sklearn RandomForest) predicts features from continuous params
+- `PrintingPredictionModel` (sklearn RandomForest) predicts features from process parameters
 
 ## Quick start
 
 ```bash
 cd pred-fab-mock
 uv venv
-uv pip install matplotlib numpy scikit-learn
-uv pip install -e "../pred-fab"
+uv sync
 python main.py
 ```
-
-<!-- COMMENT: why is pip install needed and not simply uv sync? -->
 
 Plots are saved to `./plots/`.
 
@@ -43,10 +41,12 @@ pred-fab-mock/
 ├── main.py               # Full journey Phases 0–5
 ├── schema.py             # build_schema()
 ├── agent_setup.py        # build_agent(schema, camera, energy)
+├── utils.py              # Shared helpers (params_from_spec, get_performance)
 ├── sensors/
 │   ├── physics.py        # Pure deterministic physics
 │   ├── camera.py         # CameraSystem
-│   └── energy.py         # EnergySensor
+│   ├── energy.py         # EnergySensor
+│   └── fabrication.py    # FabricationSystem (coordinates all sensors)
 ├── models/
 │   ├── feature_models.py    # PrintingFeatureModel, EnergyFeatureModel
 │   ├── evaluation_models.py # PathAccuracyModel, EnergyConsumptionModel

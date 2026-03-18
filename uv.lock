@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -1122,7 +1122,7 @@ wheels = [
 [[package]]
 name = "pred-fab"
 version = "0.1.0"
-source = { editable = "../pred-fab" }
+source = { git = "https://github.com/luca-bettermann/pred-fab.git#21012f6e2c5f18422ec59ae3fb73bfe0d74459fb" }
 dependencies = [
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
@@ -1133,17 +1133,6 @@ dependencies = [
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "scikit-optimize" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "numpy", specifier = ">=2.0.2" },
-    { name = "pandas", specifier = ">=2.3.1" },
-    { name = "pytest", specifier = ">=8.4.1" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.1" },
-    { name = "scikit-learn", specifier = ">=1.6.1" },
-    { name = "scikit-optimize", specifier = ">=0.10.2" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "pred-fab-mock"
@@ -1164,7 +1153,7 @@ dependencies = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "numpy", specifier = ">=1.24" },
-    { name = "pred-fab", editable = "../pred-fab" },
+    { name = "pred-fab", git = "https://github.com/luca-bettermann/pred-fab.git" },
     { name = "scikit-learn", specifier = ">=1.3" },
 ]
 

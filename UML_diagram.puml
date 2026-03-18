@@ -1,154 +1,137 @@
 @startuml UML_diagram
-' Examples UML diagram showing concrete implementations
-' Generate PNG: plantuml -tpng "examples/UML_diagram.puml"
+' pred-fab-mock architecture: concrete implementations against the pred-fab framework
+' Generate PNG: plantuml -tpng UML_diagram.puml
 
 !define CONCRETE_CLASS class
 
-' === STYLING - ORTHOGONAL LINES & SPACING ===
 skinparam linetype ortho
-skinparam ranksep 50
-skinparam nodesep 50
-skinparam minlen 3
-skinparam packagePadding 10ML_diagram
-' Examples UML diagram showing concrete implementations
-' Generate PNG: plantuml -tpng "examples/UML_diagram.puml"
+skinparam ranksep 60
+skinparam nodesep 40
+skinparam packagePadding 10
 
-' COMMENT: You are missing the calibrationsystem. Do not use PredictExample but an actual name that describes the model. Same for all others. Why do we have RandomSearchCalibration and DifferentialEvolutionCalibration? We simply should use the CalibrationSystem, from the agentm, which is already fully defined
+' === AGENT ===
+CONCRETE_CLASS PfabAgent {
+    + baseline_step()
+    + exploration_step()
+    + inference_step()
+    + adaptation_step()
+    + evaluate()
+    + train()
+}
 
-!define CONCRETE_CLASS class
-
-' === ORCHESTRATION LAYER ===
-CONCRETE_CLASS LBPManager {
-    + run_evaluation()
-    + run_training()
-    + run_calibration()
+' === PRED-FAB ORCHESTRATION SYSTEMS ===
+CONCRETE_CLASS FeatureSystem {
+    + run_feature_extraction()
 }
 
 CONCRETE_CLASS EvaluationSystem {
-    + add_evaluation_model()
-    + run()
+    + run_evaluation()
 }
 
 CONCRETE_CLASS PredictionSystem {
-    + add_prediction_model()
-    + train_models()
-    + predict()
-}
-
-' === CONCRETE IMPLEMENTATIONS ===
-CONCRETE_CLASS MockDataInterface #eeb6ff55 {
-    + pull_study_record()
-    + pull_exp_record()
-}
-
-CONCRETE_CLASS PathEvaluation #ADD8E655 {
-    + target_deviation: float
-    + max_deviation: float
-    + dimensions: ["layers", "segments"]
-}
-
-CONCRETE_CLASS EnergyConsumption #ADD8E655 {
-    + target_energy: float
-    + max_energy: float
-    + dimensions: []
-}
-
-CONCRETE_CLASS PredictExample #FFFFE055 {
-    + model: RandomForestRegressor
     + train()
-    + predict()
+    + predict_for_calibration()
+    + uncertainty()
 }
 
-CONCRETE_CLASS RandomSearchCalibration #FFB6C155 {
-    + n_evaluations: int
-    + optimize()
+CONCRETE_CLASS CalibrationSystem {
+    + run_baseline()
+    + run_calibration()
+    + configure_step_parameter()
 }
 
-CONCRETE_CLASS DifferentialEvolutionCalibration #FFB6C155 {
-    + maxiter: int
-    + popsize: int
-    + optimize()
+' === MOCK: SENSORS ===
+CONCRETE_CLASS FabricationSystem #ADD8E655 {
+    + run_experiment()
+    + run_layer()
 }
 
-CONCRETE_CLASS PathDeviationFeature #90EE9055 {
-    + layer_id: int
-    + segment_id: int
+CONCRETE_CLASS CameraSystem #ADD8E655 {
+    + run_layer()
+    + get_segment_data()
+}
+
+CONCRETE_CLASS EnergySensor #ADD8E655 {
+    + run_layer()
+    + get_segment_energy()
+}
+
+' === MOCK: FEATURE MODELS ===
+CONCRETE_CLASS PrintingFeatureModel #90EE9055 {
+    + outputs: [layer_width, path_deviation]
     + _load_data()
-    + _compute_features()
+    + _compute_feature_logic()
 }
 
-CONCRETE_CLASS EnergyFeature #90EE9055 {
-    + power_rating: float
-    + layerTime: float
+CONCRETE_CLASS EnergyFeatureModel #90EE9055 {
+    + outputs: [energy_per_segment]
     + _load_data()
-    + _compute_features()
+    + _compute_feature_logic()
 }
 
-CONCRETE_CLASS TemperatureExtraction #90EE9055 {
-    + base_temp: int
-    + fluctuation: int
-    + _load_data()
-    + _compute_features()
+' === MOCK: EVALUATION MODELS ===
+CONCRETE_CLASS PathAccuracyModel #eeb6ff55 {
+    + input_feature: path_deviation
+    + output_performance: path_accuracy
 }
 
-' === UTILITY PACKAGE ===
-note as utils #F8F8F820
-  **utils**
-  class ParameterHandling
-  class LocalData
-  class LBPLogger
-end note
+CONCRETE_CLASS EnergyConsumptionModel #eeb6ff55 {
+    + input_feature: energy_per_segment
+    + output_performance: energy_efficiency
+}
 
-' === LAYOUT CONTROL - ENFORCE LEVELS ===
-' Level 0 -> Level 1 vertical separation
-LBPManager -[hidden]down- EvaluationSystem  
-LBPManager -[hidden]down- PredictionSystem
-LBPManager -[hidden]down- utils
+' === MOCK: PREDICTION MODEL ===
+CONCRETE_CLASS PrintingPredictionModel #FFFFE055 {
+    + model: MultiOutputRegressor(RandomForest)
+    + outputs: [path_deviation, energy_per_segment]
+    + train()
+    + forward_pass()
+    + encode()
+}
 
-' Level 1 horizontal grouping
-MockDataInterface -[hidden]right- EvaluationSystem
+' === SCHEMA ===
+CONCRETE_CLASS DatasetSchema {
+    + parameters
+    + features
+    + performance_attrs
+}
+
+' === LAYOUT ===
+PfabAgent -[hidden]down- FeatureSystem
+PfabAgent -[hidden]down- EvaluationSystem
+PfabAgent -[hidden]down- PredictionSystem
+PfabAgent -[hidden]down- CalibrationSystem
+FeatureSystem -[hidden]right- EvaluationSystem
 EvaluationSystem -[hidden]right- PredictionSystem
-PredictionSystem -[hidden]right- utils
+PredictionSystem -[hidden]right- CalibrationSystem
 
-' Level 1 -> Level 2 vertical separation  
-EvaluationSystem -[hidden]down- PathEvaluation
-PredictionSystem -[hidden]down- PredictExample
+FeatureSystem -[hidden]down- PrintingFeatureModel
+EvaluationSystem -[hidden]down- PathAccuracyModel
+PredictionSystem -[hidden]down- PrintingPredictionModel
 
-' Level 2 horizontal grouping - concrete implementations
-MockDataInterface -[hidden]right- PathEvaluation
-PathEvaluation -[hidden]right- EnergyConsumption
-EnergyConsumption -[hidden]right- PredictExample
-PredictExample -[hidden]right- RandomSearchCalibration
+PrintingFeatureModel -[hidden]right- EnergyFeatureModel
+PathAccuracyModel -[hidden]right- EnergyConsumptionModel
 
-' Level 2 -> Level 3 vertical separation
-PathEvaluation -[hidden]down- PathDeviationFeature
-EnergyConsumption -[hidden]down- EnergyFeature
-PredictExample -[hidden]down- TemperatureExtraction
-
-' Level 3 horizontal grouping
-PathDeviationFeature -[hidden]right- EnergyFeature
-EnergyFeature -[hidden]right- TemperatureExtraction
+FabricationSystem -[hidden]down- CameraSystem
+CameraSystem -[hidden]right- EnergySensor
 
 ' === RELATIONSHIPS ===
+PfabAgent *-- FeatureSystem
+PfabAgent *-- EvaluationSystem
+PfabAgent *-- PredictionSystem
+PfabAgent *-- CalibrationSystem
+PfabAgent o-- DatasetSchema
 
-' Core Architecture
-LBPManager *-- EvaluationSystem
-LBPManager *-- PredictionSystem
+FeatureSystem o-- PrintingFeatureModel
+FeatureSystem o-- EnergyFeatureModel
+EvaluationSystem o-- PathAccuracyModel
+EvaluationSystem o-- EnergyConsumptionModel
+PredictionSystem o-- PrintingPredictionModel
 
-' Services & Support  
-LBPManager *-- MockDataInterface
-LBPManager o-- RandomSearchCalibration
-LBPManager o-- DifferentialEvolutionCalibration
-LBPManager *-- utils
+FabricationSystem *-- CameraSystem
+FabricationSystem *-- EnergySensor
 
-' Container Relationships
-EvaluationSystem o-- PathEvaluation
-EvaluationSystem o-- EnergyConsumption
-PredictionSystem o-- PredictExample
-
-' Feature Model Dependencies
-PathEvaluation ||-- PathDeviationFeature
-EnergyConsumption ||-- EnergyFeature
-PredictExample o-- TemperatureExtraction
+PrintingFeatureModel --> CameraSystem : get_segment_data()
+EnergyFeatureModel --> EnergySensor : get_segment_energy()
 
 @enduml

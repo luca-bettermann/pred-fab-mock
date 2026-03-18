@@ -10,4 +10,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-pred-fab = { path = "../pred-fab", editable = true }
+pred-fab = { git = "https://github.com/luca-bettermann/pred-fab.git" }
