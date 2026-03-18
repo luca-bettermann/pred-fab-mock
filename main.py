@@ -35,10 +35,11 @@ def _run_and_evaluate(
     params: Dict[str, Any],
     exp_code: str,
 ) -> Any:
-    """Create experiment, run fabrication, evaluate features + performance."""
+    """Create experiment, run fabrication, evaluate features + performance, persist to disk."""
     exp_data = dataset.create_experiment(exp_code, parameters=params)
     fab.run_experiment(params)
     agent.evaluate(exp_data)
+    dataset.save_experiment(exp_code)
     return exp_data
 
 
@@ -150,6 +151,7 @@ def main() -> None:
         # Infer: evaluate the experiment and propose next parameters.
         spec = agent.inference_step(exp_data, datamodule, w_explore=0.0, current_params=params)
         next_params = _with_dimensions({**params, **params_from_spec(spec)}, fab)
+        dataset.save_experiment(exp_code)
 
         # Update model with the new observation.
         datamodule.update()
@@ -204,6 +206,8 @@ def main() -> None:
             print(f"  Layer {layer_idx}: speed={layer_speeds[-1]:.1f} → {new_speed:.1f}, dev={layer_dev:.5f}")
         else:
             print(f"  Layer {layer_idx}: speed={layer_speeds[-1]:.1f}, dev={layer_dev:.5f}")
+
+    dataset.save_experiment("adapt_01")
 
     plot_adaptation(layer_speeds, layer_deviations)
     print("\nDone. Plots saved to ./plots/")
