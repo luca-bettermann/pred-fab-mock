@@ -76,7 +76,7 @@ def main() -> None:
 
     # ── Phase 1: Baseline ─────────────────────────────────────────────────────
     print("\n[PHASE 1] Baseline — 8 experiments")
-    baseline_specs = agent.baseline_step(n=5)
+    baseline_specs = agent.baseline_step(n=8)
 
     baseline_exps = []
     for i, spec in enumerate(baseline_specs):
