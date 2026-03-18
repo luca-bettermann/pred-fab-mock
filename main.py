@@ -43,7 +43,11 @@ def _run_and_evaluate(
 
 
 def _with_dimensions(params: Dict[str, Any], fab: FabricationSystem) -> Dict[str, Any]:
-    """Return params with n_layers and n_segments derived from the design choice."""
+    """Return params with n_layers and n_segments derived from the design choice.
+
+    Note: layer_height is NOT added here — it is a fabrication constant injected
+    by FabricationSystem._effective_params() when sensors are called.
+    """
     n_layers, n_segments = fab.get_dimensions(params["design"])
     return {**params, "n_layers": n_layers, "n_segments": n_segments}
 
@@ -62,9 +66,8 @@ def main() -> None:
 
     agent.configure_calibration(
         bounds={
-            "layer_height": (0.005, 0.010),
-            "water_ratio":  (0.30, 0.50),
-            "print_speed":  (20.0, 60.0),
+            "water_ratio": (0.30, 0.50),
+            "print_speed": (20.0, 60.0),
         },
         performance_weights={"path_accuracy": 1.0, "energy_efficiency": 0.8},
     )
@@ -124,13 +127,14 @@ def main() -> None:
     plot_parameter_space(all_params, all_phases)
 
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
-    # Fix design intent: pick the best-performing design + material from exploration,
-    # then optimise only the continuous parameters (layer_height, water_ratio, print_speed).
+    # The designer defines the intent: a specific design + material combination
+    # selected for the target application (geometry, structural properties, etc.).
+    # These are fixed for inference — only the continuous process parameters
+    # (water_ratio, print_speed) are optimised to make the intent work.
     print("\n[PHASE 4] Inference — 3 rounds")
-    best_entry = max(perf_history, key=lambda x: x[1].get("path_accuracy", 0.0))
-    design_intent = {k: best_entry[0][k] for k in ("design", "material")}
-    print(f"  Design intent (fixed): {design_intent}")
-    agent.configure_calibration(fixed_params=design_intent)
+    DESIGN_INTENT = {"design": "B", "material": "reinforced"}
+    print(f"  Design intent (fixed): {DESIGN_INTENT}")
+    agent.configure_calibration(fixed_params=DESIGN_INTENT)
 
     for i in range(3):
         last_exp = list(dataset.get_all_experiments())[-1]

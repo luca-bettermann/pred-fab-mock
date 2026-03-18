@@ -8,13 +8,14 @@ from .energy import EnergySensor
 # Time spent per layer — a fabrication process constant, not an optimization parameter.
 LAYER_TIME: float = 40.0  # seconds
 
-# Number of layers and segments for each design type.
-# In a real system these would reflect the actual path geometry; in this mock
-# all designs share the same 5×4 grid so data structures stay consistent.
-DESIGN_DIMENSIONS: Dict[str, Tuple[int, int]] = {
-    "A": (5, 4),
-    "B": (5, 4),
-    "C": (5, 4),
+# Per-design fabrication geometry.
+# Each design defines the target component height and the layer/segment structure.
+# layer_height is derived as target_height / n_layers, ensuring the component
+# height is preserved regardless of how other parameters are tuned.
+DESIGN_CONFIG: Dict[str, Dict] = {
+    "A": {"n_layers": 5, "n_segments": 4, "target_height": 0.040},  # 40 mm, 8 mm/layer
+    "B": {"n_layers": 5, "n_segments": 4, "target_height": 0.045},  # 45 mm, 9 mm/layer
+    "C": {"n_layers": 5, "n_segments": 4, "target_height": 0.050},  # 50 mm, 10 mm/layer
 }
 
 
@@ -36,11 +37,26 @@ class FabricationSystem:
 
     def get_dimensions(self, design: str) -> Tuple[int, int]:
         """Return (n_layers, n_segments) for the given design."""
-        return DESIGN_DIMENSIONS[design]
+        cfg = DESIGN_CONFIG[design]
+        return cfg["n_layers"], cfg["n_segments"]
+
+    def get_layer_height(self, design: str) -> float:
+        """Return layer_height [m] derived from the design's target component height."""
+        cfg = DESIGN_CONFIG[design]
+        return cfg["target_height"] / cfg["n_layers"]
 
     def _effective_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Merge fabrication-process constants into params for sensor calls."""
-        return {**params, "layer_time": self.layer_time}
+        """Merge fabrication-process constants into params for sensor calls.
+
+        Injects layer_time and layer_height (derived from design) so that
+        physics functions receive all required inputs without these values
+        being part of the optimizable schema.
+        """
+        return {
+            **params,
+            "layer_time": self.layer_time,
+            "layer_height": self.get_layer_height(params["design"]),
+        }
 
     def run_layer(self, params: Dict[str, Any], layer_idx: int) -> None:
         """Populate sensor caches for all segments of a single layer."""

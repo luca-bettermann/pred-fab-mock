@@ -17,18 +17,20 @@ SCHEMA_NAME = "extrusion_printing_v1"
 def build_schema() -> DatasetSchema:
     """Construct and return the DatasetSchema for the extrusion printing simulation."""
     # --- Parameters ---
-    # layer_time is a fabrication-process constant owned by FabricationSystem, not an optimization parameter.
-    # n_layers and n_segments are derived from the chosen design (via FabricationSystem.get_dimensions).
-    layer_height = Parameter.real("layer_height", min_val=0.005, max_val=0.010)
-    water_ratio  = Parameter.real("water_ratio",  min_val=0.30,  max_val=0.50)
-    design       = Parameter.categorical("design",   ["A", "B", "C"])
-    material     = Parameter.categorical("material", ["standard", "reinforced", "flexible"])
-    print_speed  = Parameter.real("print_speed",  min_val=20.0,  max_val=60.0, runtime=True)
-    n_layers     = Parameter.dimension("n_layers",   iterator_code="layer_idx",   level=1, min_val=5, max_val=5)
-    n_segments   = Parameter.dimension("n_segments", iterator_code="segment_idx", level=2, min_val=4, max_val=4)
+    # layer_time and layer_height are fabrication constants owned by FabricationSystem:
+    #   - layer_time: fixed process duration per layer
+    #   - layer_height: derived from design as target_height / n_layers, so the
+    #     component height is a design property, not an optimization degree of freedom.
+    # n_layers and n_segments are also derived from design (via FabricationSystem.get_dimensions).
+    water_ratio = Parameter.real("water_ratio", min_val=0.30, max_val=0.50)
+    design      = Parameter.categorical("design",   ["A", "B", "C"])
+    material    = Parameter.categorical("material", ["standard", "reinforced", "flexible"])
+    print_speed = Parameter.real("print_speed", min_val=20.0, max_val=60.0, runtime=True)
+    n_layers    = Parameter.dimension("n_layers",   iterator_code="layer_idx",   level=1, min_val=5, max_val=5)
+    n_segments  = Parameter.dimension("n_segments", iterator_code="segment_idx", level=2, min_val=4, max_val=4)
 
     params = Parameters()
-    for p in [layer_height, water_ratio, design, material, print_speed, n_layers, n_segments]:
+    for p in [water_ratio, design, material, print_speed, n_layers, n_segments]:
         params.add(p.code, p)
 
     # --- Features ---

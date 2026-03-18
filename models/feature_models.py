@@ -20,7 +20,7 @@ class PrintingFeatureModel(IFeatureModel):
     @property
     def input_parameters(self) -> List[str]:
         return [
-            "layer_height", "water_ratio", "print_speed",
+            "water_ratio", "print_speed",
             "design", "material", "n_layers", "n_segments",
         ]
 
@@ -56,7 +56,7 @@ class EnergyFeatureModel(IFeatureModel):
     @property
     def input_parameters(self) -> List[str]:
         return [
-            "layer_height", "water_ratio", "print_speed",
+            "water_ratio", "print_speed",
             "design", "material", "n_layers", "n_segments",
         ]
 

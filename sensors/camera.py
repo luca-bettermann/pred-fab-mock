@@ -22,9 +22,10 @@ class CameraSystem:
         self._cache: Dict[Tuple, Dict] = {}
 
     def _cache_key(self, params: Dict[str, Any], layer_idx: int, segment_idx: int) -> Tuple:
+        # layer_height is derived from design, so design already uniquely identifies it.
         return (
-            params["layer_height"], params["water_ratio"],
-            params["print_speed"], params["design"], params["material"],
+            params["water_ratio"], params["print_speed"],
+            params["design"], params["material"],
             layer_idx, segment_idx,
         )
 
