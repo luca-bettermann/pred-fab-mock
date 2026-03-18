@@ -20,7 +20,7 @@ class PrintingFeatureModel(IFeatureModel):
     @property
     def input_parameters(self) -> List[str]:
         return [
-            "layer_time", "layer_height", "water_ratio", "print_speed",
+            "layer_height", "water_ratio", "print_speed",
             "design", "material", "n_layers", "n_segments",
         ]
 
@@ -56,7 +56,7 @@ class EnergyFeatureModel(IFeatureModel):
     @property
     def input_parameters(self) -> List[str]:
         return [
-            "layer_time", "layer_height", "water_ratio", "print_speed",
+            "layer_height", "water_ratio", "print_speed",
             "design", "material", "n_layers", "n_segments",
         ]
 
@@ -74,6 +74,4 @@ class EnergyFeatureModel(IFeatureModel):
     def _compute_feature_logic(
         self, data: Dict, params: Dict, visualize: bool = False, **dimensions: Any
     ) -> Dict[str, float]:
-        segment_duration = float(params["layer_time"]) / 4.0
-        energy = float(np.mean(data["power_readings"])) * segment_duration
-        return {"energy_per_segment": energy}
+        return {"energy_per_segment": data["energy_per_segment"]}

@@ -21,7 +21,7 @@ class EnergySensor:
 
     def _cache_key(self, params: Dict[str, Any], layer_idx: int, segment_idx: int) -> Tuple:
         return (
-            params["layer_time"], params["layer_height"], params["water_ratio"],
+            params["layer_height"], params["water_ratio"],
             params["print_speed"], params["design"], params["material"],
             layer_idx, segment_idx,
         )
@@ -55,7 +55,9 @@ class EnergySensor:
             avg_power + self._rng.normal(0, self.NOISE_ENERGY / segment_duration)
             for _ in range(n_samples)
         ]
-        return {"power_readings": power_readings}
+        # Pre-compute energy_per_segment so feature models don't need layer_time
+        energy_per_segment = float(np.mean(power_readings)) * segment_duration
+        return {"power_readings": power_readings, "energy_per_segment": energy_per_segment}
 
     def get_segment_energy(
         self, params: Dict[str, Any], layer_idx: int, segment_idx: int

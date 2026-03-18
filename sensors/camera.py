@@ -23,7 +23,7 @@ class CameraSystem:
 
     def _cache_key(self, params: Dict[str, Any], layer_idx: int, segment_idx: int) -> Tuple:
         return (
-            params["layer_time"], params["layer_height"], params["water_ratio"],
+            params["layer_height"], params["water_ratio"],
             params["print_speed"], params["design"], params["material"],
             layer_idx, segment_idx,
         )
