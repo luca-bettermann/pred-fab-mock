@@ -25,12 +25,9 @@ class PrintingPredictionModel(IPredictionModel):
 
     @property
     def input_parameters(self) -> List[str]:
-        # Categorical parameters (design, material) are excluded: DataModule one-hot
-        # encodes them into e.g. design_A/design_B which can't be looked up by their
-        # original schema codes in _filter_batches_for_model.
         return [
             "layer_time", "layer_height", "water_ratio", "print_speed",
-            "n_layers", "n_segments",
+            "design", "material", "n_layers", "n_segments",
         ]
 
     @property
