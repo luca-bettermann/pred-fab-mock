@@ -5,17 +5,18 @@ from typing import Any, Dict, Tuple
 from .camera import CameraSystem
 from .energy import EnergySensor
 
-# Time spent per layer — a fabrication process constant, not an optimization parameter.
-LAYER_TIME: float = 40.0  # seconds
-
 # Per-design fabrication geometry.
-# Each design defines the target component height and the layer/segment structure.
-# layer_height is derived as target_height / n_layers, ensuring the component
-# height is preserved regardless of how other parameters are tuned.
+# Each design defines the target component height, layer/segment structure,
+# and total path length per layer. layer_height and layer_time are both
+# derived quantities — not optimization parameters.
+#
+#   layer_height = target_height / n_layers   (preserves component height)
+#   layer_time   = path_length / print_speed  (derived from travel speed)
+#
 DESIGN_CONFIG: Dict[str, Dict] = {
-    "A": {"n_layers": 5, "n_segments": 4, "target_height": 0.040},  # 40 mm, 8 mm/layer
-    "B": {"n_layers": 5, "n_segments": 4, "target_height": 0.045},  # 45 mm, 9 mm/layer
-    "C": {"n_layers": 5, "n_segments": 4, "target_height": 0.050},  # 50 mm, 10 mm/layer
+    "A": {"n_layers": 5, "n_segments": 4, "target_height": 0.040, "path_length": 0.40},
+    "B": {"n_layers": 5, "n_segments": 4, "target_height": 0.045, "path_length": 0.48},
+    "C": {"n_layers": 5, "n_segments": 4, "target_height": 0.050, "path_length": 0.60},
 }
 
 
@@ -25,11 +26,9 @@ class FabricationSystem:
     Iterates dimensions layer by layer so that online adaptation can interleave
     sensor data collection with agent decisions between layers.
 
-    Owns all fabrication-process constants (layer_time, design dimensions) that
-    are not optimization parameters and therefore not part of the schema.
+    Derives layer_height and layer_time from design geometry and print_speed,
+    keeping them out of the optimization schema.
     """
-
-    layer_time: float = LAYER_TIME
 
     def __init__(self, camera: CameraSystem, energy: EnergySensor) -> None:
         self.camera = camera
@@ -41,21 +40,28 @@ class FabricationSystem:
         return cfg["n_layers"], cfg["n_segments"]
 
     def get_layer_height(self, design: str) -> float:
-        """Return layer_height [m] derived from the design's target component height."""
+        """Return layer_height [m] = target_height / n_layers for the given design."""
         cfg = DESIGN_CONFIG[design]
         return cfg["target_height"] / cfg["n_layers"]
 
-    def _effective_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Merge fabrication-process constants into params for sensor calls.
+    def get_layer_time(self, design: str, print_speed: float) -> float:
+        """Return layer_time [s] = path_length / print_speed (print_speed in mm/s)."""
+        cfg = DESIGN_CONFIG[design]
+        return cfg["path_length"] / (print_speed * 1e-3)  # convert mm/s → m/s
 
-        Injects layer_time and layer_height (derived from design) so that
-        physics functions receive all required inputs without these values
-        being part of the optimizable schema.
+    def _effective_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge derived fabrication quantities into params for sensor calls.
+
+        Injects layer_height (from design geometry) and layer_time (from design
+        path length and current print_speed) so that physics functions receive
+        all required inputs without these appearing in the optimizable schema.
         """
+        design = params["design"]
+        print_speed = float(params["print_speed"])
         return {
             **params,
-            "layer_time": self.layer_time,
-            "layer_height": self.get_layer_height(params["design"]),
+            "layer_height": self.get_layer_height(design),
+            "layer_time": self.get_layer_time(design, print_speed),
         }
 
     def run_layer(self, params: Dict[str, Any], layer_idx: int) -> None:

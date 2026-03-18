@@ -17,10 +17,9 @@ SCHEMA_NAME = "extrusion_printing_v1"
 def build_schema() -> DatasetSchema:
     """Construct and return the DatasetSchema for the extrusion printing simulation."""
     # --- Parameters ---
-    # layer_time and layer_height are fabrication constants owned by FabricationSystem:
-    #   - layer_time: fixed process duration per layer
-    #   - layer_height: derived from design as target_height / n_layers, so the
-    #     component height is a design property, not an optimization degree of freedom.
+    # layer_time and layer_height are derived quantities owned by FabricationSystem:
+    #   - layer_time  = path_length(design) / print_speed  (faster printing → shorter layer time)
+    #   - layer_height = target_height(design) / n_layers  (component height is a design property)
     # n_layers and n_segments are also derived from design (via FabricationSystem.get_dimensions).
     water_ratio = Parameter.real("water_ratio", min_val=0.30, max_val=0.50)
     design      = Parameter.categorical("design",   ["A", "B", "C"])
