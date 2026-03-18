@@ -129,27 +129,41 @@ def main() -> None:
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
     # The designer defines the intent: a specific design + material combination
     # selected for the target application (geometry, structural properties, etc.).
-    # These are fixed for inference — only the continuous process parameters
-    # (water_ratio, print_speed) are optimised to make the intent work.
+    # These are fixed — only the continuous process parameters (water_ratio,
+    # print_speed) are optimised to make the intent work.
     print("\n[PHASE 4] Inference — 3 rounds")
     DESIGN_INTENT = {"design": "B", "material": "reinforced"}
     print(f"  Design intent (fixed): {DESIGN_INTENT}")
     agent.configure_calibration(fixed_params=DESIGN_INTENT)
 
+    # Start inference from the last exploration parameters (continuous values only;
+    # design intent will be pinned by configure_calibration above).
+    params = _with_dimensions({**prev_params, **DESIGN_INTENT}, fab)
+
     for i in range(3):
-        last_exp = list(dataset.get_all_experiments())[-1]
-        spec = agent.inference_step(last_exp, datamodule, w_explore=0.0, current_params=prev_params)
-        params = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
         exp_code = f"infer_{i+1:02d}"
-        exp_data = _run_and_evaluate(dataset, agent, fab, params, exp_code)
+
+        # Fabricate: run the experiment with current parameters.
+        exp_data = dataset.create_experiment(exp_code, parameters=params)
+        fab.run_experiment(params)
+
+        # Infer: evaluate the experiment and propose next parameters.
+        spec = agent.inference_step(exp_data, datamodule, w_explore=0.0, current_params=params)
+        next_params = _with_dimensions({**params, **params_from_spec(spec)}, fab)
+
+        # Update model with the new observation.
         datamodule.update()
         agent.train(datamodule, validate=False)
+
         perf = get_performance(exp_data)
         all_params.append(params)
         all_phases.append("inference")
         perf_history.append((params, perf))
-        prev_params = params
         print(f"  {exp_code}: {perf}")
+
+        params = next_params
+
+    prev_params = params
 
     plot_performance_trajectory(perf_history)
 
