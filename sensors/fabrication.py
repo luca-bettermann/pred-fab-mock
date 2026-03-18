@@ -19,6 +19,7 @@ class FabricationSystem:
 
     def run_layer(self, params: Dict[str, Any], layer_idx: int) -> None:
         """Populate sensor caches for all segments of a single layer."""
+        print(f"Printing layer {layer_idx}...")
         self.camera.run_layer(params, layer_idx)
         self.energy.run_layer(params, layer_idx)
 

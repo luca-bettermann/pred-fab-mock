@@ -40,21 +40,21 @@ CONCRETE_CLASS CalibrationSystem {
     + configure_step_parameter()
 }
 
-' === MOCK: SENSORS ===
-CONCRETE_CLASS FabricationSystem #ADD8E655 {
-    + run_experiment()
-    + run_layer()
-}
+' ' === MOCK: SENSORS ===
+' CONCRETE_CLASS FabricationSystem #ADD8E655 {
+'     + run_experiment()
+'     + run_layer()
+' }
 
-CONCRETE_CLASS CameraSystem #ADD8E655 {
-    + run_layer()
-    + get_segment_data()
-}
+' CONCRETE_CLASS CameraSystem #ADD8E655 {
+'     + run_layer()
+'     + get_segment_data()
+' }
 
-CONCRETE_CLASS EnergySensor #ADD8E655 {
-    + run_layer()
-    + get_segment_energy()
-}
+' CONCRETE_CLASS EnergySensor #ADD8E655 {
+'     + run_layer()
+'     + get_segment_energy()
+' }
 
 ' === MOCK: FEATURE MODELS ===
 CONCRETE_CLASS PrintingFeatureModel #90EE9055 {
@@ -112,8 +112,8 @@ PredictionSystem -[hidden]down- PrintingPredictionModel
 PrintingFeatureModel -[hidden]right- EnergyFeatureModel
 PathAccuracyModel -[hidden]right- EnergyConsumptionModel
 
-FabricationSystem -[hidden]down- CameraSystem
-CameraSystem -[hidden]right- EnergySensor
+' FabricationSystem -[hidden]down- CameraSystem
+' CameraSystem -[hidden]right- EnergySensor
 
 ' === RELATIONSHIPS ===
 PfabAgent *-- FeatureSystem
@@ -128,10 +128,10 @@ EvaluationSystem o-- PathAccuracyModel
 EvaluationSystem o-- EnergyConsumptionModel
 PredictionSystem o-- PrintingPredictionModel
 
-FabricationSystem *-- CameraSystem
-FabricationSystem *-- EnergySensor
+' FabricationSystem *-- CameraSystem
+' FabricationSystem *-- EnergySensor
 
-PrintingFeatureModel --> CameraSystem : get_segment_data()
-EnergyFeatureModel --> EnergySensor : get_segment_energy()
+' PrintingFeatureModel --> CameraSystem : get_segment_data()
+' EnergyFeatureModel --> EnergySensor : get_segment_energy()
 
 @enduml
