@@ -13,6 +13,7 @@ from pred_fab.core import (
 ROOT_FOLDER = "./pfab_data"
 SCHEMA_NAME = "extrusion_printing_v1"
 
+# COMMENT: I am preferring defining the parameters separately and then creating blocks, then adding them to the schema. Now, we need to define the names twice, which makes little sense.
 
 def build_schema() -> DatasetSchema:
     """Construct and return the DatasetSchema for the extrusion printing simulation."""

@@ -32,6 +32,8 @@ uv pip install -e "../pred-fab"
 python main.py
 ```
 
+<!-- COMMENT: why is pip install needed and not simply uv sync? -->
+
 Plots are saved to `./plots/`.
 
 ## Repository structure

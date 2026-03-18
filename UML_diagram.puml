@@ -13,6 +13,8 @@ skinparam packagePadding 10ML_diagram
 ' Examples UML diagram showing concrete implementations
 ' Generate PNG: plantuml -tpng "examples/UML_diagram.puml"
 
+' COMMENT: You are missing the calibrationsystem. Do not use PredictExample but an actual name that describes the model. Same for all others. Why do we have RandomSearchCalibration and DifferentialEvolutionCalibration? We simply should use the CalibrationSystem, from the agentm, which is already fully defined
+
 !define CONCRETE_CLASS class
 
 ' === ORCHESTRATION LAYER ===

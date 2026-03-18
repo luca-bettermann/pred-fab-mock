@@ -26,6 +26,9 @@ from visualization.plots import (
     plot_adaptation,
 )
 
+# COMMENT: Create utils file where you add helpers etc. the main script should be as clean as possible.
+# COMMENT: Maybe you could create classes for different stages of the process. Not sure if this makes sense, but think about it,
+
 # ─── Helper ──────────────────────────────────────────────────────────────────
 
 def _params_from_spec(spec: Any) -> Dict[str, Any]:
@@ -52,6 +55,8 @@ def _run_and_evaluate(
 ) -> Any:
     """Create experiment, populate sensor caches, evaluate features + performance."""
     exp_data = dataset.create_experiment(exp_code, parameters=params)
+
+    # COMMENT: Instead of running the experiment for the sensors separately, I want you to create a FabrricationSystem class that has a run_experiment method which takes care of running all sensors and populating the caches. The run_experiment should iterate over the dimensions and populate gradually. This way, we will be able to add online adaptation later, where we call the agent directly during the fabrication steps.
     camera.run_experiment(params)
     energy.run_experiment(params)
     agent.evaluate(exp_data)
