@@ -5,6 +5,7 @@ from pred_fab.core import (
     Parameters,
     Features,
     PerformanceAttributes,
+    Dimension,
     Domain,
     Domains,
     Parameter,
@@ -19,7 +20,6 @@ SCHEMA_NAME = "extrusion_printing_v2"
 def build_schema() -> DatasetSchema:
     """Construct and return the DatasetSchema for the extrusion printing simulation."""
     # --- Parameters (optimization parameters only — no dimension params) ---
-    # layer_time and layer_height are derived quantities owned by FabricationSystem.
     # Domain axes (n_layers, n_segments) are declared in the domain below.
     water_ratio = Parameter.real("water_ratio", min_val=0.30, max_val=0.50)
     design      = Parameter.categorical("design",   ["A", "B", "C"])
@@ -28,15 +28,14 @@ def build_schema() -> DatasetSchema:
 
     params = Parameters()
     for p in [water_ratio, design, material, print_speed]:
-        params.add(p.code, p)
+        params.add(p)
 
     # --- Domains ---
     # spatial_segment: (layer, segment) — the measurement space for all sensors.
     # Axis sizes are fixed per design (5 layers × 4 segments = 20 evaluation steps).
-    spatial = Domain("spatial_segment", [
-        ("n_layers",   "layer_idx",   5, 5),
-        ("n_segments", "segment_idx", 4, 4),
-    ])
+    n_layers   = Dimension("n_layers",   "layer_idx",   min_val=5, max_val=5)
+    n_segments = Dimension("n_segments", "segment_idx", min_val=4, max_val=4)
+    spatial = Domain("spatial_segment", [n_layers, n_segments])
     domains = Domains()
     domains.add(spatial)
 
@@ -47,7 +46,7 @@ def build_schema() -> DatasetSchema:
 
     features = Features()
     for f in [layer_width, path_deviation, energy_per_segment]:
-        features.add(f.code, f)
+        features.add(f)
 
     # --- Performance ---
     path_accuracy     = PerformanceAttribute.score("path_accuracy")
@@ -55,7 +54,7 @@ def build_schema() -> DatasetSchema:
 
     performance = PerformanceAttributes()
     for a in [path_accuracy, energy_efficiency]:
-        performance.add(a.code, a)
+        performance.add(a)
 
     return DatasetSchema(
         root_folder=ROOT_FOLDER,
