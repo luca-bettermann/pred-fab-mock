@@ -1,5 +1,10 @@
 .venv/
 build
+__pycache__/
+**/__pycache__/
+*.pyc
+pfab_data/
+plots/
 
 # Ignore all local data
 logs/
