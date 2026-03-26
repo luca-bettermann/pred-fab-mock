@@ -39,9 +39,9 @@ def build_schema() -> DatasetSchema:
 
     # --- Features (tied to domain; depth=None means full domain depth) ---
     features = Features([
-        Feature.array("layer_width",        domain="spatial_segment"),
-        Feature.array("path_deviation",     domain="spatial_segment"),
-        Feature.array("energy_per_segment", domain="spatial_segment"),
+        Feature.array("layer_width",        domain=spatial),
+        Feature.array("path_deviation",     domain=spatial),
+        Feature.array("energy_per_segment", domain=spatial),
     ])
 
     # --- Performance ---
