@@ -6,7 +6,6 @@ Phases:
   2 — Initial Training
   3 — Exploration (4 rounds)
   4 — Inference (3 rounds, with design intent fixed)
-  5 — Online Adaptation (layer-by-layer)
 """
 
 import os
@@ -25,12 +24,10 @@ from visualization import (
     plot_prediction_accuracy,
     plot_parameter_space,
     plot_performance_trajectory,
-    plot_adaptation,
     print_phase_header,
     print_section,
     print_experiment_row,
     print_phase_summary,
-    print_adaptation_row,
     print_done,
 )
 
@@ -164,48 +161,8 @@ def main() -> None:
         print_experiment_row(exp_code, params, perf)
         params = next_params
 
-    prev_params = params
     print_phase_summary(infer_log)
     plot_performance_trajectory(perf_history, all_phases)
-
-    # ── Phase 5: Online Adaptation ─────────────────────────────────────────────
-    print_phase_header(5, "Online Adaptation", "layer-by-layer print_speed tuning")
-    agent.configure_step_parameter("print_speed", "n_layers")
-    agent.configure_calibration(adaptation_delta={"print_speed": 5.0})
-
-    adapt_params = _with_dimensions(prev_params, fab)
-    adapt_exp    = dataset.create_experiment("adapt_01", parameters=adapt_params)
-    agent.set_active_experiment(adapt_exp)
-
-    layer_speeds:     List[float] = []
-    layer_deviations: List[float] = []
-
-    for layer_idx in range(5):
-        fab.run_layer(adapt_params, layer_idx)
-        start, end = adapt_exp.parameters.get_start_and_end_indices("n_layers", layer_idx)
-        agent.feature_system.run_feature_extraction(  # type: ignore[union-attr]
-            adapt_exp, evaluate_from=start, evaluate_to=end
-        )
-
-        speed_before = float(adapt_params["print_speed"])
-        layer_speeds.append(speed_before)
-        feat_tensor = adapt_exp.features.get_value("path_deviation")
-        layer_dev   = float(feat_tensor[layer_idx, :].mean())  # type: ignore[index]
-        layer_deviations.append(layer_dev)
-
-        if layer_idx < 4:
-            spec      = agent.adaptation_step(
-                dimension="n_layers", step_index=layer_idx,
-                exp_data=adapt_exp, record=True,
-            )
-            new_speed = float(spec.initial_params.get("print_speed", speed_before))
-            adapt_params["print_speed"] = new_speed
-            print_adaptation_row(layer_idx, speed_before, layer_dev, speed_after=new_speed)
-        else:
-            print_adaptation_row(layer_idx, speed_before, layer_dev)
-
-    dataset.save_experiment("adapt_01")
-    plot_adaptation(layer_speeds, layer_deviations)
 
     print_done()
 
