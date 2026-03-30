@@ -20,7 +20,6 @@ SCHEMA_NAME = "extrusion_printing_v2"
 def build_schema() -> DatasetSchema:
     """Construct and return the DatasetSchema for the extrusion printing simulation."""
     # --- Parameters (optimization parameters only — no dimension params) ---
-    # Domain axes (n_layers, n_segments) are declared in the domain below.
     params = Parameters([
         Parameter.real("water_ratio", min_val=0.30, max_val=0.50),
         Parameter.categorical("design",   ["A", "B", "C"]),
@@ -43,6 +42,7 @@ def build_schema() -> DatasetSchema:
         Feature.array("path_deviation",     domain=spatial),
         Feature.array("energy_per_segment", domain=spatial),
     ])
+    # COMMENT: can we have energy per layer instead, and use the depth argument for it?
 
     # --- Performance ---
     performance = PerformanceAttributes([
@@ -58,3 +58,7 @@ def build_schema() -> DatasetSchema:
         performance=performance,
         domains=domains,
     )
+
+# COMMENT: I am getting these warnings below in my logger:
+# 2026-03-30 16:26:06,360 - WARNING - warning:65 - The following codes are defined in the schema but not used by any model: {'n_segments', 'n_layers'}
+# 2026-03-30 16:26:07,256 - WARNING - warning:65 - The following codes are defined in the schema but not used by any model: {'layer_width'}
