@@ -32,10 +32,6 @@ class PrintingPredictionModel(IPredictionModel):
         return []
 
     @property
-    def input_domain(self) -> str:
-        return "spatial_segment"
-
-    @property
     def outputs(self) -> List[str]:
         return ["path_deviation", "energy_per_segment"]
 
