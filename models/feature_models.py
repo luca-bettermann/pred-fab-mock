@@ -22,10 +22,6 @@ class PrintingFeatureModel(IFeatureModel):
         return ["water_ratio", "print_speed", "design", "material"]
 
     @property
-    def input_domain(self) -> str:
-        return "spatial_segment"
-
-    @property
     def outputs(self) -> List[str]:
         return ["layer_width", "path_deviation"]
 
@@ -57,10 +53,6 @@ class EnergyFeatureModel(IFeatureModel):
     @property
     def input_parameters(self) -> List[str]:
         return ["water_ratio", "print_speed", "design", "material"]
-
-    @property
-    def input_domain(self) -> str:
-        return "spatial_segment"
 
     @property
     def outputs(self) -> List[str]:
