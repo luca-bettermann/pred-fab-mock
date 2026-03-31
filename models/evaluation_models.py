@@ -37,7 +37,7 @@ class EnergyConsumptionModel(IEvaluationModel):
     """Scores energy_per_segment against a target energy consumption."""
 
     TARGET_ENERGY = 8.0   # J
-    MAX_ENERGY = 20.0     # J — energy at which score = 0
+    MAX_ENERGY = 60.0     # J — energy at which score = 0
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)

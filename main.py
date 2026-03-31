@@ -122,7 +122,7 @@ def main() -> None:
     explore_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
 
     for i in range(4):
-        spec     = agent.exploration_step(datamodule, w_explore=0.7, current_params=prev_params)
+        spec     = agent.exploration_step(datamodule, w_explore=0.7)
         params   = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
         exp_code = f"explore_{i+1:02d}"
         exp_data = _run_and_evaluate(dataset, agent, fab, params, exp_code)

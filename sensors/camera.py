@@ -62,10 +62,11 @@ class CameraSystem:
             w + self._rng.normal(0, self.NOISE_WIDTH) for _ in range(10)
         ]
 
-        # Measured vs designed path: 5 sample points
+        # Measured vs designed path: 5 sample points.
+        # Noise is lateral-only (y axis); x is along-path and not a source of deviation.
         designed_path = [(float(i) * 0.01, 0.0) for i in range(5)]
         measured_path = [
-            (p[0] + self._rng.normal(0, self.NOISE_DEVIATION),
+            (p[0],
              p[1] + d + self._rng.normal(0, self.NOISE_DEVIATION))
             for p in designed_path
         ]
