@@ -13,6 +13,8 @@ import os
 import shutil
 from typing import Any, Dict, List, Tuple
 
+import numpy as np
+
 from pred_fab.core import Dataset
 
 from schema import build_schema
@@ -73,14 +75,14 @@ def main() -> None:
             "water_ratio": (0.30, 0.50),
             "print_speed": (20.0, 60.0),
         },
-        performance_weights={"path_accuracy": 0.75, "energy_efficiency": 0.25},
+        performance_weights={"path_accuracy": 0.5, "energy_efficiency": 0.5},
     )
 
     dataset = Dataset(schema=schema)
 
     # ── Phase 1: Baseline ─────────────────────────────────────────────────────
-    print_phase_header(1, "Baseline Sampling", "8 Latin-hypercube experiments")
-    baseline_specs = agent.baseline_step(n=8)
+    print_phase_header(1, "Baseline Sampling", "12 Latin-hypercube experiments")
+    baseline_specs = agent.baseline_step(n=12)
 
     baseline_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
     baseline_exps = []
@@ -117,11 +119,11 @@ def main() -> None:
     ]
 
     # ── Phase 3: Exploration ───────────────────────────────────────────────────
-    print_phase_header(3, "Exploration", "4 rounds  (w_explore=0.7)")
+    print_phase_header(3, "Exploration", "6 rounds  (w_explore=0.7)")
     prev_params = _with_dimensions(params_from_spec(baseline_specs[-1]), fab)
     explore_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
 
-    for i in range(4):
+    for i in range(6):
         spec     = agent.exploration_step(datamodule, w_explore=0.7)
         params   = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
         exp_code = f"explore_{i+1:02d}"
@@ -137,10 +139,10 @@ def main() -> None:
         print_experiment_row(exp_code, params, perf)
 
     print_phase_summary(explore_log)
-    plot_parameter_space(all_params, all_phases)
+    plot_parameter_space(all_params, all_phases, perf_history)
 
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
-    DESIGN_INTENT = {"design": "B", "material": "reinforced"}
+    DESIGN_INTENT = {"design": "B", "material": "flexible"}
     print_phase_header(4, "Inference", f"3 rounds  ·  intent fixed: {DESIGN_INTENT}")
     agent.configure_calibration(fixed_params=DESIGN_INTENT)
     params = _with_dimensions({**prev_params, **DESIGN_INTENT}, fab)
@@ -173,7 +175,10 @@ def main() -> None:
     agent.configure_step_parameter("print_speed", "n_layers")
     agent.configure_calibration(adaptation_delta={"print_speed": 5.0})
 
-    adapt_params = _with_dimensions(prev_params, fab)
+    # Start adaptation at a deliberately suboptimal print_speed so the agent has
+    # observable room to improve. Layer drift in the physics means deviation rises
+    # over layers unless print_speed is actively reduced.
+    adapt_params = _with_dimensions({**prev_params, "print_speed": 40.0}, fab)
     adapt_exp    = dataset.create_experiment("adapt_01", parameters=adapt_params)
     agent.set_active_experiment(adapt_exp)
 
@@ -189,8 +194,9 @@ def main() -> None:
 
         speed_before = float(adapt_params["print_speed"])
         layer_speeds.append(speed_before)
-        feat_tensor = adapt_exp.features.get_value("path_deviation")
-        layer_dev   = float(feat_tensor[layer_idx, :].mean())  # type: ignore[index]
+
+        feat = adapt_exp.features.get_value("path_deviation")
+        layer_dev = float(np.mean(feat[layer_idx, :]))
         layer_deviations.append(layer_dev)
 
         if layer_idx < 4:
@@ -205,7 +211,23 @@ def main() -> None:
             print_adaptation_row(layer_idx, speed_before, layer_dev)
 
     dataset.save_experiment("adapt_01")
-    plot_adaptation(layer_speeds, layer_deviations)
+
+    # Counterfactual: what deviation would look like at constant speed=40 (no adaptation).
+    # Computed analytically from the physics so no extra simulation is needed.
+    from sensors.physics import path_deviation as _phys_dev
+    no_adapt_design = str(adapt_params.get("design", "B"))
+    fixed_dev = [
+        float(
+            sum(
+                _phys_dev(40.0, no_adapt_design, seg_idx, layer_idx)
+                for seg_idx in range(int(adapt_params["n_segments"]))
+            )
+            / int(adapt_params["n_segments"])
+        )
+        for layer_idx in range(5)
+    ]
+
+    plot_adaptation(layer_speeds, layer_deviations, no_adapt_deviations=fixed_dev)
 
     print_done()
 

@@ -22,7 +22,8 @@ class CameraSystem:
         self._cache: Dict[Tuple, Dict] = {}
 
     def _cache_key(self, params: Dict[str, Any], layer_idx: int, segment_idx: int) -> Tuple:
-        # layer_height is derived from design, so design already uniquely identifies it.
+        # layer_time and layer_height are deterministic functions of design+print_speed,
+        # so they are redundant in the key.
         return (
             params["water_ratio"], params["print_speed"],
             params["design"], params["material"],
@@ -49,12 +50,11 @@ class CameraSystem:
     ) -> Dict:
         # Deterministic values + noise
         w = filament_width(
-            params["layer_height"], params["water_ratio"],
+            params["water_ratio"],
             params["print_speed"], params["design"], params["material"],
         )
         d = path_deviation(
-            params["print_speed"], params["layer_time"],
-            params["design"], segment_idx,
+            params["print_speed"], params["design"], segment_idx, layer_idx=layer_idx,
         )
 
         # 10 width readings per segment
