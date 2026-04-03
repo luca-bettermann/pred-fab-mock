@@ -1,5 +1,6 @@
 from .plots import (
     plot_path_comparison,
+    plot_physics_landscape,
     plot_feature_heatmaps,
     plot_prediction_accuracy,
     plot_parameter_space,
@@ -17,6 +18,7 @@ from .console import (
 
 __all__ = [
     "plot_path_comparison",
+    "plot_physics_landscape",
     "plot_feature_heatmaps",
     "plot_prediction_accuracy",
     "plot_parameter_space",
