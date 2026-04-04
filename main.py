@@ -23,6 +23,8 @@ from sensors import CameraSystem, EnergySensor, FabricationSystem
 from utils import params_from_spec, get_performance
 from visualization import (
     plot_path_comparison,
+    plot_path_comparison_3d,
+    plot_filament_volume,
     plot_physics_landscape,
     plot_feature_heatmaps,
     plot_prediction_accuracy,
@@ -102,6 +104,8 @@ def main() -> None:
 
     print_phase_summary(baseline_log)
     plot_path_comparison(baseline_exps[-1], fab.camera, last_params)
+    plot_path_comparison_3d(baseline_exps[-1], fab.camera, last_params)
+    plot_filament_volume(baseline_exps[-1], fab.camera, last_params)
     plot_feature_heatmaps(baseline_exps[-1])
     plot_physics_landscape(last_params)
 

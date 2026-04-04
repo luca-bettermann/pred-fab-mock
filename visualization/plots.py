@@ -39,6 +39,31 @@ def _annotate_heatmap(ax: Any, grid: np.ndarray, fmt: str = "{:.4f}") -> None:
             )
 
 
+# ── Filament tube helper ──────────────────────────────────────────────────────
+
+def _make_filament_tube(
+    xs: List[float],
+    ys: List[float],
+    z_center: float,
+    radius: float,
+    n_circ: int = 24,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return (X, Y, Z) surface arrays for a cylindrical tube following (xs, ys) at z_center.
+
+    The tube cross-section is circular with given radius. Suitable for plot_surface.
+    Shape of each output array: (n_circ, len(xs)).
+    """
+    n_pts = len(xs)
+    phi = np.linspace(0, 2.0 * np.pi, n_circ, endpoint=True)
+    PHI = phi[:, np.newaxis]                       # (n_circ, 1)
+    XS  = np.array(xs, dtype=float)[np.newaxis, :] # (1, n_pts)
+    YS  = np.array(ys, dtype=float)[np.newaxis, :] # (1, n_pts)
+    X = np.repeat(XS, n_circ, axis=0)              # (n_circ, n_pts)
+    Y = YS + radius * np.cos(PHI)                  # (n_circ, n_pts)
+    Z = z_center + radius * np.sin(PHI)             # (n_circ, n_pts)
+    return X, Y, Z
+
+
 # ── Phase 1: As-Printed vs As-Designed (per-layer 2D grid) ───────────────────
 
 def plot_path_comparison(
@@ -465,3 +490,238 @@ def plot_adaptation(
     ax_dev.set_xticklabels([f"L{i}" for i in layers])
 
     _save_and_show("adaptation")
+
+
+# ── Phase 1: 3D tube comparison ───────────────────────────────────────────────
+
+def plot_path_comparison_3d(
+    exp_data: ExperimentData,
+    camera: Any,
+    params: Dict[str, Any],
+) -> None:
+    """3D stacked tube view: designed (grey wireframe) vs as-printed (coloured solid).
+
+    Each filament is a cylindrical tube. The designed path is rendered as a wireframe
+    ghost so the measured path (solid, coloured by deviation) reads clearly in front.
+    Layer drift accumulates upward — the colour shift from green → red tells the story.
+    """
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    N_LAYERS, N_SEGMENTS, N_PTS = 5, 4, 5
+    SEG_LENGTH = (N_PTS - 1) * 0.01
+    SEG_GAP    = 0.008
+
+    sample_data = camera.get_segment_data(params, 0, 0)
+    radius     = float(np.mean(sample_data["width_readings"])) / 2.0
+    LAYER_STEP = radius * 2.6   # gap > diameter so layers don't touch visually
+
+    cache: Dict[Tuple[int, int], Dict] = {}
+    all_devs: List[float] = []
+    for li in range(N_LAYERS):
+        for si in range(N_SEGMENTS):
+            d = camera.get_segment_data(params, li, si)
+            cache[(li, si)] = d
+            for mp, dp in zip(d["measured_path"], d["designed_path"]):
+                all_devs.append(abs(mp[1] - dp[1]))
+
+    vmax = max(all_devs) * 1.1 if all_devs else 1e-4
+    norm = Normalize(vmin=0.0, vmax=vmax)
+    cmap = plt.cm.RdYlGn_r  # type: ignore[attr-defined]
+
+    fig = plt.figure(figsize=(15, 8))
+    ax  = fig.add_subplot(111, projection="3d")
+
+    Y_SCALE = 3.0  # exaggerate lateral deviation so it reads clearly in 3D
+
+    for li in range(N_LAYERS):
+        z_center = li * LAYER_STEP
+        x_off    = 0.0
+
+        for si in range(N_SEGMENTS):
+            data    = cache[(li, si)]
+            dp      = data["designed_path"]
+            mp      = data["measured_path"]
+            xs        = [p[0] + x_off for p in dp]
+            ys_des    = [0.0] * len(dp)
+            ys_meas_r = [p[1] for p in mp]
+            ys_meas_v = [y * Y_SCALE for y in ys_meas_r]   # visual (scaled)
+
+            mean_dev   = float(np.mean([abs(ym) for ym in ys_meas_r]))
+            tube_color = cmap(norm(mean_dev))
+
+            # Designed — wireframe ghost at y=0
+            Xd, Yd, Zd = _make_filament_tube(xs, ys_des, z_center, radius, n_circ=16)
+            ax.plot_wireframe(  # type: ignore[union-attr]
+                Xd, Yd, Zd,
+                color="#6699CC", alpha=0.35, linewidth=0.4,
+                rstride=4, cstride=1,
+            )
+            # Designed centreline — dashed blue-white
+            ax.plot(  # type: ignore[union-attr]
+                xs, ys_des, [z_center] * len(xs),
+                color="#AACCFF", linestyle="--", linewidth=1.0, alpha=0.80, zorder=4,
+            )
+
+            # Measured — solid coloured tube (y-scaled)
+            Xm, Ym, Zm = _make_filament_tube(xs, ys_meas_v, z_center, radius, n_circ=20)
+            ax.plot_surface(  # type: ignore[union-attr]
+                Xm, Ym, Zm,
+                color=tube_color, alpha=0.88, linewidth=0, antialiased=True, shade=True,
+            )
+
+            x_off += SEG_LENGTH + SEG_GAP
+
+    # Fix aspect ratio: amplify y and z display relative to x so tubes look round
+    ax.set_box_aspect([9, 2.5, 2.2])  # type: ignore[union-attr]
+
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cb = fig.colorbar(sm, ax=ax, pad=0.09, shrink=0.52, aspect=16)
+    cb.set_label("Path Deviation [m]", fontsize=9)
+
+    design   = params.get("design",      "?")
+    material = params.get("material",    "?")
+    speed    = params.get("print_speed", 0.0)
+
+    ax.set_xlabel("Along-path [m]",    labelpad=10, fontsize=9)   # type: ignore[union-attr]
+    ax.set_ylabel(f"Lateral offset [m ×{Y_SCALE:.0f}]", labelpad=10, fontsize=9)  # type: ignore[union-attr]
+    ax.set_zticks([i * LAYER_STEP for i in range(N_LAYERS)])      # type: ignore[union-attr]
+    ax.set_zticklabels([f"L{i}" for i in range(N_LAYERS)])        # type: ignore[union-attr]
+    ax.set_title(  # type: ignore[union-attr]
+        f"As-Printed vs As-Designed — 3D Tube View  ·  {exp_data.code}\n"
+        f"design={design}   material={material}   speed={speed:.1f} mm/s\n"
+        f"Blue wireframe = designed   Solid = as-printed   Colour = deviation   "
+        f"y ×{Y_SCALE:.0f} for visibility",
+        pad=12, fontsize=10,
+    )
+    ax.view_init(elev=28, azim=-62)  # type: ignore[union-attr]
+    _save_and_show("path_comparison_3d")
+
+
+# ── Phase 1: Volumetric filament close-up ─────────────────────────────────────
+
+def plot_filament_volume(
+    exp_data: ExperimentData,
+    camera: Any,
+    params: Dict[str, Any],
+) -> None:
+    """Close-up 3D filament volume: designed (grey wireframe) vs as-printed (coloured solid).
+
+    Focuses on two middle segments of layers 0 and 4. The y-axis is scaled ×3 for
+    visibility — the physical deviation is smaller than the filament diameter, so
+    this exaggeration lets the lateral offset read clearly in 3D space.
+    Deviation arrows mark the centreline offset at the midpoint of each segment.
+    """
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    SEG_LENGTH   = 0.04      # 5 pts × 0.01 m spacing
+    SEG_GAP      = 0.008
+    SHOW_SEGS    = [1, 2]    # middle two segments — highest curvature
+    SHOW_LAYERS  = [0, 4]    # first vs last layer
+    LAYER_STEP   = 0.022     # vertical gap between the two displayed layers
+    Y_SCALE      = 3.0       # exaggerate y for visibility
+
+    sample_data  = camera.get_segment_data(params, 0, SHOW_SEGS[0])
+    radius       = float(np.mean(sample_data["width_readings"])) / 2.0
+
+    all_devs: List[float] = []
+    for li in SHOW_LAYERS:
+        for si in SHOW_SEGS:
+            d = camera.get_segment_data(params, li, si)
+            for mp, dp in zip(d["measured_path"], d["designed_path"]):
+                all_devs.append(abs(mp[1] - dp[1]) * Y_SCALE)
+    vmax = max(all_devs) * 1.2 if all_devs else 1e-4
+    norm = Normalize(vmin=0.0, vmax=vmax / Y_SCALE)   # colormap in real units
+    cmap = plt.cm.RdYlGn_r  # type: ignore[attr-defined]
+
+    fig = plt.figure(figsize=(13, 7))
+    ax  = fig.add_subplot(111, projection="3d")
+
+    for row_idx, li in enumerate(SHOW_LAYERS):
+        z_center = row_idx * LAYER_STEP
+        # x offset: start from second segment position
+        x_start = SHOW_SEGS[0] * (SEG_LENGTH + SEG_GAP)
+        x_off   = 0.0
+
+        for si in SHOW_SEGS:
+            d      = camera.get_segment_data(params, li, si)
+            dp     = d["designed_path"]
+            mp     = d["measured_path"]
+            widths = d["width_readings"]
+
+            seg_radius = float(np.mean(widths)) / 2.0
+
+            xs         = [p[0] + x_off for p in dp]
+            ys_des     = [0.0] * len(dp)
+            ys_meas_r  = [p[1] for p in mp]                         # real
+            ys_meas_v  = [y * Y_SCALE for y in ys_meas_r]           # visual (scaled)
+
+            mean_dev   = float(np.mean([abs(ym) for ym in ys_meas_r]))
+            tube_color = cmap(norm(mean_dev))
+
+            # Designed — blue wireframe ghost
+            Xd, Yd, Zd = _make_filament_tube(xs, ys_des,    z_center, seg_radius, n_circ=22)
+            ax.plot_wireframe(  # type: ignore[union-attr]
+                Xd, Yd, Zd, color="#4488CC", alpha=0.50, linewidth=0.6,
+                rstride=3, cstride=1,
+            )
+            ax.plot(  # type: ignore[union-attr]
+                xs, ys_des, [z_center] * len(xs),
+                color="#AACCFF", linestyle="--", linewidth=1.2, alpha=0.85, zorder=5,
+            )
+
+            # Measured — solid coloured tube (y-scaled)
+            Xm, Ym, Zm = _make_filament_tube(xs, ys_meas_v, z_center, seg_radius, n_circ=28)
+            ax.plot_surface(  # type: ignore[union-attr]
+                Xm, Ym, Zm,
+                color=tube_color, alpha=0.90, linewidth=0, antialiased=True, shade=True,
+            )
+            ax.plot(  # type: ignore[union-attr]
+                xs, ys_meas_v, [z_center] * len(xs),
+                color="#222222", linewidth=0.7, alpha=0.6, zorder=5,
+            )
+
+            # Deviation arrow at segment midpoint (above tube, z_center+seg_radius)
+            mid      = len(xs) // 2
+            x_mid    = xs[mid]
+            y_meas_m = ys_meas_v[mid]
+            z_arrow  = z_center + seg_radius * 1.1   # sit just above the tube
+            if abs(y_meas_m) > 1e-6:
+                ax.quiver(  # type: ignore[union-attr]
+                    x_mid, 0.0, z_arrow,
+                    0, y_meas_m, 0,
+                    color="#FF2222", linewidth=2.0, arrow_length_ratio=0.25,
+                    alpha=0.95,
+                )
+
+            x_off += SEG_LENGTH + SEG_GAP
+
+        # Layer annotations omitted — z-tick labels already identify L0 / L4
+
+    # Box aspect: x wide, y and z enlarged relative to data
+    ax.set_box_aspect([5, 2.5, 2.0])  # type: ignore[union-attr]
+
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cb = fig.colorbar(sm, ax=ax, pad=0.09, shrink=0.50, aspect=16)
+    cb.set_label("Path Deviation [m]  (real)", fontsize=9)
+
+    design   = params.get("design",      "?")
+    material = params.get("material",    "?")
+    speed    = params.get("print_speed", 0.0)
+    water    = params.get("water_ratio", 0.0)
+
+    ax.set_xlabel("Along-path [m]",          labelpad=10, fontsize=9)  # type: ignore[union-attr]
+    ax.set_ylabel(f"Lateral offset [m ×{Y_SCALE:.0f}]", labelpad=10, fontsize=9)  # type: ignore[union-attr]
+    ax.set_zticks([i * LAYER_STEP for i in range(len(SHOW_LAYERS))])  # type: ignore[union-attr]
+    ax.set_zticklabels([f"L{li}" for li in SHOW_LAYERS])               # type: ignore[union-attr]
+    ax.set_title(  # type: ignore[union-attr]
+        f"Filament Volume — Segments 1 & 2 · Layers 0 vs 4  ·  {exp_data.code}\n"
+        f"design={design}   material={material}   speed={speed:.1f} mm/s   "
+        f"water_ratio={water:.2f}\n"
+        f"Wireframe = designed   Solid = as-printed   "
+        f"Red arrows = deviation (y ×{Y_SCALE:.0f} for visibility)",
+        pad=12, fontsize=9,
+    )
+    ax.view_init(elev=18, azim=-72)  # type: ignore[union-attr]
+    _save_and_show("filament_volume")
