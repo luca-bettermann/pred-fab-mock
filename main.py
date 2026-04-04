@@ -2,9 +2,9 @@
 
 Phases:
   0 — Setup
-  1 — Baseline (8 experiments)
+  1 — Baseline (4 experiments)
   2 — Initial Training
-  3 — Exploration (4 rounds)
+  3 — Exploration (6 rounds)
   4 — Inference (3 rounds, with design intent fixed)
   5 — Online Adaptation (layer-by-layer)
 """
@@ -31,11 +31,13 @@ from visualization import (
     plot_parameter_space,
     plot_performance_trajectory,
     plot_adaptation,
+    plot_inference_convergence,
     print_phase_header,
     print_section,
     print_experiment_row,
     print_phase_summary,
     print_adaptation_row,
+    print_run_summary,
     print_done,
 )
 
@@ -104,10 +106,15 @@ def main() -> None:
 
     print_phase_summary(baseline_log)
     plot_path_comparison(baseline_exps[-1], fab.camera, last_params)
+    print_section("→ path_comparison.png  —  per-layer measured vs designed path with deviation fill")
     plot_path_comparison_3d(baseline_exps[-1], fab.camera, last_params)
+    print_section("→ path_comparison_3d.png  —  3D tube stack, layer drift shown by green→red colour")
     plot_filament_volume(baseline_exps[-1], fab.camera, last_params)
+    print_section("→ filament_volume.png  —  close-up cylindrical filament, designed ghost vs as-printed")
     plot_feature_heatmaps(baseline_exps[-1])
+    print_section("→ feature_heatmaps.png  —  path_deviation and energy_per_segment over all layers/segments")
     plot_physics_landscape(last_params)
+    print_section("→ physics_landscape.png  —  U-shaped deviation vs speed, actual and optimal speed marked")
 
     # ── Phase 2: Initial Training ──────────────────────────────────────────────
     print_phase_header(2, "Initial Training",
@@ -117,6 +124,7 @@ def main() -> None:
     agent.train(datamodule, validate=True)
     print_section("Training complete — plotting prediction accuracy")
     plot_prediction_accuracy(agent, datamodule)
+    print_section("→ prediction_accuracy.png  —  predicted vs actual scatter with R² for both models")
 
     # Tracking lists for Phase 3/4
     all_params: List[Dict[str, Any]] = [params_from_spec(s) for s in baseline_specs]
@@ -151,6 +159,7 @@ def main() -> None:
 
     print_phase_summary(explore_log)
     plot_parameter_space(all_params, all_phases, perf_history)
+    print_section("→ parameter_space.png  —  water_ratio vs speed scatter, coloured by score, phase/design encoded")
 
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
     DESIGN_INTENT = {"design": "B", "material": "flexible"}
@@ -182,6 +191,9 @@ def main() -> None:
     prev_params = params
     print_phase_summary(infer_log)
     plot_performance_trajectory(perf_history, all_phases, exp_codes=all_codes)
+    print_section("→ performance_trajectory.png  —  score history across all phases with phase bands")
+    plot_inference_convergence(infer_log, DESIGN_INTENT)
+    print_section("→ inference_convergence.png  —  physics score landscape with inference trajectory")
 
     # ── Phase 5: Online Adaptation ─────────────────────────────────────────────
     print_phase_header(5, "Online Adaptation",
@@ -244,6 +256,23 @@ def main() -> None:
     ]
 
     plot_adaptation(layer_speeds, layer_deviations, no_adapt_deviations=fixed_dev)
+    print_section("→ adaptation.png  —  adapted speed vs counterfactual deviation, layer-by-layer")
+
+    # Physics optimum for the inference intent (minimum-deviation speed at material's optimal water_ratio)
+    from sensors.physics import (  # type: ignore[import-not-found]
+        DELTA, THETA, DESIGN_COMPLEXITY, MATERIAL_VISCOSITY, KAPPA, W_OPTIMAL_WATER,
+    )
+    _di = DESIGN_INTENT
+    _complexity = DESIGN_COMPLEXITY[str(_di["design"])]
+    _viscosity  = MATERIAL_VISCOSITY[str(_di["material"])]
+    _w_opt      = W_OPTIMAL_WATER[str(_di["material"])]
+    _spd_opt    = float(np.clip(
+        np.sqrt(THETA * _viscosity / (DELTA * _complexity * 1.0)), 20.0, 60.0
+    ))
+    print_run_summary(
+        perf_history, all_phases, all_codes, DESIGN_INTENT,
+        phys_opt_speed=_spd_opt, phys_opt_water=_w_opt,
+    )
 
     print_done()
 

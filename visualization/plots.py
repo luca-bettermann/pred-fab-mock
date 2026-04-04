@@ -725,3 +725,115 @@ def plot_filament_volume(
     )
     ax.view_init(elev=18, azim=-72)  # type: ignore[union-attr]
     _save_and_show("filament_volume")
+
+
+# ── Phase 4: Inference convergence ───────────────────────────────────────────
+
+def plot_inference_convergence(
+    infer_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]],
+    design_intent: Dict[str, Any],
+) -> None:
+    """2D parameter space for the inference intent showing optimizer convergence.
+
+    Background contour: combined physics score (deviation + energy) across
+    (water_ratio, print_speed) for the fixed design and material. The 3 inference
+    experiments are plotted as a connected trajectory. The physics optimum (minimum
+    deviation, ignoring energy) is marked as a white star. Together these show whether
+    the model converged toward the true optimum and how quickly.
+    """
+    from sensors.physics import (  # type: ignore[import-not-found]
+        path_deviation as _phys_dev,
+        energy_per_segment as _phys_eng,
+        DELTA, THETA, DESIGN_COMPLEXITY, MATERIAL_VISCOSITY, KAPPA, W_OPTIMAL_WATER,
+    )
+
+    design   = str(design_intent.get("design",   "B"))
+    material = str(design_intent.get("material", "flexible"))
+
+    # Physics background grid
+    n_grid = 50
+    water_vals = np.linspace(0.30, 0.50, n_grid)
+    speed_vals = np.linspace(20.0, 60.0, n_grid)
+    W, S = np.meshgrid(water_vals, speed_vals)
+
+    N_SEGS = 4
+    dev_grid = np.zeros_like(W)
+    eng_grid = np.zeros_like(W)
+    for i in range(n_grid):
+        for j in range(n_grid):
+            spd, w = float(S[i, j]), float(W[i, j])
+            dev_grid[i, j] = float(np.mean([
+                _phys_dev(spd, design, si, w, material, layer_idx=0)
+                for si in range(N_SEGS)
+            ]))
+            eng_grid[i, j] = float(np.mean([
+                _phys_eng(spd, material, si, 0)
+                for si in range(N_SEGS)
+            ]))
+
+    # Normalise each to [0,1] then combine
+    def _norm01(arr: np.ndarray) -> np.ndarray:
+        lo, hi = arr.min(), arr.max()
+        return (arr - lo) / (hi - lo + 1e-12)
+
+    acc_grid  = 1.0 - _norm01(dev_grid)   # higher = less deviation = better
+    eff_grid  = 1.0 - _norm01(eng_grid)   # higher = less energy = better
+    combined  = 0.5 * acc_grid + 0.5 * eff_grid
+
+    # Theoretical optimal speed at the material's best water_ratio
+    w_opt      = W_OPTIMAL_WATER[material]
+    complexity = DESIGN_COMPLEXITY[design]
+    viscosity  = MATERIAL_VISCOSITY[material]
+    flow_opt   = max(0.1, 1.0 - KAPPA * (w_opt - w_opt) ** 2)  # = 1.0
+    spd_opt    = float(np.clip(np.sqrt(THETA * viscosity / (DELTA * complexity * flow_opt)), 20.0, 60.0))
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    intent_str = f"design={design}   material={material}"
+    fig.suptitle(
+        f"Inference Convergence  ·  {intent_str}\n"
+        f"Background = combined physics score (path accuracy + energy efficiency)",
+        fontsize=11, fontweight="bold",
+    )
+
+    cf = ax.contourf(W, S, combined, levels=30, cmap="RdYlGn", alpha=0.85)
+    ax.contour(W, S, combined, levels=8, colors="white", alpha=0.18, linewidths=0.5)
+    cb = fig.colorbar(cf, ax=ax, pad=0.02)
+    cb.set_label("Combined Score [0–1]", fontsize=9)
+
+    # Physics optimum star
+    ax.scatter([w_opt], [spd_opt], marker="*", s=350, color="white",
+               edgecolors="#333333", linewidths=0.8, zorder=10,
+               label=f"Physics optimum  (w={w_opt:.2f}, spd={spd_opt:.1f})")
+
+    # Inference trajectory
+    ws    = [p.get("water_ratio", 0.0) for _, p, _ in infer_log]
+    spds  = [p.get("print_speed",  0.0) for _, p, _ in infer_log]
+    codes = [c for c, _, _ in infer_log]
+    perfs = [pf for _, _, pf in infer_log]
+
+    for i, (w, spd, code, perf) in enumerate(zip(ws, spds, codes, perfs)):
+        comb_val = 0.5 * perf.get("path_accuracy", 0.0) + 0.5 * perf.get("energy_efficiency", 0.0)
+        ax.scatter([w], [spd], s=100, marker="D",
+                   color=_PHASE_COLORS["inference"],
+                   edgecolors="white", linewidths=0.8, zorder=9)
+        ax.annotate(
+            f"{code}\n({comb_val:.2f})",
+            (w, spd), xytext=(7, 5), textcoords="offset points",
+            fontsize=7, color="white", fontweight="bold",
+        )
+        if i > 0:
+            ax.annotate(
+                "", xy=(ws[i], spds[i]), xytext=(ws[i - 1], spds[i - 1]),
+                arrowprops=dict(arrowstyle="-|>", color="white", lw=1.6),
+            )
+
+    ax.scatter([], [], marker="D", color=_PHASE_COLORS["inference"],
+               edgecolors="white", linewidths=0.8, label="Inference experiments")
+
+    ax.set_xlabel("Water Ratio",        fontsize=10)
+    ax.set_ylabel("Print Speed [mm/s]", fontsize=10)
+    ax.set_xlim(0.30, 0.50)
+    ax.set_ylim(20.0, 60.0)
+    ax.legend(fontsize=8, loc="lower right")
+    ax.grid(True, alpha=0.15)
+    _save_and_show("inference_convergence")
