@@ -20,9 +20,10 @@ _PHASE_COLORS = {"baseline": "#4C72B0", "exploration": "#DD8452", "inference": "
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
-def _save_and_show(name: str) -> None:
+def _save(path: str) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     plt.tight_layout()
-    plt.savefig(f"./plots/{name}.png", dpi=120, bbox_inches="tight")
+    plt.savefig(path, dpi=120, bbox_inches="tight")
     plt.close()
 
 
@@ -70,6 +71,7 @@ def plot_path_comparison(
     exp_data: ExperimentData,
     camera: Any,
     params: Dict[str, Any],
+    save_dir: str = "./plots/phase_1_baseline",
 ) -> None:
     """Per-layer 2D grid: designed (grey dashed at y=0) vs as-printed (coloured by deviation).
 
@@ -148,12 +150,12 @@ def plot_path_comparison(
     cb.set_label("Mean deviation [m]", fontsize=8)
     cb.ax.tick_params(labelsize=7)
 
-    _save_and_show("path_comparison")
+    _save(os.path.join(save_dir, "path_comparison.png"))
 
 
 # ── Phase 1: Physics landscape ────────────────────────────────────────────────
 
-def plot_physics_landscape(params: Dict[str, Any]) -> None:
+def plot_physics_landscape(params: Dict[str, Any], save_dir: str = "./plots/phase_1_baseline") -> None:
     """U-shaped deviation vs print_speed curve for the experiment's conditions.
 
     Shows where the actual experiment speed sits relative to the theoretical optimum.
@@ -218,12 +220,12 @@ def plot_physics_landscape(params: Dict[str, Any]) -> None:
     ax.legend(fontsize=8, loc="upper right")
     ax.grid(True, alpha=0.25)
 
-    _save_and_show("physics_landscape")
+    _save(os.path.join(save_dir, "physics_landscape.png"))
 
 
 # ── Phase 1: Feature heatmaps ─────────────────────────────────────────────────
 
-def plot_feature_heatmaps(exp_data: ExperimentData) -> None:
+def plot_feature_heatmaps(exp_data: ExperimentData, save_dir: str = "./plots/phase_1_baseline") -> None:
     """2-panel (5×4) heatmaps of path_deviation and energy_per_segment with value labels."""
     n_layers, n_segments = 5, 4
     features_cfg = [
@@ -247,12 +249,12 @@ def plot_feature_heatmaps(exp_data: ExperimentData) -> None:
         plt.colorbar(im, ax=ax, fraction=0.04, pad=0.04)
         _annotate_heatmap(ax, grid)
 
-    _save_and_show("feature_heatmaps")
+    _save(os.path.join(save_dir, "feature_heatmaps.png"))
 
 
 # ── Phase 2: Prediction accuracy ─────────────────────────────────────────────
 
-def plot_prediction_accuracy(agent: PfabAgent, datamodule: DataModule) -> None:
+def plot_prediction_accuracy(agent: PfabAgent, datamodule: DataModule, save_dir: str = "./plots/phase_2_training") -> None:
     """Scatter of predicted vs actual for both output features with R² annotation."""
     from sklearn.metrics import r2_score
     from pred_fab.utils import SplitType  # type: ignore[attr-defined]
@@ -303,7 +305,7 @@ def plot_prediction_accuracy(agent: PfabAgent, datamodule: DataModule) -> None:
         ax.set_xlim(lim); ax.set_ylim(lim)
         ax.legend(fontsize=8)
 
-    _save_and_show("prediction_accuracy")
+    _save(os.path.join(save_dir, "prediction_accuracy.png"))
 
 
 # ── Phase 3: Parameter space ──────────────────────────────────────────────────
@@ -312,6 +314,7 @@ def plot_parameter_space(
     all_params: List[Dict[str, Any]],
     phases: List[str],
     perf_history: Optional[List[Tuple[Dict[str, Any], Dict[str, float]]]] = None,
+    save_dir: str = "./plots/phase_3_exploration",
 ) -> None:
     """2-D scatter of water_ratio vs print_speed.
 
@@ -388,7 +391,7 @@ def plot_parameter_space(
     ax.set_xlabel("Water Ratio",        fontsize=10)
     ax.set_ylabel("Print Speed [mm/s]", fontsize=10)
     ax.grid(True, alpha=0.25)
-    _save_and_show("parameter_space")
+    _save(os.path.join(save_dir, "parameter_space.png"))
 
 
 # ── Phase 4: Performance trajectory ──────────────────────────────────────────
@@ -397,6 +400,7 @@ def plot_performance_trajectory(
     exp_params_and_perf: List[Tuple[Dict[str, Any], Dict[str, float]]],
     phases: List[str],
     exp_codes: Optional[List[str]] = None,
+    save_dir: str = "./plots/phase_4_inference",
 ) -> None:
     """Dual-line plot with shaded phase bands, phase labels, and optional x-tick experiment codes."""
     path_acc   = [pp[1].get("path_accuracy",    float("nan")) for pp in exp_params_and_perf]
@@ -439,7 +443,7 @@ def plot_performance_trajectory(
     ax.set_xlim(0.5, len(xs) + 0.5)
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.25)
-    _save_and_show("performance_trajectory")
+    _save(os.path.join(save_dir, "performance_trajectory.png"))
 
 
 # ── Phase 5: Online adaptation ────────────────────────────────────────────────
@@ -448,6 +452,7 @@ def plot_adaptation(
     layer_speeds: List[float],
     deviations: List[float],
     no_adapt_deviations: Optional[List[float]] = None,
+    save_dir: str = "./plots/phase_5_adaptation",
 ) -> None:
     """Two stacked subplots: print_speed per layer (top) and path deviation (bottom).
 
@@ -489,7 +494,7 @@ def plot_adaptation(
     ax_dev.set_xticks(layers)
     ax_dev.set_xticklabels([f"L{i}" for i in layers])
 
-    _save_and_show("adaptation")
+    _save(os.path.join(save_dir, "adaptation.png"))
 
 
 # ── Phase 1: 3D tube comparison ───────────────────────────────────────────────
@@ -498,6 +503,7 @@ def plot_path_comparison_3d(
     exp_data: ExperimentData,
     camera: Any,
     params: Dict[str, Any],
+    save_dir: str = "./plots/phase_1_baseline",
 ) -> None:
     """3D stacked tube view: designed (grey wireframe) vs as-printed (coloured solid).
 
@@ -595,7 +601,7 @@ def plot_path_comparison_3d(
         pad=12, fontsize=10,
     )
     ax.view_init(elev=28, azim=-62)  # type: ignore[union-attr]
-    _save_and_show("path_comparison_3d")
+    _save(os.path.join(save_dir, "path_comparison_3d.png"))
 
 
 # ── Phase 1: Volumetric filament close-up ─────────────────────────────────────
@@ -604,6 +610,7 @@ def plot_filament_volume(
     exp_data: ExperimentData,
     camera: Any,
     params: Dict[str, Any],
+    save_dir: str = "./plots/phase_1_baseline",
 ) -> None:
     """Close-up 3D filament volume: designed (grey wireframe) vs as-printed (coloured solid).
 
@@ -724,7 +731,7 @@ def plot_filament_volume(
         pad=12, fontsize=9,
     )
     ax.view_init(elev=18, azim=-72)  # type: ignore[union-attr]
-    _save_and_show("filament_volume")
+    _save(os.path.join(save_dir, "filament_volume.png"))
 
 
 # ── Phase 4: Inference convergence ───────────────────────────────────────────
@@ -732,6 +739,7 @@ def plot_filament_volume(
 def plot_inference_convergence(
     infer_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]],
     design_intent: Dict[str, Any],
+    save_dir: str = "./plots/phase_4_inference",
 ) -> None:
     """2D parameter space for the inference intent showing optimizer convergence.
 
@@ -836,4 +844,129 @@ def plot_inference_convergence(
     ax.set_ylim(20.0, 60.0)
     ax.legend(fontsize=8, loc="lower right")
     ax.grid(True, alpha=0.15)
-    _save_and_show("inference_convergence")
+    _save(os.path.join(save_dir, "inference_convergence.png"))
+
+
+# ── Acquisition topology (exploration & inference) ────────────────────────────
+
+def plot_acquisition_topology(
+    agent: PfabAgent,
+    w_explore: float,
+    proposed: Dict[str, Any],
+    history: List[Dict[str, Any]],
+    fixed: Dict[str, Any],
+    label: str,
+    save_dir: str = "./plots",
+) -> None:
+    """3-panel acquisition landscape: performance | uncertainty | combined.
+
+    Evaluates the model on a 2D grid over (water_ratio, print_speed) with
+    design/material fixed. Marks existing experiments and the proposed next point.
+    Saved as ``{label}_topology.png`` inside save_dir.
+
+    Args:
+        agent: PfabAgent with fitted prediction and calibration systems.
+        w_explore: Exploration weight used for this step (for combined panel).
+        proposed: Parameter dict for the proposed next experiment.
+        history: List of all parameter dicts evaluated so far.
+        fixed: Dict with at least 'design', 'material', 'n_layers', 'n_segments'.
+        label: Short identifier (e.g. 'explore_03') for title and filename.
+        save_dir: Directory to save the plot.
+    """
+    dm = agent.calibration_system._active_datamodule  # type: ignore[attr-defined]
+    if dm is None:
+        return  # model not yet fitted
+
+    design   = str(fixed.get("design",     proposed.get("design",   "B")))
+    material = str(fixed.get("material",   proposed.get("material", "standard")))
+    n_layers = int(fixed.get("n_layers",   proposed.get("n_layers",   5)))
+    n_segs   = int(fixed.get("n_segments", proposed.get("n_segments", 4)))
+
+    N_W, N_S = 28, 28
+    water_grid = np.linspace(0.30, 0.50, N_W)
+    speed_grid = np.linspace(20.0, 60.0, N_S)
+    W_mesh, S_mesh = np.meshgrid(water_grid, speed_grid)
+
+    perf_grid  = np.zeros((N_S, N_W))
+    unc_grid   = np.zeros((N_S, N_W))
+
+    base_params = {
+        "design": design, "material": material,
+        "n_layers": n_layers, "n_segments": n_segs,
+    }
+
+    for si in range(N_S):
+        for wi in range(N_W):
+            p = {**base_params,
+                 "water_ratio": float(W_mesh[si, wi]),
+                 "print_speed": float(S_mesh[si, wi])}
+            try:
+                perf_dict = agent.calibration_system.perf_fn(p)
+                acc = float(perf_dict.get("path_accuracy",    0.0) or 0.0)
+                eff = float(perf_dict.get("energy_efficiency", 0.0) or 0.0)
+                perf_grid[si, wi] = 0.5 * acc + 0.5 * eff
+            except Exception:
+                perf_grid[si, wi] = 0.0
+            try:
+                X_norm = dm.params_to_array(p)
+                unc_grid[si, wi] = agent.pred_system.uncertainty(X_norm)
+            except Exception:
+                unc_grid[si, wi] = 1.0
+
+    combined_grid = (1.0 - w_explore) * perf_grid + w_explore * unc_grid
+
+    # ── Figure ────────────────────────────────────────────────────────────────
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig.suptitle(
+        f"Acquisition Topology — {label}  ·  design={design}  material={material}  "
+        f"w_explore={w_explore:.1f}",
+        fontsize=11, fontweight="bold",
+    )
+
+    panels = [
+        (axes[0], perf_grid,     "Performance (predicted)",    "YlGn",   False),
+        (axes[1], unc_grid,      "Uncertainty (evidence gap)", "PuBu",   False),
+        (axes[2], combined_grid, "Combined acquisition",       "RdYlGn", True),
+    ]
+
+    # History water/speed, filtered to those that match fixed design/material
+    hist_w   = [p["water_ratio"] for p in history
+                if p.get("design") == design and p.get("material") == material]
+    hist_spd = [p["print_speed"]  for p in history
+                if p.get("design") == design and p.get("material") == material]
+    # All history regardless of design/material (lighter markers)
+    all_w   = [p.get("water_ratio", 0.0) for p in history]
+    all_spd = [p.get("print_speed",  0.0) for p in history]
+
+    prop_w   = float(proposed.get("water_ratio", 0.0))
+    prop_spd = float(proposed.get("print_speed",  0.0))
+
+    for ax, grid, title, cmap_name, mark_proposed in panels:
+        cf = ax.contourf(W_mesh, S_mesh, grid, levels=24, cmap=cmap_name, alpha=0.92)
+        ax.contour(W_mesh, S_mesh, grid, levels=6, colors="white", alpha=0.20, linewidths=0.5)
+        fig.colorbar(cf, ax=ax, pad=0.02, fraction=0.045)
+
+        # All-history (faint)
+        if all_w:
+            ax.scatter(all_w, all_spd, s=18, color="white", alpha=0.35,
+                       edgecolors="#555555", linewidths=0.5, zorder=4)
+        # Same-design history (solid)
+        if hist_w:
+            ax.scatter(hist_w, hist_spd, s=40, color="#222222", alpha=0.85,
+                       edgecolors="white", linewidths=0.8, zorder=5,
+                       label="Evaluated (same design)")
+
+        if mark_proposed:
+            ax.scatter([prop_w], [prop_spd], s=160, marker="*", color="#FFD700",
+                       edgecolors="#333333", linewidths=0.8, zorder=10,
+                       label=f"Proposed  (w={prop_w:.2f}, spd={prop_spd:.1f})")
+            ax.legend(fontsize=7, loc="lower right")
+
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel("Water Ratio",        fontsize=9)
+        ax.set_ylabel("Print Speed [mm/s]", fontsize=9)
+        ax.set_xlim(0.30, 0.50)
+        ax.set_ylim(20.0, 60.0)
+        ax.grid(True, alpha=0.12)
+
+    _save(os.path.join(save_dir, f"{label}_topology.png"))

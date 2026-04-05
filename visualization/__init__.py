@@ -9,6 +9,7 @@ from .plots import (
     plot_performance_trajectory,
     plot_adaptation,
     plot_inference_convergence,
+    plot_acquisition_topology,
 )
 from .console import (
     print_phase_header,
@@ -31,6 +32,7 @@ __all__ = [
     "plot_performance_trajectory",
     "plot_adaptation",
     "plot_inference_convergence",
+    "plot_acquisition_topology",
     "print_phase_header",
     "print_section",
     "print_experiment_row",
