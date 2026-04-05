@@ -68,4 +68,4 @@ class EnergyFeatureModel(IFeatureModel):
     def _compute_feature_logic(
         self, data: Dict, params: Dict, visualize: bool = False, **dimensions: Any
     ) -> Dict[str, float]:
-        return {"energy_per_segment": data["energy_per_segment"]}
+        return {"energy_per_segment": float(data["energy_per_segment"])}

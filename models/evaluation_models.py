@@ -36,8 +36,8 @@ class PathAccuracyModel(IEvaluationModel):
 class EnergyConsumptionModel(IEvaluationModel):
     """Scores energy_per_segment against a target energy consumption."""
 
-    TARGET_ENERGY = 8.0   # J
-    MAX_ENERGY = 60.0     # J — energy at which score = 0
+    TARGET_ENERGY = 14.0  # J  — achieved at ~speed=35 mm/s, standard material
+    MAX_ENERGY = 40.0     # J  — max physically reachable (~speed=60, reinforced)
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)

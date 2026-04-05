@@ -8,15 +8,33 @@ DESIGN_SCALE = {"A": 0.9, "B": 1.0, "C": 1.1}
 MATERIAL_VISCOSITY = {"standard": 1.0, "reinforced": 1.4, "flexible": 0.7}
 MATERIAL_FACTOR = {"standard": 1.0, "reinforced": 1.05, "flexible": 0.95}
 
-# Physics constants
-ALPHA_OFFSET = 0.0035  # constant width offset (was ALPHA * fixed_layer_height)
-BETA = 0.008        # water_ratio contribution to width
-GAMMA = 0.0002      # inverse print_speed contribution to width
-DELTA = 0.000030    # print_speed contribution to deviation [m / (mm/s)]
-ZETA = 0.000400     # design complexity contribution to deviation [m per unit]
-LAYER_DRIFT = 0.000150  # m/layer — path drift from material settling per layer
-ETA = 1.0           # base energy per segment [J]
-PHI = 0.35          # print_speed contribution to energy [J / (mm/s)]
+# Physics constants — filament width
+ALPHA_OFFSET = 0.0035  # constant width offset
+BETA = 0.008           # water_ratio contribution to width
+GAMMA = 0.0002         # inverse print_speed contribution to width
+
+# Physics constants — path deviation (U-shaped speed response)
+# Two competing error sources:
+#   deviation_speed = DELTA * print_speed * complexity * curvature   (inertia / overshoot)
+#   deviation_sag   = THETA * viscosity / (print_speed * flow) * curvature  (low-speed droop)
+# Optimal speed = sqrt(THETA * viscosity / (DELTA * complexity * flow)), varies by design+material.
+DELTA = 0.000011       # high-speed inertia coefficient [m / (mm/s · complexity)]
+THETA = 0.029          # low-speed sag coefficient [m · mm/s / viscosity]
+LAYER_DRIFT = 0.000150 # m/layer — gradual path drift from material settling
+
+# Flowability: how well the material flows at a given water_ratio.
+# flow = max(0.1, 1 − KAPPA · (water_ratio − w_opt)²)
+# Too little or too much water degrades flow; the optimum varies by material.
+KAPPA = 20.0
+W_OPTIMAL_WATER = {
+    "flexible":   0.44,   # low viscosity — benefits from more water
+    "standard":   0.40,   # balanced
+    "reinforced": 0.36,   # high viscosity — too much water hurts stiffness
+}
+
+# Physics constants — energy
+ETA = 1.0    # base energy per segment [J]
+PHI = 0.35   # print_speed contribution to energy [J / (mm/s)]
 
 
 def segment_curvature(segment_idx: int) -> float:
@@ -40,17 +58,33 @@ def path_deviation(
     print_speed: float,
     design: str,
     segment_idx: int,
+    water_ratio: float,
+    material: str,
     layer_idx: int = 0,
 ) -> float:
     """Deterministic lateral path deviation [m].
 
-    Deviation scales linearly with print_speed and design complexity.
-    LAYER_DRIFT adds a per-layer offset simulating gradual material settling.
+    Two competing error sources create a U-shaped speed response:
+    - High-speed inertia error: grows with print_speed × design complexity.
+    - Low-speed sag error: material droops when extruded slowly; grows with
+      material viscosity / (print_speed × flowability).
+
+    The optimal speed is in the interior of the operating range and varies by
+    design complexity, material viscosity, and water_ratio (via flowability).
+    Using too little or too much water degrades flowability, raising deviation
+    at all speeds and shifting the optimal speed upward.
+
+    Optimal speed formula (ignoring curvature):
+        spd_opt = sqrt(THETA × viscosity / (DELTA × complexity × flow))
     """
     complexity = DESIGN_COMPLEXITY[design]
+    viscosity = MATERIAL_VISCOSITY[material]
     curv = segment_curvature(segment_idx)
-    base = (DELTA * print_speed + ZETA * complexity) * curv
-    return base + LAYER_DRIFT * layer_idx
+    w_opt = W_OPTIMAL_WATER[material]
+    flow = max(0.1, 1.0 - KAPPA * (water_ratio - w_opt) ** 2)
+    deviation_speed = DELTA * print_speed * complexity * curv
+    deviation_sag = THETA * viscosity / (print_speed * flow) * curv
+    return deviation_speed + deviation_sag + LAYER_DRIFT * layer_idx
 
 
 def energy_per_segment(

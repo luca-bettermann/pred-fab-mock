@@ -7,7 +7,7 @@ from sensors.camera import CameraSystem
 from sensors.energy import EnergySensor
 from models.feature_models import PrintingFeatureModel, EnergyFeatureModel
 from models.evaluation_models import PathAccuracyModel, EnergyConsumptionModel
-from models.prediction_model import PrintingPredictionModel
+from models.prediction_model import DeviationPredictionModel, EnergyPredictionModel
 
 
 def build_agent(
@@ -23,7 +23,8 @@ def build_agent(
     agent.register_feature_model(EnergyFeatureModel, energy_sensor=energy_sensor)
     agent.register_evaluation_model(PathAccuracyModel)
     agent.register_evaluation_model(EnergyConsumptionModel)
-    agent.register_prediction_model(PrintingPredictionModel)
+    agent.register_prediction_model(DeviationPredictionModel)
+    agent.register_prediction_model(EnergyPredictionModel)
 
     # Initialize all systems against the schema
     agent.initialize_systems(schema, verbose_flag=True)

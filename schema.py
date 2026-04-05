@@ -42,8 +42,6 @@ def build_schema() -> DatasetSchema:
         Feature.array("path_deviation",     domain=spatial),
         Feature.array("energy_per_segment", domain=spatial),
     ])
-    # COMMENT: can we have energy per layer instead, and use the depth argument for it?
-
     # --- Performance ---
     performance = PerformanceAttributes([
         PerformanceAttribute.score("path_accuracy"),
@@ -59,6 +57,5 @@ def build_schema() -> DatasetSchema:
         domains=domains,
     )
 
-# COMMENT: I am getting these warnings below in my logger:
-# 2026-03-30 16:26:06,360 - WARNING - warning:65 - The following codes are defined in the schema but not used by any model: {'n_segments', 'n_layers'}
-# 2026-03-30 16:26:07,256 - WARNING - warning:65 - The following codes are defined in the schema but not used by any model: {'layer_width'}
+# Note: layer_width has no evaluation model (no width-accuracy metric), so a
+# "layer_width unused" warning is expected and intentional.

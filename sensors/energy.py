@@ -20,10 +20,8 @@ class EnergySensor:
         self._cache: Dict[Tuple, Dict] = {}
 
     def _cache_key(self, params: Dict[str, Any], layer_idx: int, segment_idx: int) -> Tuple:
-        # layer_height is derived from design, so design already uniquely identifies it.
         return (
-            params["water_ratio"], params["print_speed"],
-            params["design"], params["material"],
+            params["print_speed"], params["design"], params["material"],
             layer_idx, segment_idx,
         )
 
@@ -44,21 +42,13 @@ class EnergySensor:
     def _simulate_segment(
         self, params: Dict[str, Any], layer_idx: int, segment_idx: int
     ) -> Dict:
-        # Deterministic energy + noise — 10 Hz power readings over segment duration
+        # Deterministic energy + noise
         e = physics_energy(
-            params["print_speed"], params["layer_height"],
-            params["material"], params["layer_time"],
+            params["print_speed"], params["material"],
+            segment_idx=segment_idx, layer_idx=layer_idx,
         )
-        segment_duration = float(params["layer_time"]) / 4.0
-        n_samples = max(1, int(segment_duration * 10))
-        avg_power = e / segment_duration
-        power_readings = [
-            avg_power + self._rng.normal(0, self.NOISE_ENERGY / segment_duration)
-            for _ in range(n_samples)
-        ]
-        # Pre-compute energy_per_segment so feature models don't need layer_time
-        energy_per_segment = float(np.mean(power_readings)) * segment_duration
-        return {"power_readings": power_readings, "energy_per_segment": energy_per_segment}
+        energy_noisy = e + self._rng.normal(0, self.NOISE_ENERGY)
+        return {"energy_per_segment": float(max(0.0, energy_noisy))}
 
     def get_segment_energy(
         self, params: Dict[str, Any], layer_idx: int, segment_idx: int
