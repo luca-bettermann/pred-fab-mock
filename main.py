@@ -110,8 +110,8 @@ def main() -> None:
     dataset = Dataset(schema=schema)
 
     # ── Phase 1: Baseline ─────────────────────────────────────────────────────
-    _n_baseline    = 2 if QUICK_TEST else 4
-    _n_explore     = 2 if QUICK_TEST else 6
+    _n_baseline    = 2 if QUICK_TEST else 20
+    _n_explore     = 2 if QUICK_TEST else 10
     _n_infer       = 1 if QUICK_TEST else 3
     print_phase_header(1, "Baseline Sampling",
                        f"{_n_baseline} Latin-hypercube experiments — no model yet, space-filling only")
@@ -122,7 +122,6 @@ def main() -> None:
 
     baseline_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
     baseline_exps = []
-    last_params: Dict[str, Any] = {}
 
     for i, spec in enumerate(baseline_specs):
         params   = _with_dimensions(params_from_spec(spec), fab)
@@ -131,15 +130,14 @@ def main() -> None:
         perf     = get_performance(exp_data)
         baseline_exps.append(exp_data)
         baseline_log.append((exp_code, params, perf))
-        last_params = params
         print_experiment_row(exp_code, params, perf)
 
     print_phase_summary(baseline_log)
-    plot_path_comparison(baseline_exps[-1], fab.camera, last_params, save_dir=_D1)
-    plot_path_comparison_3d(baseline_exps[-1], fab.camera, last_params, save_dir=_D1)
-    plot_filament_volume(baseline_exps[-1], fab.camera, last_params, save_dir=_D1)
+    plot_path_comparison(baseline_exps[-1], fab.camera, params, save_dir=_D1)
+    plot_path_comparison_3d(baseline_exps[-1], fab.camera, params, save_dir=_D1)
+    plot_filament_volume(baseline_exps[-1], fab.camera, params, save_dir=_D1)
     plot_feature_heatmaps(baseline_exps[-1], save_dir=_D1)
-    plot_physics_landscape(last_params, save_dir=_D1)
+    plot_physics_landscape(params, save_dir=_D1)
     plot_physics_topology(save_dir=_D1)
     plot_baseline_scatter(baseline_log, save_dir=_D1)
     print_section(f"7 plots saved to {_D1}/")
