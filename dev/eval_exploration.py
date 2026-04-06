@@ -62,8 +62,8 @@ FEATURE_PERF_MAP: Dict[str, str] = {
     "production_rate":   "production_rate",
 }
 
-DATA_ROOT     = "./dev_data"
-PLOT_DIR      = "./dev_plots"
+DATA_ROOT     = "./dev/data"
+PLOT_DIR      = "./dev/plots"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

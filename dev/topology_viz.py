@@ -5,7 +5,7 @@ topology_viz.py — visualise evidence, performance and combined acquisition lan
 Figure 1: bandwidth comparison (Silverman vs narrow) with sharpness γ, N fixed.
 Figure 2: dynamic bandwidth h = c/√N — how the landscape evolves as data accumulates.
 
-Run: uv run python topology_viz.py
+Run: uv run python dev/topology_viz.py  (from repo root)
 """
 
 import os

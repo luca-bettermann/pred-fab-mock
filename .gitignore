@@ -3,9 +3,12 @@ build
 __pycache__/
 **/__pycache__/
 *.pyc
-pfab_data/
-plots/
+.DS_Store
 
-# Ignore all local data
-logs/
-local/
+# Runtime data
+pfab_data/
+
+# Generated plots and data (main workflow + dev scripts)
+plots/
+dev/plots/
+dev/data/
