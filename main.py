@@ -106,11 +106,12 @@ def main() -> None:
     dataset = Dataset(schema=schema)
 
     # ── Phase 1: Baseline ─────────────────────────────────────────────────────
+    n_baseline_exps = 10
     print_phase_header(1, "Baseline Sampling",
-                       "4 Latin-hypercube experiments — no model yet, space-filling only")
+                       f"{n_baseline_exps} Latin-hypercube experiments — no model yet, space-filling only")
 
     agent.logger.set_console_output(False)
-    baseline_specs = agent.baseline_step(n=4)
+    baseline_specs = agent.baseline_step(n=n_baseline_exps)
     agent.logger.set_console_output(True)
 
     baseline_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
@@ -157,13 +158,14 @@ def main() -> None:
     ]
 
     # ── Phase 3: Exploration ───────────────────────────────────────────────────
+    n_explore_rounds = 10
     print_phase_header(3, "Exploration",
-                       "6 rounds  (w_explore=0.7) — model guides search toward uncertain regions")
+                       f"{n_explore_rounds} rounds  (w_explore=0.7) — model guides search toward uncertain regions")
     prev_params = _with_dimensions(params_from_spec(baseline_specs[-1]), fab)
     explore_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
     W_EXPLORE = 0.7
 
-    for i in range(6):
+    for i in range(n_explore_rounds):
         agent.logger.set_console_output(False)
         spec = agent.exploration_step(datamodule, w_explore=W_EXPLORE)
         agent.logger.set_console_output(True)
@@ -220,15 +222,16 @@ def main() -> None:
     print_section(f"7 plots saved to {_D3}/")
 
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
+    n_inference_rounds = 3
     DESIGN_INTENT = {"design": "A", "material": "concrete"}
     print_phase_header(4, "Inference",
-                       f"3 rounds  ·  intent fixed: {DESIGN_INTENT}  ·  model optimises w_explore=0")
+                       f"{n_inference_rounds} rounds  ·  intent fixed: {DESIGN_INTENT}  ·  model optimises w_explore=0")
     agent.configure_calibration(fixed_params=DESIGN_INTENT)
     params = _with_dimensions({**prev_params, **DESIGN_INTENT}, fab)
 
     infer_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
 
-    for i in range(3):
+    for i in range(n_inference_rounds):
         exp_code = f"infer_{i+1:02d}"
         exp_data = dataset.create_experiment(exp_code, parameters=params)
         fab.run_experiment(params)
