@@ -10,6 +10,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 from pred_fab.core import ExperimentData, DataModule
 from pred_fab import PfabAgent
@@ -926,7 +927,7 @@ def plot_acquisition_topology(
     # ── Figure ────────────────────────────────────────────────────────────────
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
     fig.suptitle(
-        f"Acquisition Topology — {label}  ·  design={design}  material={material}  "
+        f"Exploration Topology — {label}  ·  design={design}  material={material}  "
         f"w_explore={w_explore:.1f}",
         fontsize=11, fontweight="bold",
     )
@@ -934,35 +935,44 @@ def plot_acquisition_topology(
     panels = [
         (axes[0], perf_grid,     "Performance (predicted)",    "YlGn",   False),
         (axes[1], unc_grid,      "Uncertainty (evidence gap)", "PuBu",   False),
-        (axes[2], combined_grid, "Combined acquisition",       "RdYlGn", True),
+        (axes[2], combined_grid, "Combined exploration",       "RdYlGn", True),
     ]
 
-    # History water/speed, filtered to those that match fixed design/material
-    hist_w   = [p["water_ratio"] for p in history
-                if p.get("design") == design and p.get("material") == material]
-    hist_spd = [p["print_speed"]  for p in history
-                if p.get("design") == design and p.get("material") == material]
-    # All history regardless of design/material (lighter markers)
-    all_w   = [p.get("water_ratio", 0.0) for p in history]
-    all_spd = [p.get("print_speed",  0.0) for p in history]
+    # Split history into same design+material vs others
+    same_set = [
+        p for p in history
+        if p.get("design") == design and p.get("material") == material
+    ]
+    other_set = [p for p in history if p not in same_set]
+
+    other_w   = [p.get("water_ratio", 0.0) for p in other_set]
+    other_spd = [p.get("print_speed",  0.0) for p in other_set]
+    same_w    = [p.get("water_ratio", 0.0) for p in same_set]
+    same_spd  = [p.get("print_speed",  0.0) for p in same_set]
 
     prop_w   = float(proposed.get("water_ratio", 0.0))
     prop_spd = float(proposed.get("print_speed",  0.0))
 
-    for ax, grid, title, cmap_name, mark_proposed in panels:
+    for panel_idx, (ax, grid, title, cmap_name, mark_proposed) in enumerate(panels):
         cf = ax.contourf(W_mesh, S_mesh, grid, levels=24, cmap=cmap_name, alpha=0.92)
         ax.contour(W_mesh, S_mesh, grid, levels=6, colors="white", alpha=0.20, linewidths=0.5)
         fig.colorbar(cf, ax=ax, pad=0.02, fraction=0.045)
 
-        # All-history (faint)
-        if all_w:
-            ax.scatter(all_w, all_spd, s=18, color="white", alpha=0.35,
-                       edgecolors="#555555", linewidths=0.5, zorder=4)
-        # Same-design history (solid)
-        if hist_w:
-            ax.scatter(hist_w, hist_spd, s=40, color="#222222", alpha=0.85,
-                       edgecolors="white", linewidths=0.8, zorder=5,
-                       label="Evaluated (same design)")
+        is_last = panel_idx == 2
+        # Other history — small grey open circles (context)
+        if other_w:
+            ax.scatter(
+                other_w, other_spd, s=18, c="white", edgecolors="#999999",
+                linewidths=0.8, alpha=0.5, zorder=4,
+                label="Evaluated (other)" if is_last else None,
+            )
+        # Same design+material history — filled black circles
+        if same_w:
+            ax.scatter(
+                same_w, same_spd, s=28, c="black", edgecolors="white",
+                linewidths=0.8, zorder=5,
+                label="Evaluated (same combo)" if is_last else None,
+            )
 
         if mark_proposed:
             ax.scatter([prop_w], [prop_spd], s=160, marker="*", color="#FFD700",
@@ -978,3 +988,168 @@ def plot_acquisition_topology(
         ax.grid(True, alpha=0.12)
 
     _save(os.path.join(save_dir, f"{label}_topology.png"))
+
+
+# ── Phase 1: Physics topology grid ────────────────────────────────────────────
+
+def plot_physics_topology(save_dir: str = "./plots/phase_1_baseline") -> None:
+    """4×4 grid showing true physics performance landscapes for all design+material combos.
+
+    Rows: (A,clay), (A,concrete), (B,clay), (B,concrete).
+    Columns: path_accuracy, energy_efficiency, production_rate, combined (2:1:1 weights).
+    Uses the physics functions directly — no ML model involved.
+    """
+    from sensors.physics import (  # type: ignore[import-not-found]
+        path_deviation as _phys_dev,
+        energy_per_segment as _phys_eng,
+    )
+    from models.evaluation_models import PathAccuracyModel, EnergyConsumptionModel, ProductionRateModel
+
+    COMBOS = [("A", "clay"), ("A", "concrete"), ("B", "clay"), ("B", "concrete")]
+    N_W, N_S = 20, 20
+    water_vals = np.linspace(0.30, 0.50, N_W)
+    speed_vals = np.linspace(20.0, 60.0, N_S)
+    W_mesh, S_mesh = np.meshgrid(water_vals, speed_vals)
+
+    max_dev  = PathAccuracyModel.MAX_DEVIATION
+    target_e = EnergyConsumptionModel.TARGET_ENERGY
+    max_e    = EnergyConsumptionModel.MAX_ENERGY
+    max_spd  = ProductionRateModel.MAX_SPEED
+
+    n_rows = len(COMBOS)
+    n_cols = 4
+    col_titles = ["Path Accuracy", "Energy Efficiency", "Production Rate", "Combined (2:1:1)"]
+    row_labels  = [f"{d}/{m}" for d, m in COMBOS]
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, 12))
+    fig.suptitle("Physics Performance Topology — All Design × Material Combos",
+                 fontsize=13, fontweight="bold")
+
+    col_cmaps = ["YlGn", "PuBu", "YlOrRd", "RdYlGn"]
+
+    # Precompute grids for each combo and column
+    for row_idx, (design, material) in enumerate(COMBOS):
+        acc_grid  = np.zeros((N_S, N_W))
+        eff_grid  = np.zeros((N_S, N_W))
+        rate_grid = np.zeros((N_S, N_W))
+
+        for si in range(N_S):
+            for wi in range(N_W):
+                spd = float(S_mesh[si, wi])
+                w   = float(W_mesh[si, wi])
+
+                # Path accuracy: avg deviation over 5 layers × 4 segments
+                devs = [
+                    _phys_dev(spd, design, seg_i, w, material, li)
+                    for li in range(5) for seg_i in range(4)
+                ]
+                avg_dev = float(np.mean(devs))
+                acc_grid[si, wi] = max(0.0, 1.0 - avg_dev / max_dev)
+
+                # Energy efficiency
+                energies = [
+                    _phys_eng(spd, material, design, w, seg_i, li)
+                    for li in range(5) for seg_i in range(4)
+                ]
+                avg_e = float(np.mean(energies))
+                eff_grid[si, wi] = max(0.0, 1.0 - abs(avg_e - target_e) / max_e)
+
+                # Production rate
+                rate_grid[si, wi] = spd / max_spd
+
+        combined_grid = (2 * acc_grid + eff_grid + rate_grid) / 4
+
+        grids = [acc_grid, eff_grid, rate_grid, combined_grid]
+        for col_idx, (grid, cmap_name) in enumerate(zip(grids, col_cmaps)):
+            ax = axes[row_idx, col_idx]
+            cf = ax.contourf(W_mesh, S_mesh, grid, levels=20, cmap=cmap_name, vmin=0.0, vmax=1.0)
+            ax.contour(W_mesh, S_mesh, grid, levels=5, colors="white", alpha=0.20, linewidths=0.4)
+            fig.colorbar(cf, ax=ax, pad=0.02, fraction=0.045)
+
+            if row_idx == 0:
+                ax.set_title(col_titles[col_idx], fontsize=10, fontweight="bold")
+            if col_idx == 0:
+                ax.set_ylabel(f"{row_labels[row_idx]}\nPrint Speed [mm/s]", fontsize=8)
+            else:
+                ax.set_ylabel("Print Speed [mm/s]", fontsize=8)
+            ax.set_xlabel("Water Ratio", fontsize=8)
+            ax.set_xlim(0.30, 0.50)
+            ax.set_ylim(20.0, 60.0)
+            ax.tick_params(labelsize=7)
+            ax.grid(True, alpha=0.10)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    _save(os.path.join(save_dir, "physics_topology.png"))
+
+
+# ── Phase 1: Baseline parameter scatter ───────────────────────────────────────
+
+def plot_baseline_scatter(
+    experiments: List[Tuple[str, Dict[str, Any], Dict[str, float]]],
+    save_dir: str = "./plots/phase_1_baseline",
+) -> None:
+    """3D scatter: z-axis = design+material combo (4 levels), x/y = water_ratio/print_speed.
+
+    Each experiment appears as a point on its design+material floor.
+    Point color = combined performance score (2:1:1 weights).
+    """
+    COMBOS = [("A", "clay"), ("A", "concrete"), ("B", "clay"), ("B", "concrete")]
+    combo_z = {combo: i for i, combo in enumerate(COMBOS)}
+    z_labels = [f"{d}/{m}" for d, m in COMBOS]
+
+    def _combined(perf: Dict[str, float]) -> float:
+        return (
+            2 * perf.get("path_accuracy",    0.0)
+            +   perf.get("energy_efficiency", 0.0)
+            +   perf.get("production_rate",   0.0)
+        ) / 4
+
+    xs, ys, zs, cs, labels_list = [], [], [], [], []
+    for code, params, perf in experiments:
+        design   = str(params.get("design",   "A"))
+        material = str(params.get("material", "clay"))
+        z = float(combo_z.get((design, material), 0))
+        xs.append(float(params.get("water_ratio", 0.0)))
+        ys.append(float(params.get("print_speed",  0.0)))
+        zs.append(z)
+        cs.append(_combined(perf))
+        labels_list.append(code)
+
+    fig = plt.figure(figsize=(11, 7))
+    ax  = fig.add_subplot(111, projection="3d")
+    fig.suptitle("Baseline Experiments — Parameter & Performance Scatter",
+                 fontsize=12, fontweight="bold")
+
+    # Semi-transparent floor planes at each z level
+    for z_level in range(len(COMBOS)):
+        xx = np.array([0.30, 0.50, 0.50, 0.30])
+        yy = np.array([20.0, 20.0, 60.0, 60.0])
+        zz = np.full(4, float(z_level))
+        verts = [list(zip(xx, yy, zz))]
+        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+        poly = Poly3DCollection(verts, alpha=0.06, facecolor="#888888", edgecolor="#999999")
+        ax.add_collection3d(poly)  # type: ignore[union-attr]
+
+    cmap = plt.cm.RdYlGn  # type: ignore[attr-defined]
+    sc = ax.scatter(  # type: ignore[union-attr]
+        xs, ys, zs,
+        c=cs, cmap=cmap, vmin=0.0, vmax=1.0,
+        s=80, edgecolors="white", linewidths=0.8, zorder=5,
+    )
+
+    for x, y, z, lbl in zip(xs, ys, zs, labels_list):
+        ax.text(x, y, z + 0.08, lbl, fontsize=7, ha="center", zorder=6)  # type: ignore[union-attr]
+
+    cb = fig.colorbar(sc, ax=ax, pad=0.12, shrink=0.55, aspect=18)
+    cb.set_label("Combined Score (2:1:1)", fontsize=9)
+
+    ax.set_xlabel("Water Ratio",        labelpad=8, fontsize=9)   # type: ignore[union-attr]
+    ax.set_ylabel("Print Speed [mm/s]", labelpad=8, fontsize=9)   # type: ignore[union-attr]
+    ax.set_zticks(list(range(len(COMBOS))))                        # type: ignore[union-attr]
+    ax.set_zticklabels(z_labels, fontsize=8)                       # type: ignore[union-attr]
+    ax.set_xlim(0.30, 0.50)  # type: ignore[union-attr]
+    ax.set_ylim(20.0, 60.0)  # type: ignore[union-attr]
+    ax.set_zlim(-0.3, len(COMBOS) - 0.7)  # type: ignore[union-attr]
+    ax.view_init(elev=20, azim=-55)  # type: ignore[union-attr]
+
+    _save(os.path.join(save_dir, "baseline_scatter.png"))

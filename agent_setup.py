@@ -5,9 +5,9 @@ from pred_fab.core import DatasetSchema
 
 from sensors.camera import CameraSystem
 from sensors.energy import EnergySensor
-from models.feature_models import PrintingFeatureModel, EnergyFeatureModel
-from models.evaluation_models import PathAccuracyModel, EnergyConsumptionModel
-from models.prediction_model import DeviationPredictionModel, EnergyPredictionModel
+from models.feature_models import PrintingFeatureModel, EnergyFeatureModel, ProductionRateFeatureModel
+from models.evaluation_models import PathAccuracyModel, EnergyConsumptionModel, ProductionRateModel
+from models.prediction_model import DeviationPredictionModel, EnergyPredictionModel, ProductionRatePredictionModel
 
 
 def build_agent(
@@ -21,10 +21,13 @@ def build_agent(
     # Register models
     agent.register_feature_model(PrintingFeatureModel, camera=camera)
     agent.register_feature_model(EnergyFeatureModel, energy_sensor=energy_sensor)
+    agent.register_feature_model(ProductionRateFeatureModel)
     agent.register_evaluation_model(PathAccuracyModel)
     agent.register_evaluation_model(EnergyConsumptionModel)
+    agent.register_evaluation_model(ProductionRateModel)
     agent.register_prediction_model(DeviationPredictionModel)
     agent.register_prediction_model(EnergyPredictionModel)
+    agent.register_prediction_model(ProductionRatePredictionModel)
 
     # Initialize all systems against the schema
     agent.initialize_systems(schema, verbose_flag=True)

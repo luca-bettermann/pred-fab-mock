@@ -1,5 +1,6 @@
 """Terminal pretty-printing for the PFAB showcase flow."""
 
+import math
 from typing import Dict, Any, List, Optional, Tuple
 
 # ANSI codes
@@ -47,18 +48,102 @@ def print_experiment_row(
     water    = params.get("water_ratio",  0.0)
     speed    = params.get("print_speed",  0.0)
 
-    acc = perf.get("path_accuracy",    float("nan"))
-    eff = perf.get("energy_efficiency", float("nan"))
+    acc  = perf.get("path_accuracy",    float("nan"))
+    eff  = perf.get("energy_efficiency", float("nan"))
+    rate = perf.get("production_rate",   float("nan"))
 
-    acc_str = f"{_score_color(acc)}{acc:.3f}{_R}"
-    eff_str = f"{_score_color(eff)}{eff:.3f}{_R}"
+    acc_str  = f"{_score_color(acc)}{acc:.3f}{_R}"
+    eff_str  = f"{_score_color(eff)}{eff:.3f}{_R}"
 
     meta = f"design={design}  mat={material}  w={water:.2f}  spd={speed:.1f}"
+    rate_part = ""
+    if not math.isnan(rate):
+        rate_str = f"{_score_color(rate)}{rate:.3f}{_R}"
+        rate_part = f"  rate={rate_str}"
     print(
         f"  {_B}{exp_code:<14}{_R}"
         f"{_D}{meta}{_R}"
-        f"  acc={acc_str}  eff={eff_str}"
+        f"  acc={acc_str}  eff={eff_str}{rate_part}"
     )
+
+
+def print_explore_row(
+    exp_code: str,
+    params: Dict[str, Any],
+    perf: Dict[str, float],
+    u: float,
+    obj: float,
+    w_explore: float,
+) -> None:
+    """One-line exploration experiment result: params (dim) + perf scores + u + obj."""
+    design   = params.get("design",      "?")
+    material = str(params.get("material", "?"))[:3]
+    water    = params.get("water_ratio",  0.0)
+    speed    = params.get("print_speed",  0.0)
+
+    acc  = perf.get("path_accuracy",    float("nan"))
+    eff  = perf.get("energy_efficiency", float("nan"))
+    rate = perf.get("production_rate",   float("nan"))
+
+    meta   = f"design={design}  mat={material}  w={water:.2f}  spd={speed:.1f}"
+    perf_s = (
+        f"acc={_score_color(acc)}{acc:.3f}{_R}  "
+        f"eff={_score_color(eff)}{eff:.3f}{_R}  "
+        f"rate={_score_color(rate)}{rate:.3f}{_R}"
+    )
+    u_s   = f"{_score_color(u)}{u:.3f}{_R}"
+    obj_s = f"{_score_color(obj)}{obj:.3f}{_R}"
+    print(
+        f"  {_B}{exp_code:<14}{_R}"
+        f"{_D}{meta}{_R}"
+        f"  {perf_s}  "
+        f"u={u_s}  obj={obj_s}"
+    )
+
+
+def print_infer_row(
+    exp_code: str,
+    params: Dict[str, Any],
+    perf: Dict[str, float],
+    obj: float,
+) -> None:
+    """One-line inference experiment result: params (dim) + perf scores + obj."""
+    design   = params.get("design",      "?")
+    material = str(params.get("material", "?"))[:3]
+    water    = params.get("water_ratio",  0.0)
+    speed    = params.get("print_speed",  0.0)
+
+    acc  = perf.get("path_accuracy",    float("nan"))
+    eff  = perf.get("energy_efficiency", float("nan"))
+    rate = perf.get("production_rate",   float("nan"))
+
+    meta   = f"design={design}  mat={material}  w={water:.2f}  spd={speed:.1f}"
+    perf_s = (
+        f"acc={_score_color(acc)}{acc:.3f}{_R}  "
+        f"eff={_score_color(eff)}{eff:.3f}{_R}  "
+        f"rate={_score_color(rate)}{rate:.3f}{_R}"
+    )
+    obj_s = f"{_score_color(obj)}{obj:.3f}{_R}"
+    print(
+        f"  {_B}{exp_code:<14}{_R}"
+        f"{_D}{meta}{_R}"
+        f"  {perf_s}  "
+        f"obj={obj_s}"
+    )
+
+
+def print_optimizer_row(n_starts: int, n_evals: int) -> None:
+    """Dim optimizer summary line."""
+    print(f"  {_D}    {n_starts} starts · {n_evals} evals{_R}")
+
+
+def _combined_score(perf: Dict[str, float]) -> float:
+    """2:1:1 weighted combined score across path_accuracy, energy_efficiency, production_rate."""
+    return (
+        2 * perf.get("path_accuracy",    0.0)
+        +   perf.get("energy_efficiency", 0.0)
+        +   perf.get("production_rate",   0.0)
+    ) / 4
 
 
 def print_phase_summary(
@@ -69,15 +154,17 @@ def print_phase_summary(
         return
     best_code, best_params, best_perf = max(
         experiments,
-        key=lambda x: 0.5 * x[2].get("path_accuracy", 0.0) + 0.5 * x[2].get("energy_efficiency", 0.0),
+        key=lambda x: _combined_score(x[2]),
     )
-    acc = best_perf.get("path_accuracy",    float("nan"))
-    eff = best_perf.get("energy_efficiency", float("nan"))
+    acc  = best_perf.get("path_accuracy",    float("nan"))
+    eff  = best_perf.get("energy_efficiency", float("nan"))
+    rate = best_perf.get("production_rate",   float("nan"))
     design   = best_params.get("design",   "?")
     material = best_params.get("material", "?")
+    rate_part = f"  rate={rate:.3f}" if not math.isnan(rate) else ""
     print(
         f"\n  {_G}✓{_R} Best: {_B}{best_code}{_R} "
-        f"— acc={_G}{acc:.3f}{_R}  eff={eff:.3f}  "
+        f"— acc={_G}{acc:.3f}{_R}  eff={eff:.3f}{rate_part}  "
         f"{_D}(design={design}, {material}){_R}"
     )
 
@@ -122,39 +209,39 @@ def print_run_summary(
     phys_opt_water: float,
 ) -> None:
     """Print a final table comparing best found params against the physics optimum."""
-    def _combined(perf: Dict[str, float]) -> float:
-        return 0.5 * perf.get("path_accuracy", 0.0) + 0.5 * perf.get("energy_efficiency", 0.0)
-
     # Best overall and best inference
     all_scored = [(code, params, perf, phase)
                   for (params, perf), code, phase
                   in zip(perf_history, exp_codes, phases)]
-    best        = max(all_scored, key=lambda x: _combined(x[2]))
+    best        = max(all_scored, key=lambda x: _combined_score(x[2]))
     infer_items = [x for x in all_scored if x[3] == "inference"]
-    best_infer  = max(infer_items, key=lambda x: _combined(x[2])) if infer_items else None
+    best_infer  = max(infer_items, key=lambda x: _combined_score(x[2])) if infer_items else None
 
     bar = "─" * _W
     print(f"\n  {_B}Run Summary{_R}")
     print(f"  {_D}{bar}{_R}")
 
-    header = f"  {'Experiment':<16} {'design':<8} {'material':<11} {'w':>5} {'spd':>6}  {'acc':>6}  {'eff':>6}  {'combined':>8}"
+    header = f"  {'Experiment':<16} {'design':<8} {'material':<11} {'w':>5} {'spd':>6}  {'acc':>6}  {'eff':>6}  {'rate':>6}  {'combined':>8}"
     print(f"  {_D}{header}{_R}")
     print(f"  {_D}{bar}{_R}")
 
     def _row(label: str, code: str, params: Dict[str, Any], perf: Dict[str, float]) -> None:
         acc  = perf.get("path_accuracy",    float("nan"))
         eff  = perf.get("energy_efficiency", float("nan"))
-        comb = _combined(perf)
+        rate = perf.get("production_rate",   float("nan"))
+        comb = _combined_score(perf)
         w    = params.get("water_ratio", float("nan"))
         spd  = params.get("print_speed",  float("nan"))
         des  = str(params.get("design",   "?"))
         mat  = str(params.get("material", "?"))
+        rate_s = f"{_score_color(rate)}{rate:>6.3f}{_R}" if not math.isnan(rate) else f"{'n/a':>6}"
         print(
             f"  {_B}{label:<16}{_R}"
             f"{des:<8}{mat:<11}"
             f"{w:>5.2f} {spd:>6.1f}  "
             f"{_score_color(acc)}{acc:>6.3f}{_R}  "
             f"{_score_color(eff)}{eff:>6.3f}{_R}  "
+            f"{rate_s}  "
             f"{_score_color(comb)}{comb:>8.3f}{_R}"
         )
 

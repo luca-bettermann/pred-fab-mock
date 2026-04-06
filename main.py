@@ -9,6 +9,10 @@ Phases:
   5 — Online Adaptation (layer-by-layer)
 """
 
+# ── Quick-test flag ────────────────────────────────────────────────────────────
+# When True: baseline n=2, exploration rounds=2, inference rounds=1
+QUICK_TEST = False
+
 import os
 import shutil
 from typing import Any, Dict, List, Tuple
@@ -33,6 +37,8 @@ from visualization import (
     plot_adaptation,
     plot_inference_convergence,
     plot_acquisition_topology,
+    plot_physics_topology,
+    plot_baseline_scatter,
     print_phase_header,
     print_section,
     print_experiment_row,
@@ -41,6 +47,9 @@ from visualization import (
     print_adaptation_row,
     print_run_summary,
     print_done,
+    print_explore_row,
+    print_infer_row,
+    print_optimizer_row,
 )
 
 # ── Phase output directories ───────────────────────────────────────────────────
@@ -74,11 +83,6 @@ def _with_dimensions(params: Dict[str, Any], fab: FabricationSystem) -> Dict[str
     return {**params, "n_layers": n_layers, "n_segments": n_segments}
 
 
-def _opt_info(agent: Any) -> str:
-    """One-line optimizer summary: starts × evals, best acquisition score."""
-    cs = agent.calibration_system
-    return f"optimizer: {cs.last_opt_n_starts} starts · {cs.last_opt_nfev} evals · obj={cs.last_opt_score:.4f}"
-
 
 def main() -> None:
     # Clean up previous run artefacts so schema registry stays consistent
@@ -100,18 +104,20 @@ def main() -> None:
             "water_ratio": (0.30, 0.50),
             "print_speed": (20.0, 60.0),
         },
-        performance_weights={"path_accuracy": 0.5, "energy_efficiency": 0.5},
+        performance_weights={"path_accuracy": 2, "energy_efficiency": 1, "production_rate": 1},
     )
 
     dataset = Dataset(schema=schema)
 
     # ── Phase 1: Baseline ─────────────────────────────────────────────────────
-    n_baseline_exps = 10
+    _n_baseline    = 2 if QUICK_TEST else 4
+    _n_explore     = 2 if QUICK_TEST else 6
+    _n_infer       = 1 if QUICK_TEST else 3
     print_phase_header(1, "Baseline Sampling",
-                       f"{n_baseline_exps} Latin-hypercube experiments — no model yet, space-filling only")
+                       f"{_n_baseline} Latin-hypercube experiments — no model yet, space-filling only")
 
     agent.logger.set_console_output(False)
-    baseline_specs = agent.baseline_step(n=n_baseline_exps)
+    baseline_specs = agent.baseline_step(n=_n_baseline)
     agent.logger.set_console_output(True)
 
     baseline_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
@@ -134,7 +140,9 @@ def main() -> None:
     plot_filament_volume(baseline_exps[-1], fab.camera, last_params, save_dir=_D1)
     plot_feature_heatmaps(baseline_exps[-1], save_dir=_D1)
     plot_physics_landscape(last_params, save_dir=_D1)
-    print_section(f"5 plots saved to {_D1}/")
+    plot_physics_topology(save_dir=_D1)
+    plot_baseline_scatter(baseline_log, save_dir=_D1)
+    print_section(f"7 plots saved to {_D1}/")
 
     # ── Phase 2: Initial Training ──────────────────────────────────────────────
     print_phase_header(2, "Initial Training",
@@ -152,51 +160,47 @@ def main() -> None:
     all_params: List[Dict[str, Any]] = [params_from_spec(s) for s in baseline_specs]
     all_phases: List[str]            = ["baseline"] * len(baseline_specs)
     all_codes:  List[str]            = [f"baseline_{i+1:02d}" for i in range(len(baseline_specs))]
+
     perf_history: List[Tuple[Dict[str, Any], Dict[str, float]]] = [
         (params_from_spec(s), get_performance(e))
         for s, e in zip(baseline_specs, baseline_exps)
     ]
 
     # ── Phase 3: Exploration ───────────────────────────────────────────────────
-    n_explore_rounds = 10
     print_phase_header(3, "Exploration",
-                       f"{n_explore_rounds} rounds  (w_explore=0.7) — model guides search toward uncertain regions")
+                       f"{_n_explore} rounds  (w_explore=0.7) — model guides search toward uncertain regions")
     prev_params = _with_dimensions(params_from_spec(baseline_specs[-1]), fab)
     explore_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
     W_EXPLORE = 0.7
 
-    for i in range(n_explore_rounds):
+    for i in range(_n_explore):
         agent.logger.set_console_output(False)
         spec = agent.exploration_step(datamodule, w_explore=W_EXPLORE)
         agent.logger.set_console_output(True)
 
-        cs       = agent.calibration_system
-        opt_info = _opt_info(agent)
+        cs = agent.calibration_system
         # Evaluate perf and uncertainty at the proposed point
         _proposed_p = {**prev_params, **params_from_spec(spec), "n_layers": 5, "n_segments": 4}
         _perf_at_proposed = cs.perf_fn(_proposed_p)
-        _perf_combined = sum(
-            _perf_at_proposed.get(k, 0.0) * 0.5  # type: ignore[operator]
-            for k in ("path_accuracy", "energy_efficiency")
-        )
+        _perf_combined = (
+            2 * _perf_at_proposed.get("path_accuracy",    0.0)  # type: ignore[operator]
+            +   _perf_at_proposed.get("energy_efficiency", 0.0)  # type: ignore[operator]
+            +   _perf_at_proposed.get("production_rate",   0.0)  # type: ignore[operator]
+        ) / 4
         _dm = cs._active_datamodule  # type: ignore[attr-defined]
         _u_at_proposed = (
             float(agent.pred_system.uncertainty(_dm.params_to_array(_proposed_p)))
             if _dm is not None else 0.0
-        )
-        acq_detail = (
-            f"perf={_perf_combined:.4f}  "
-            f"u={_u_at_proposed:.4f}  "
-            f"combined={cs.last_opt_score:.4f}"
         )
 
         params   = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
         exp_code = f"explore_{i+1:02d}"
 
         # Topology plot before running the experiment (shows what the model "sees")
+        # Use proposed design+material as reference so topology shows the relevant slice
         plot_acquisition_topology(
             agent, W_EXPLORE, params_from_spec(spec),
-            all_params, prev_params, exp_code, save_dir=_D3,
+            all_params, params_from_spec(spec), exp_code, save_dir=_D3,
         )
 
         exp_data = _run_and_evaluate(dataset, agent, fab, params, exp_code)
@@ -213,25 +217,23 @@ def main() -> None:
         perf_history.append((params, perf))
         explore_log.append((exp_code, params, perf))
         prev_params = params
-        print_experiment_row(exp_code, params, perf)
-        print_section(f"  {opt_info}")
-        print_section(f"  acquisition  {acq_detail}")
+        print_explore_row(exp_code, params, perf, _u_at_proposed, cs.last_opt_score, W_EXPLORE)
+        print_optimizer_row(cs.last_opt_n_starts, cs.last_opt_nfev)
 
     print_phase_summary(explore_log)
     plot_parameter_space(all_params, all_phases, perf_history, save_dir=_D3)
     print_section(f"7 plots saved to {_D3}/")
 
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
-    n_inference_rounds = 3
     DESIGN_INTENT = {"design": "A", "material": "concrete"}
     print_phase_header(4, "Inference",
-                       f"{n_inference_rounds} rounds  ·  intent fixed: {DESIGN_INTENT}  ·  model optimises w_explore=0")
+                       f"{_n_infer} rounds  ·  intent fixed: {DESIGN_INTENT}  ·  model optimises w_explore=0")
     agent.configure_calibration(fixed_params=DESIGN_INTENT)
     params = _with_dimensions({**prev_params, **DESIGN_INTENT}, fab)
 
     infer_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
 
-    for i in range(n_inference_rounds):
+    for i in range(_n_infer):
         exp_code = f"infer_{i+1:02d}"
         exp_data = dataset.create_experiment(exp_code, parameters=params)
         fab.run_experiment(params)
@@ -240,7 +242,6 @@ def main() -> None:
         spec = agent.inference_step(exp_data, datamodule, w_explore=0.0, current_params=params)
         agent.logger.set_console_output(True)
 
-        opt_info    = _opt_info(agent)
         next_params = _with_dimensions({**params, **params_from_spec(spec)}, fab)
 
         # Topology for inference step
@@ -261,8 +262,9 @@ def main() -> None:
         all_codes.append(exp_code)
         perf_history.append((params, perf))
         infer_log.append((exp_code, params, perf))
-        print_experiment_row(exp_code, params, perf)
-        print_section(f"  {opt_info}")
+        cs_infer = agent.calibration_system
+        print_infer_row(exp_code, params, perf, cs_infer.last_opt_score)
+        print_optimizer_row(cs_infer.last_opt_n_starts, cs_infer.last_opt_nfev)
         params = next_params
 
     prev_params = params

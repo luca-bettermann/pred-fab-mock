@@ -68,3 +68,26 @@ class EnergyFeatureModel(IFeatureModel):
         self, data: Dict, params: Dict, visualize: bool = False, **dimensions: Any
     ) -> Dict[str, float]:
         return {"energy_per_segment": float(data["energy_per_segment"])}
+
+
+class ProductionRateFeatureModel(IFeatureModel):
+    """Returns print_speed as the production_rate proxy at each spatial position."""
+
+    def __init__(self, logger: PfabLogger) -> None:
+        super().__init__(logger)
+
+    @property
+    def input_parameters(self) -> List[str]:
+        return ["print_speed"]
+
+    @property
+    def outputs(self) -> List[str]:
+        return ["production_rate"]
+
+    def _load_data(self, params: Dict, **dimensions: Any) -> Dict:
+        return {}
+
+    def _compute_feature_logic(
+        self, data: Dict, params: Dict, visualize: bool = False, **dimensions: Any
+    ) -> Dict[str, float]:
+        return {"production_rate": float(params["print_speed"])}

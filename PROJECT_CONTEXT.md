@@ -15,9 +15,11 @@ Self-contained showcase of the full PFAB journey (baseline → exploration → i
 | `visualization/` | Per-phase plotting helpers |
 
 ## Key Points
-- Schema v3: 2 designs (A, B) × 2 materials (clay, concrete); no layer_width feature.
+- Schema v4: 2 designs (A, B) × 2 materials (clay, concrete); 3 features (path_deviation, energy_per_segment, production_rate); 3 performance attributes (path_accuracy, energy_efficiency, production_rate).
 - Physics: 4 optima (A,clay≈40, B,clay≈33, A,concrete≈25, B,concrete≈20 mm/s). Layer drift makes deviation grow when speed deviates from the layer-specific optimum — makes adaptation meaningful.
+- Calibration weights: path_accuracy=2, energy_efficiency=1, production_rate=1. Combined = (2·acc + eff + rate) / 4. Creates three-way trade-off: higher speed improves production_rate but worsens path_accuracy and energy_efficiency.
 - Feature tensors are stored as `(n_layers, n_segments)` 2D arrays — not flat tables.
 - Phase 5 (online adaptation) reads deviation directly from the feature tensor without calling `run_evaluation` on partial data, since partial evaluation has NaN rows that break `nanmean`.
 - Categorical parameters must be carried over explicitly by passing `current_params` to `exploration_step` / `inference_step`.
-- `design` and `material` are included in both prediction models (one-hot encoded by DataModule; recognized by column prefix matching).
+- `design` and `material` are included in both MLP prediction models (one-hot encoded by DataModule; recognized by column prefix matching).
+- `QUICK_TEST = True` at top of main.py enables fast runs (baseline n=2, exploration rounds=2, inference rounds=1).

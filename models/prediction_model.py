@@ -127,3 +127,45 @@ class EnergyPredictionModel(IPredictionModel):
 
     def encode(self, X: np.ndarray) -> np.ndarray:
         return X
+
+
+class ProductionRatePredictionModel(IPredictionModel):
+    """Deterministic production_rate prediction: rate = print_speed / 60.
+
+    No ML needed — forward_pass implements the formula directly.
+    The input is normalized print_speed (schema bounds [20, 60] → [0, 1]).
+    """
+
+    SPEED_MIN = 20.0
+    SPEED_MAX = 60.0
+
+    def __init__(self, logger: PfabLogger) -> None:
+        super().__init__(logger)
+
+    @property
+    def input_parameters(self) -> List[str]:
+        return ["print_speed"]
+
+    @property
+    def input_features(self) -> List[str]:
+        return []
+
+    @property
+    def outputs(self) -> List[str]:
+        return ["production_rate"]
+
+    def train(
+        self,
+        train_batches: List[Tuple[np.ndarray, np.ndarray]],
+        val_batches: List[Tuple[np.ndarray, np.ndarray]],
+        **kwargs: Any,
+    ) -> None:
+        pass  # deterministic — no training needed
+
+    def forward_pass(self, X: np.ndarray) -> np.ndarray:
+        # X[:,0] = normalized print_speed in [0,1] via min-max on [20, 60]
+        speed = X[:, 0] * (self.SPEED_MAX - self.SPEED_MIN) + self.SPEED_MIN
+        return (speed / self.SPEED_MAX).reshape(-1, 1)
+
+    def encode(self, X: np.ndarray) -> np.ndarray:
+        return X
