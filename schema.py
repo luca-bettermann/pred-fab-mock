@@ -17,7 +17,7 @@ ROOT_FOLDER = "./pfab_data"
 SCHEMA_NAME = "extrusion_printing_v4"
 
 
-def build_schema() -> DatasetSchema:
+def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
     """Construct and return the DatasetSchema for the extrusion printing simulation."""
     # --- Parameters (optimization parameters only — no dimension params) ---
     params = Parameters([
@@ -50,7 +50,7 @@ def build_schema() -> DatasetSchema:
     ])
 
     return DatasetSchema(
-        root_folder=ROOT_FOLDER,
+        root_folder=root_folder,
         name=SCHEMA_NAME,
         parameters=params,
         features=features,
