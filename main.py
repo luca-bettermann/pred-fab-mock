@@ -9,7 +9,7 @@ from schema import build_schema
 from agent_setup import build_agent
 from sensors import CameraSystem, EnergySensor, FabricationSystem
 from pred_fab.core import Dataset
-from utils import params_from_spec
+from utils import params_from_spec, quiet_console
 from workflow import (
     JourneyState, clean_artifacts, with_dimensions,
     run_baseline_phase, run_exploration_round, run_inference_round,
@@ -110,9 +110,8 @@ def main() -> None:
                        "Fit prediction models (deviation + energy) on baseline data")
     datamodule = agent.create_datamodule(dataset)
     datamodule.prepare(val_size=0.25)
-    agent.logger.set_console_output(False)
-    agent.train(datamodule, validate=True)
-    agent.logger.set_console_output(True)
+    with quiet_console(agent.logger):
+        agent.train(datamodule, validate=True)
 
     r2_scores = plot_prediction_accuracy(agent, datamodule, save_dir=d["training"])
     print_training_summary(r2_scores)

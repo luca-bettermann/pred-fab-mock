@@ -14,7 +14,7 @@ from pred_fab.core import Dataset, DataModule
 from pred_fab.orchestration import PfabAgent
 
 from sensors import FabricationSystem
-from utils import params_from_spec, get_performance
+from utils import params_from_spec, get_performance, quiet_console
 
 
 ExperimentLog = List[Tuple[str, Dict[str, Any], Dict[str, float]]]
@@ -63,10 +63,9 @@ def run_and_evaluate(
     """Create experiment, run fabrication, evaluate features + performance, persist."""
     exp_data = dataset.create_experiment(exp_code, parameters=params)
     fab.run_experiment(params)
-    agent.logger.set_console_output(False)
-    agent.evaluate(exp_data)
-    dataset.save_experiment(exp_code)
-    agent.logger.set_console_output(True)
+    with quiet_console(agent.logger):
+        agent.evaluate(exp_data)
+        dataset.save_experiment(exp_code)
     return exp_data
 
 
@@ -78,9 +77,8 @@ def run_baseline_phase(
     state: JourneyState,
 ) -> Tuple[ExperimentLog, List[Any], List[Any]]:
     """Run baseline experiments and return (log, experiment_data_list, specs)."""
-    agent.logger.set_console_output(False)
-    specs = agent.baseline_step(n=n_baseline)
-    agent.logger.set_console_output(True)
+    with quiet_console(agent.logger):
+        specs = agent.baseline_step(n=n_baseline)
 
     log: ExperimentLog = []
     exps = []
@@ -108,9 +106,8 @@ def run_exploration_round(
     n_optimization_rounds: int,
 ) -> Tuple[str, Dict[str, Any], Dict[str, float], float, Dict[str, Any]]:
     """Run one exploration round. Returns (code, params, perf, uncertainty, proposed_raw)."""
-    agent.logger.set_console_output(False)
-    spec = agent.exploration_step(datamodule, w_explore=w_explore, n_optimization_rounds=n_optimization_rounds)
-    agent.logger.set_console_output(True)
+    with quiet_console(agent.logger):
+        spec = agent.exploration_step(datamodule, w_explore=w_explore, n_optimization_rounds=n_optimization_rounds)
 
     proposed = params_from_spec(spec)
     proposed_full = {**state.prev_params, **proposed, "n_layers": 5, "n_segments": 4}
@@ -119,10 +116,9 @@ def run_exploration_round(
 
     exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
 
-    agent.logger.set_console_output(False)
-    datamodule.update()
-    agent.train(datamodule, validate=False)
-    agent.logger.set_console_output(True)
+    with quiet_console(agent.logger):
+        datamodule.update()
+        agent.train(datamodule, validate=False)
 
     perf = get_performance(exp_data)
     state.record("exploration", exp_code, params, perf)
@@ -145,18 +141,16 @@ def run_inference_round(
     exp_data = dataset.create_experiment(exp_code, parameters=params)
     fab.run_experiment(params)
 
-    agent.logger.set_console_output(False)
-    spec = agent.inference_step(exp_data, datamodule, w_explore=0.0,
-                                 n_optimization_rounds=n_optimization_rounds, current_params=params)
-    agent.logger.set_console_output(True)
+    with quiet_console(agent.logger):
+        spec = agent.inference_step(exp_data, datamodule, w_explore=0.0,
+                                     n_optimization_rounds=n_optimization_rounds, current_params=params)
 
     next_params = with_dimensions({**params, **params_from_spec(spec)}, fab)
 
-    agent.logger.set_console_output(False)
-    dataset.save_experiment(exp_code)
-    datamodule.update()
-    agent.train(datamodule, validate=False)
-    agent.logger.set_console_output(True)
+    with quiet_console(agent.logger):
+        dataset.save_experiment(exp_code)
+        datamodule.update()
+        agent.train(datamodule, validate=False)
 
     perf = get_performance(exp_data)
     state.record("inference", exp_code, params, perf)
@@ -195,17 +189,15 @@ def run_adaptation_phase(
         deviations.append(dev)
 
         if layer_idx < n_layers - 1:
-            agent.logger.set_console_output(False)
-            spec = agent.adaptation_step(
-                dimension="n_layers", step_index=layer_idx,
-                exp_data=adapt_exp, record=True,
-            )
-            agent.logger.set_console_output(True)
+            with quiet_console(agent.logger):
+                spec = agent.adaptation_step(
+                    dimension="n_layers", step_index=layer_idx,
+                    exp_data=adapt_exp, record=True,
+                )
             adapt_params["print_speed"] = float(spec.initial_params.get("print_speed", speed))
 
-    agent.logger.set_console_output(False)
-    dataset.save_experiment("adapt_01")
-    agent.logger.set_console_output(True)
+    with quiet_console(agent.logger):
+        dataset.save_experiment("adapt_01")
 
     # Counterfactual: constant speed
     from sensors.physics import path_deviation as _phys_dev
