@@ -52,7 +52,7 @@ N_EXPLORE     = 10     # exploration rounds
 N_TEST        = 32     # test experiments (uniform grid, never used for training)
 N_RANDOM      = 20     # random-LHS baseline (larger pool for fairer comparison)
 W_EXPLORE     = 0.7
-PERF_WEIGHTS  = {"path_accuracy": 2, "energy_efficiency": 1, "production_rate": 1}
+PERF_WEIGHTS: Dict[str, float] = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 CAL_BOUNDS    = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 
 # Maps each predicted feature to its corresponding performance attribute.
@@ -84,6 +84,79 @@ def _exploration_adjusted_q(weighted_r2: float) -> float:
     Reflects how much prediction accuracy matters for UCB guidance at this w_explore.
     """
     return (1.0 - W_EXPLORE) * weighted_r2 + W_EXPLORE
+
+
+def _cov_weighted_summary_perf_r2(cov_r2: Dict[str, float]) -> float:
+    """PERF_WEIGHTS-weighted average of per-attribute coverage-weighted R²."""
+    total_w, weighted_sum = 0.0, 0.0
+    for attr, w in PERF_WEIGHTS.items():
+        total_w += w
+        weighted_sum += w * cov_r2.get(attr, 0.0)
+    return weighted_sum / total_w if total_w > 0 else 0.0
+
+
+def _compute_cov_weighted_perf_r2(
+    agent: Any,
+    train_dm: Any,
+    test_dataset: Dataset,
+    test_params: List[Dict[str, Any]],
+) -> Dict[str, float]:
+    """Coverage-weighted R² on performance scores.
+
+    w_i = max(0, 1 − uncertainty(x_i)) from the KDE evidence model.
+    High weight where the exploration KDE has high density — i.e. the region
+    the calibration system has been active in.  As exploration concentrates
+    near the optimum this metric focuses there, unlike uniform-test R² which
+    dilutes the signal across the full parameter space.
+    """
+    test_codes = list(test_dataset._experiments.keys())
+    perf_names = sorted(PERF_WEIGHTS.keys())
+
+    true_p: Dict[str, List[float]] = {k: [] for k in perf_names}
+    pred_p: Dict[str, List[float]] = {k: [] for k in perf_names}
+    cov_list: List[float] = []
+
+    for code, params in zip(test_codes, test_params):
+        # Coverage weight: how well this point is covered by the training KDE
+        try:
+            x_norm = train_dm.params_to_array(params)
+            u = agent.pred_system.uncertainty(x_norm)
+            cov_list.append(max(0.0, 1.0 - float(u)))
+        except Exception:
+            cov_list.append(1.0)
+
+        # Ground-truth performance (already evaluated in test_dataset)
+        exp = test_dataset.get_experiment(code)
+        true_perf = exp.performance.get_values_dict()
+
+        # Predicted performance via prediction + evaluation pipeline
+        try:
+            pred_perf = agent.predict_performance(params)
+        except Exception:
+            pred_perf = {}
+
+        for k in perf_names:
+            tv = true_perf.get(k)
+            pv = pred_perf.get(k)
+            true_p[k].append(float(tv) if tv is not None else np.nan)
+            pred_p[k].append(float(pv) if pv is not None else np.nan)
+
+    cov = np.array(cov_list, dtype=float)
+    if cov.sum() < 1e-12:
+        return {}
+
+    cov_r2: Dict[str, float] = {}
+    for k in perf_names:
+        yt = np.array(true_p[k])
+        yp = np.array(pred_p[k])
+        mask = ~(np.isnan(yt) | np.isnan(yp))
+        if mask.sum() < 2 or cov[mask].sum() < 1e-12:
+            continue
+        try:
+            cov_r2[k] = float(r2_score(yt[mask], yp[mask], sample_weight=cov[mask]))
+        except Exception:
+            pass
+    return cov_r2
 
 
 def _make_fresh_env(data_root: str) -> Tuple[Any, Any, Any, Dataset]:
@@ -248,11 +321,11 @@ def run_exploration_workflow(
     test_dataset: Dataset,
     test_params: List[Dict[str, Any]],
     optimizer: Optimizer = Optimizer.LBFGSB,
-) -> Tuple[List[int], List[Dict[str, float]], List[int]]:
+) -> Tuple[List[int], List[Dict[str, float]], List[int], List[Dict[str, float]]]:
     """Baseline + incremental exploration.
 
     After each new experiment, train and evaluate R² on the test set.
-    Returns (training_sizes, r2_per_step, cumulative_nfev_per_step).
+    Returns (training_sizes, r2_per_step, cumulative_nfev_per_step, cov_r2_per_step).
     """
     agent, fab2, schema, dataset = _make_fresh_env(DATA_ROOT + f"_explore_{optimizer.value}")
     agent.configure(optimizer=optimizer)
@@ -270,8 +343,10 @@ def run_exploration_workflow(
     agent.train(dm, validate=False)
 
     r2_0 = _compute_r2_on_test(agent, dm, test_dataset, test_params)
+    cov_r2_0 = _compute_cov_weighted_perf_r2(agent, dm, test_dataset, test_params)
     training_sizes = [N_BASELINE]
     r2_history = [r2_0]
+    cov_r2_history = [cov_r2_0]
     nfev_cumulative = [0]  # no forward passes before exploration
     print(f"    n={N_BASELINE}: {r2_0}  |  nfev=0")
 
@@ -288,13 +363,15 @@ def run_exploration_workflow(
         n_total = N_BASELINE + i + 1
         cumulative = nfev_cumulative[-1] + nfev_step
         r2 = _compute_r2_on_test(agent, dm, test_dataset, test_params)
+        cov_r2 = _compute_cov_weighted_perf_r2(agent, dm, test_dataset, test_params)
         training_sizes.append(n_total)
         r2_history.append(r2)
+        cov_r2_history.append(cov_r2)
         nfev_cumulative.append(cumulative)
         print(f"    n={n_total}: {r2}  |  nfev_step={nfev_step}, cumulative={cumulative}")
 
     shutil.rmtree(DATA_ROOT + f"_explore_{optimizer.value}", ignore_errors=True)
-    return training_sizes, r2_history, nfev_cumulative
+    return training_sizes, r2_history, nfev_cumulative, cov_r2_history
 
 
 # ── Workflow C: Random sampling baseline ─────────────────────────────────────
@@ -330,8 +407,15 @@ def plot_learning_curves(
     de_r2s: List[Dict[str, float]],
     baseline_r2: Dict[str, float],
     random_r2: Dict[str, float],
+    lbfgsb_cov_r2s: List[Dict[str, float]],
+    de_cov_r2s: List[Dict[str, float]],
 ) -> None:
-    """Plot per-feature R² learning curves + weighted summary R² for all workflows."""
+    """Plot per-feature R² learning curves + weighted summary R² for all workflows.
+
+    The summary panel shows both uniform R² (solid) and coverage-weighted R²
+    (dashed, using KDE density as weights) to separate global accuracy from
+    accuracy near the explored optimum.
+    """
     os.makedirs(PLOT_DIR, exist_ok=True)
     features = list(lbfgsb_r2s[0].keys())
     n_feats = len(features)
@@ -383,14 +467,23 @@ def plot_learning_curves(
     bl_sum     = _weighted_summary_r2(baseline_r2)
     rnd_sum    = _weighted_summary_r2(random_r2)
 
+    # Uniform R² (solid lines)
     ax_sum.plot(lbfgsb_sizes, lbfgsb_sum, "o-", color=colors["lbfgsb"], lw=2, ms=6,
-                label="Explore (L-BFGS-B)")
+                label="Uniform R² — Explore (L-BFGS-B)")
     ax_sum.plot(de_sizes, de_sum, "s--", color=colors["de"], lw=2, ms=6,
-                label="Explore (DE)")
+                label="Uniform R² — Explore (DE)")
     ax_sum.axhline(bl_sum,  color=colors["baseline"], lw=1.5, ls="--",
-                   label=f"Baseline (n={N_BASELINE})")
+                   label=f"Uniform R² — Baseline (n={N_BASELINE})")
     ax_sum.axhline(rnd_sum, color=colors["random"],   lw=1.5, ls=":",
-                   label=f"Random LHS (n={N_RANDOM})")
+                   label=f"Uniform R² — Random LHS (n={N_RANDOM})")
+
+    # Coverage-weighted R² (thicker dashed lines with diamond markers)
+    lbfgsb_cov_sum = [_cov_weighted_summary_perf_r2(d) for d in lbfgsb_cov_r2s]
+    de_cov_sum     = [_cov_weighted_summary_perf_r2(d) for d in de_cov_r2s]
+    ax_sum.plot(lbfgsb_sizes, lbfgsb_cov_sum, "D-", color=colors["lbfgsb"],
+                lw=2.5, ms=7, alpha=0.7, label="Coverage R² — Explore (L-BFGS-B)")
+    ax_sum.plot(de_sizes, de_cov_sum, "D--", color=colors["de"],
+                lw=2.5, ms=7, alpha=0.7, label="Coverage R² — Explore (DE)")
 
     # Exploration-adjusted Q on secondary axis
     ax_q = ax_sum.twinx()
@@ -404,7 +497,7 @@ def plot_learning_curves(
 
     ax_sum.set_title(
         f"Weighted Summary R²  (weights: {PERF_WEIGHTS})\n"
-        f"(dotted = exploration-adjusted Q = (1−{W_EXPLORE})·R² + {W_EXPLORE})",
+        f"solid=uniform · diamond=coverage-weighted · dotted=exploration Q=(1−{W_EXPLORE})·R²+{W_EXPLORE}",
         fontsize=9,
     )
     ax_sum.set_xlabel("Training set size", fontsize=9)
@@ -413,7 +506,7 @@ def plot_learning_curves(
     ax_sum.set_ylim(-0.2, 1.05)
     ax_sum.axhline(0, color="grey", lw=0.8, alpha=0.4)
     ax_sum.grid(True, alpha=0.3)
-    ax_sum.legend(fontsize=8)
+    ax_sum.legend(fontsize=7, ncol=2)
 
     out = os.path.join(PLOT_DIR, "learning_curves.png")
     plt.savefig(out, dpi=130, bbox_inches="tight")
@@ -464,13 +557,13 @@ def main() -> None:
     print(f"  R²: {baseline_r2}")
 
     print(f"\n[3/5] Exploration (L-BFGS-B): baseline={N_BASELINE}, explore={N_EXPLORE}...")
-    lbfgsb_sizes, lbfgsb_r2s, lbfgsb_nfev = run_exploration_workflow(
+    lbfgsb_sizes, lbfgsb_r2s, lbfgsb_nfev, lbfgsb_cov_r2s = run_exploration_workflow(
         fab_test, test_dataset, test_params, optimizer=Optimizer.LBFGSB
     )
     print(f"  Total forward passes (L-BFGS-B): {lbfgsb_nfev[-1]}")
 
     print(f"\n[4/5] Exploration (DE): baseline={N_BASELINE}, explore={N_EXPLORE}...")
-    de_sizes, de_r2s, de_nfev = run_exploration_workflow(
+    de_sizes, de_r2s, de_nfev, de_cov_r2s = run_exploration_workflow(
         fab_test, test_dataset, test_params, optimizer=Optimizer.DE
     )
     print(f"  Total forward passes (DE): {de_nfev[-1]}")
@@ -484,6 +577,7 @@ def main() -> None:
         lbfgsb_sizes, lbfgsb_r2s,
         de_sizes, de_r2s,
         baseline_r2, random_r2,
+        lbfgsb_cov_r2s, de_cov_r2s,
     )
     plot_forward_passes(lbfgsb_sizes, lbfgsb_nfev, de_sizes, de_nfev)
 
@@ -513,6 +607,12 @@ def main() -> None:
     rnd_sum = _weighted_summary_r2(random_r2)
     print(f"  {'weighted_R2':25s}  {bl_sum:{col_w}.3f}  {l_sum:{col_w}.3f}  {d_sum:{col_w}.3f}  {rnd_sum:{col_w}.3f}")
     print(f"  {'exploration_Q':25s}  {_exploration_adjusted_q(bl_sum):{col_w}.3f}  {_exploration_adjusted_q(l_sum):{col_w}.3f}  {_exploration_adjusted_q(d_sum):{col_w}.3f}  {_exploration_adjusted_q(rnd_sum):{col_w}.3f}")
+
+    print("\n  [coverage-weighted R² — accuracy near explored optimum]")
+    l_cov  = _cov_weighted_summary_perf_r2(lbfgsb_cov_r2s[-1])
+    d_cov  = _cov_weighted_summary_perf_r2(de_cov_r2s[-1])
+    print(f"  {'coverage_R2':25s}  {'n/a':>{col_w}}  {l_cov:{col_w}.3f}  {d_cov:{col_w}.3f}  {'n/a':>{col_w}}")
+
     print(f"\n  Cumulative forward passes — L-BFGS-B: {lbfgsb_nfev[-1]}, DE: {de_nfev[-1]}")
 
 
