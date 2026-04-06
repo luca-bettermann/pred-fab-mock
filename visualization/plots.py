@@ -168,7 +168,10 @@ def plot_parameter_space(
         scores = [_combined(ph[1]) for ph in perf_history]
 
     _MARKERS   = {"baseline": "o", "exploration": "*", "inference": "D"}
-    _DESIGN_EC = {"A": "#2266AA", "B": "#AA6622", "C": "#226622"}  # edge colour by design
+    # Collect designs actually present in the data
+    present_designs = sorted({str(p.get("design", "A")) for p in all_params})
+    _DESIGN_EC_ALL = {"A": "#2266AA", "B": "#AA6622", "C": "#226622"}
+    _DESIGN_EC = {d: _DESIGN_EC_ALL[d] for d in present_designs if d in _DESIGN_EC_ALL}
 
     fig, ax = plt.subplots(figsize=(9, 5))
     fig.suptitle("Parameter Space — Baseline & Exploration", fontsize=12, fontweight="bold")
@@ -235,6 +238,7 @@ def plot_performance_trajectory(
     """Dual-line plot with shaded phase bands, phase labels, and optional x-tick experiment codes."""
     path_acc   = [pp[1].get("path_accuracy",    float("nan")) for pp in exp_params_and_perf]
     energy_eff = [pp[1].get("energy_efficiency", float("nan")) for pp in exp_params_and_perf]
+    prod_rate  = [pp[1].get("production_rate",   float("nan")) for pp in exp_params_and_perf]
     xs = list(range(1, len(path_acc) + 1))
 
     fig, ax = plt.subplots(figsize=(11, 4))
@@ -252,6 +256,8 @@ def plot_performance_trajectory(
             linewidth=1.8, markersize=5, label="Path Accuracy")
     ax.plot(xs, energy_eff, marker="s", color=_PHASE_COLORS["inference"],
             linewidth=1.8, markersize=5, label="Energy Efficiency")
+    ax.plot(xs, prod_rate,  marker="^", color="#8856a7",
+            linewidth=1.2, markersize=4, alpha=0.7, label="Production Rate")
 
     # Phase labels at top
     for phase, color in _PHASE_COLORS.items():
@@ -673,15 +679,19 @@ def plot_inference_convergence(
     codes = [c for c, _, _ in infer_log]
     perfs = [pf for _, _, pf in infer_log]
 
+    # Alternate label offsets to avoid overlap when points are close
+    offsets = [(10, 8), (-10, -18), (10, -18)]
     for i, (w, spd, code, perf) in enumerate(zip(ws, spds, codes, perfs)):
         comb_val = 0.5 * perf.get("path_accuracy", 0.0) + 0.5 * perf.get("energy_efficiency", 0.0)
         ax.scatter([w], [spd], s=100, marker="D",
                    color=_PHASE_COLORS["inference"],
                    edgecolors="white", linewidths=0.8, zorder=9)
+        ofs = offsets[i % len(offsets)]
         ax.annotate(
             f"{code}\n({comb_val:.2f})",
-            (w, spd), xytext=(7, 5), textcoords="offset points",
+            (w, spd), xytext=ofs, textcoords="offset points",
             fontsize=7, color="white", fontweight="bold",
+            arrowprops=dict(arrowstyle="-", color="white", lw=0.5, alpha=0.5),
         )
         if i > 0:
             ax.annotate(
@@ -787,16 +797,18 @@ def plot_acquisition_topology(
 
     # ── Figure ────────────────────────────────────────────────────────────────
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    phase_label = "Inference" if w_explore == 0.0 else "Exploration"
     fig.suptitle(
-        f"Exploration Topology — {label}  ·  design={design}  material={material}  "
+        f"{phase_label} Topology — {label}  ·  design={design}  material={material}  "
         f"w_explore={w_explore:.1f}",
         fontsize=11, fontweight="bold",
     )
 
+    combined_title = "Combined (performance only)" if w_explore == 0.0 else "Combined exploration"
     panels = [
         (axes[0], perf_grid,     "Performance (predicted)",    "YlGn",   False),
         (axes[1], unc_grid,      "Uncertainty (evidence gap)", "PuBu",   False),
-        (axes[2], combined_grid, "Combined exploration",       "RdYlGn", True),
+        (axes[2], combined_grid, combined_title,               "RdYlGn", True),
     ]
 
     # Split history into same design+material vs others
