@@ -13,6 +13,10 @@ Phases:
 # When True: baseline n=2, exploration rounds=2, inference rounds=1
 QUICK_TEST = False
 
+# ── Step-level parameters (per-call, not agent-level config) ──────────────────
+W_EXPLORE = 0.7                  # exploration weight κ: 0 = pure exploitation, 1 = pure uncertainty
+N_OPTIMIZATION_ROUNDS = 5        # L-BFGS-B random restarts (ignored by DE)
+
 import os
 import shutil
 from typing import Any, Dict, List, Tuple
@@ -140,11 +144,9 @@ def main() -> None:
         print_experiment_row(exp_code, params, perf)
 
     print_phase_summary(baseline_log)
-    plot_path_comparison_3d(baseline_exps[-1], fab.camera, params, save_dir=_D1)  # type: ignore[possibly-undefined]
-    plot_filament_volume(baseline_exps[-1], fab.camera, params, save_dir=_D1)  # type: ignore[possibly-undefined]
     plot_physics_topology(agent, save_dir=_D1)
     plot_baseline_scatter(baseline_log, save_dir=_D1)
-    print_section(f"4 plots saved to {_D1}/")
+    print_section(f"2 plots saved to {_D1}/")
 
     # ── Phase 2: Initial Training ──────────────────────────────────────────────
     print_phase_header(2, "Initial Training",
@@ -170,14 +172,13 @@ def main() -> None:
 
     # ── Phase 3: Exploration ───────────────────────────────────────────────────
     print_phase_header(3, "Exploration",
-                       f"{_n_explore} rounds  (w_explore=0.7) — model guides search toward uncertain regions")
+                       f"{_n_explore} rounds  (w_explore={W_EXPLORE}) — model guides search toward uncertain regions")
     prev_params = _with_dimensions(params_from_spec(baseline_specs[-1]), fab)
     explore_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
-    W_EXPLORE = 0.7
 
     for i in range(_n_explore):
         agent.logger.set_console_output(False)
-        spec = agent.exploration_step(datamodule, w_explore=W_EXPLORE)
+        spec = agent.exploration_step(datamodule, w_explore=W_EXPLORE, n_optimization_rounds=N_OPTIMIZATION_ROUNDS)
         agent.logger.set_console_output(True)
 
         _proposed_p = {**prev_params, **params_from_spec(spec), "n_layers": 5, "n_segments": 4}
@@ -228,7 +229,7 @@ def main() -> None:
         fab.run_experiment(params)
 
         agent.logger.set_console_output(False)
-        spec = agent.inference_step(exp_data, datamodule, w_explore=0.0, current_params=params)
+        spec = agent.inference_step(exp_data, datamodule, w_explore=0.0, n_optimization_rounds=N_OPTIMIZATION_ROUNDS, current_params=params)
         agent.logger.set_console_output(True)
 
         next_params = _with_dimensions({**params, **params_from_spec(spec)}, fab)
@@ -257,9 +258,11 @@ def main() -> None:
 
     prev_params = params
     print_phase_summary(infer_log)
+    plot_path_comparison_3d(exp_data, fab.camera, params, save_dir=_D4)  # type: ignore[possibly-undefined]
+    plot_filament_volume(exp_data, fab.camera, params, save_dir=_D4)  # type: ignore[possibly-undefined]
     plot_performance_trajectory(perf_history, all_phases, exp_codes=all_codes, save_dir=_D4)
     plot_inference_convergence(infer_log, DESIGN_INTENT, save_dir=_D4)
-    print_section(f"5 plots saved to {_D4}/")
+    print_section(f"7 plots saved to {_D4}/")
 
     # ── Phase 5: Online Adaptation ─────────────────────────────────────────────
     print_phase_header(5, "Online Adaptation",

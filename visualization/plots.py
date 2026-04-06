@@ -828,11 +828,10 @@ def plot_acquisition_topology(
             )
 
         if mark_proposed:
-            # Use cross (x) instead of star
             ax.scatter([prop_w], [prop_spd], s=180, marker="x", color="#FFD700",
                        linewidths=3.0, zorder=10,
                        label=f"Proposed  (w={prop_w:.2f}, spd={prop_spd:.1f})")
-            ax.legend(fontsize=7, loc="lower right")
+            ax.legend(fontsize=7, loc="lower right", markerscale=0.5)
 
         ax.set_title(title, fontsize=10)
         ax.set_xlabel("Water Ratio",        fontsize=9)
@@ -968,10 +967,15 @@ def plot_physics_topology(
             if row_idx == 0:
                 ax.set_title(col_titles[col_idx], fontsize=11, fontweight="bold", pad=8)
             
-            # Enhanced row labels for better category visibility
+            # Row label (bold) separate from axis label (normal weight)
             if col_idx == 0:
-                ax.set_ylabel(f"{row_labels[row_idx]}\nPrint Speed [mm/s]", 
-                            fontsize=9, fontweight="bold")
+                ax.set_ylabel("Print Speed [mm/s]", fontsize=8)
+                ax.text(
+                    -0.28, 0.5, row_labels[row_idx],
+                    transform=ax.transAxes,
+                    fontsize=9, fontweight="bold",
+                    ha="center", va="center", rotation=90,
+                )
             else:
                 ax.set_ylabel("Print Speed [mm/s]", fontsize=8)
             
@@ -981,7 +985,7 @@ def plot_physics_topology(
             ax.tick_params(labelsize=7)
             ax.grid(True, alpha=0.12, linestyle=":", linewidth=0.5)
 
-    plt.tight_layout(rect=(0, 0, 1, 0.985))
+    plt.tight_layout(rect=(0.06, 0, 1, 0.985))
     _save(os.path.join(save_dir, "physics_topology.png"))
 
 
@@ -993,49 +997,42 @@ def plot_baseline_scatter(
 ) -> None:
     """2D scatter: water_ratio vs print_speed, colored by design+material combination.
 
-    Each experiment appears as a point. Color distinguishes design+material combo.
-    All points are circles with uniform size for clean visual appearance.
+    LHS stratification is 4D (water_ratio, print_speed, design, material), so the
+    2D projection onto continuous axes may show gaps — this is expected.
+    Design is encoded by marker shape, material by color.
     """
-    COMBOS = [("A", "clay"), ("A", "concrete"), ("B", "clay"), ("B", "concrete")]
-    # Coherent color palette: greens and blues (distinguishable but harmonious)
-    COMBO_COLORS = ["#2E7D32", "#1976D2", "#66BB6A", "#42A5F5"]
-    
+    DESIGN_MARKERS = {"A": "o", "B": "s"}         # circle vs square
+    MATERIAL_COLORS = {"clay": "#2E7D32", "concrete": "#1976D2"}
+
     # Organize data by combo
+    COMBOS = [("A", "clay"), ("A", "concrete"), ("B", "clay"), ("B", "concrete")]
     combo_data: Dict[Tuple[str, str], List] = {c: [] for c in COMBOS}
-    
+
     for code, params, perf in experiments:
         design   = str(params.get("design",   "A"))
         material = str(params.get("material", "clay"))
         combo = (design, material)
-        
         x = float(params.get("water_ratio", 0.0))
         y = float(params.get("print_speed",  0.0))
-        
         combo_data[combo].append((x, y, code))
 
     fig, ax = plt.subplots(figsize=(10, 7))
     fig.suptitle("Baseline Experiments — Parameter Space",
                  fontsize=13, fontweight="bold")
 
-    # Plot each combo separately for legend
-    for combo_idx, combo in enumerate(COMBOS):
+    for combo in COMBOS:
         data = combo_data[combo]
         if not data:
             continue
-            
         xs = [d[0] for d in data]
         ys = [d[1] for d in data]
         labels = [d[2] for d in data]
-        
         design, material = combo
-        label = f"Design {design} / {material}"
-        color = COMBO_COLORS[combo_idx]
-        
-        ax.scatter(xs, ys, s=120, c=color, marker="o", 
-                  alpha=0.80, edgecolors="white", linewidths=1.8,
-                  label=label, zorder=3)
-        
-        # Add experiment labels
+        ax.scatter(xs, ys, s=120,
+                   c=MATERIAL_COLORS[material],
+                   marker=DESIGN_MARKERS[design],
+                   alpha=0.80, edgecolors="white", linewidths=1.8,
+                   label=f"Design {design} / {material}", zorder=3)
         for x, y, lbl in zip(xs, ys, labels):
             ax.annotate(lbl, (x, y), xytext=(4, 4), textcoords="offset points",
                        fontsize=7, alpha=0.75)
@@ -1045,9 +1042,13 @@ def plot_baseline_scatter(
     ax.set_xlim(0.28, 0.52)
     ax.set_ylim(18.0, 62.0)
     ax.grid(True, alpha=0.25, linestyle=":", linewidth=0.8)
-    
-    # Single legend for design × material combinations
-    ax.legend(loc="upper left", fontsize=9, framealpha=0.95, 
+
+    ax.legend(loc="upper left", fontsize=9, framealpha=0.95,
              title="Design × Material", title_fontsize=10)
-    
+
+    # Add footnote about LHS stratification
+    ax.text(0.99, 0.01, "LHS stratified across 4 dimensions\n(incl. design + material)",
+            transform=ax.transAxes, fontsize=7, alpha=0.5,
+            ha="right", va="bottom", style="italic")
+
     _save(os.path.join(save_dir, "baseline_scatter.png"))
