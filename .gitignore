@@ -4,11 +4,12 @@ __pycache__/
 **/__pycache__/
 *.pyc
 .DS_Store
+**/logs/
 
 # Runtime data
 pfab_data/
 
 # Generated plots and data (main workflow + dev scripts)
 plots/
-dev/plots/
-dev/data/
+dev_plots/
+dev_data/
