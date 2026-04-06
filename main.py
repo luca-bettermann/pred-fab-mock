@@ -26,11 +26,8 @@ from agent_setup import build_agent
 from sensors import CameraSystem, EnergySensor, FabricationSystem
 from utils import params_from_spec, get_performance
 from visualization import (
-    plot_path_comparison,
     plot_path_comparison_3d,
     plot_filament_volume,
-    plot_physics_landscape,
-    plot_feature_heatmaps,
     plot_prediction_accuracy,
     plot_parameter_space,
     plot_performance_trajectory,
@@ -133,14 +130,11 @@ def main() -> None:
         print_experiment_row(exp_code, params, perf)
 
     print_phase_summary(baseline_log)
-    plot_path_comparison(baseline_exps[-1], fab.camera, params, save_dir=_D1)
     plot_path_comparison_3d(baseline_exps[-1], fab.camera, params, save_dir=_D1)
     plot_filament_volume(baseline_exps[-1], fab.camera, params, save_dir=_D1)
-    plot_feature_heatmaps(baseline_exps[-1], save_dir=_D1)
-    plot_physics_landscape(params, save_dir=_D1)
-    plot_physics_topology(save_dir=_D1)
+    plot_physics_topology(agent, save_dir=_D1)
     plot_baseline_scatter(baseline_log, save_dir=_D1)
-    print_section(f"7 plots saved to {_D1}/")
+    print_section(f"4 plots saved to {_D1}/")
 
     # ── Phase 2: Initial Training ──────────────────────────────────────────────
     print_phase_header(2, "Initial Training",

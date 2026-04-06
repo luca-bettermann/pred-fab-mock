@@ -10,10 +10,17 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
+from matplotlib.lines import Line2D
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+from sklearn.metrics import r2_score
 
 from pred_fab.core import ExperimentData, DataModule
 from pred_fab import PfabAgent
+from pred_fab.utils import SplitType  # type: ignore[attr-defined]
+
+# Local imports (type: ignore to avoid pyright issues with local modules)
+from sensors.physics import FILAMENT_RADIUS, path_deviation, energy_per_segment 
+from models.evaluation_models import PathAccuracyModel, EnergyConsumptionModel, ProductionRateModel 
 
 os.makedirs("./plots", exist_ok=True)
 
@@ -66,191 +73,6 @@ def _make_filament_tube(
     return X, Y, Z
 
 
-# ── Phase 1: As-Printed vs As-Designed (per-layer 2D grid) ───────────────────
-
-def plot_path_comparison(
-    exp_data: ExperimentData,
-    camera: Any,
-    params: Dict[str, Any],
-    save_dir: str = "./plots/phase_1_baseline",
-) -> None:
-    """Per-layer 2D grid: designed (grey dashed at y=0) vs as-printed (coloured by deviation).
-
-    One subplot per layer. The designed path is always y=0 (perfectly straight),
-    so any vertical spread in the measured line is path deviation. The fill between
-    the two makes deviation immediately visible; layer drift accumulates top-to-bottom.
-    """
-    N_LAYERS, N_SEGMENTS, N_PTS = 5, 4, 5
-    SEG_LENGTH = (N_PTS - 1) * 0.01   # 0.04 m per segment
-    SEG_GAP    = 0.008                 # gap between segments
-
-    # Pre-fetch all segment data and find the global deviation range for a shared colormap
-    cache: Dict[Tuple[int, int], Dict] = {}
-    all_devs: List[float] = []
-    for li in range(N_LAYERS):
-        for si in range(N_SEGMENTS):
-            data = camera.get_segment_data(params, li, si)
-            cache[(li, si)] = data
-            for mp, dp in zip(data["measured_path"], data["designed_path"]):
-                all_devs.append(abs(mp[1] - dp[1]))
-
-    vmax = max(all_devs) * 1.1 if all_devs else 1e-4
-    norm = Normalize(vmin=0.0, vmax=vmax)
-    cmap = plt.cm.RdYlGn_r  # type: ignore[attr-defined]
-
-    fig, axes = plt.subplots(1, N_LAYERS, figsize=(14, 3.2), sharey=True)
-
-    design   = params.get("design",      "?")
-    material = params.get("material",    "?")
-    speed    = params.get("print_speed", 0.0)
-    fig.suptitle(
-        f"As-Printed vs As-Designed  ·  {exp_data.code}\n"
-        f"design={design}   material={material}   speed={speed:.1f} mm/s",
-        fontsize=11, fontweight="bold",
-    )
-
-    for li, ax in enumerate(axes):
-        x_off = 0.0
-        all_x: List[float] = []
-        all_y_meas: List[float] = []
-        all_y_des: List[float]  = []
-
-        for si in range(N_SEGMENTS):
-            data = cache[(li, si)]
-            for (xd, yd), (_, ym) in zip(data["designed_path"], data["measured_path"]):
-                all_x.append(xd + x_off)
-                all_y_des.append(yd)
-                all_y_meas.append(ym)
-            x_off += SEG_LENGTH + SEG_GAP
-
-        devs     = [abs(ym - yd) for ym, yd in zip(all_y_meas, all_y_des)]
-        mean_dev = float(np.mean(devs))
-        line_col = cmap(norm(mean_dev))
-
-        # Reference (designed) path is always y=0
-        ax.axhline(0.0, color="#999999", linestyle="--", linewidth=1.2,
-                   label="Designed" if li == 0 else None)
-        # Measured path and shaded deviation area
-        ax.plot(all_x, all_y_meas, color=line_col, linewidth=1.8,
-                label="Measured" if li == 0 else None)
-        ax.fill_between(all_x, all_y_des, all_y_meas, color=line_col, alpha=0.25)
-
-        ax.set_title(f"Layer {li}\nΔ = {mean_dev * 1000:.2f} mm", fontsize=8)
-        ax.set_xlabel("Along-path [m]", fontsize=8)
-        ax.tick_params(labelsize=7)
-        ax.grid(True, alpha=0.2)
-
-        if li == 0:
-            ax.set_ylabel("Lateral offset [m]", fontsize=8)
-            ax.legend(fontsize=7, loc="upper left")
-
-    # Shared colorbar on the right
-    sm = ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-    cb = fig.colorbar(sm, ax=axes[-1], pad=0.03, fraction=0.06)
-    cb.set_label("Mean deviation [m]", fontsize=8)
-    cb.ax.tick_params(labelsize=7)
-
-    _save(os.path.join(save_dir, "path_comparison.png"))
-
-
-# ── Phase 1: Physics landscape ────────────────────────────────────────────────
-
-def plot_physics_landscape(params: Dict[str, Any], save_dir: str = "./plots/phase_1_baseline") -> None:
-    """U-shaped deviation vs print_speed curve for the experiment's conditions.
-
-    Shows where the actual experiment speed sits relative to the theoretical optimum.
-    The U-shape arises from two competing effects: high-speed inertia overshoot and
-    low-speed material sag. This plot gives the user intuition for why the optimizer
-    converges to a specific speed range for each design/material combination.
-    """
-    from sensors.physics import (  # type: ignore[import-not-found]
-        path_deviation as _phys_dev,
-        DELTA, THETA, DESIGN_COMPLEXITY, MAT_SAG, KAPPA, W_OPTIMAL,
-    )
-
-    design      = str(params.get("design",      "B"))
-    material    = str(params.get("material",    "clay"))
-    water_ratio = float(params.get("water_ratio", 0.42))
-    act_speed   = float(params.get("print_speed", 40.0))
-    n_segments  = int(params.get("n_segments",    4))
-
-    speeds = np.linspace(20.0, 60.0, 200)
-    # Average deviation over segments at layer 0 (no layer-drift offset)
-    mean_devs = np.array([
-        float(np.mean([_phys_dev(spd, design, si, water_ratio, material, layer_idx=0)
-                       for si in range(n_segments)]))
-        for spd in speeds
-    ])
-
-    # Theoretical optimal speed (from physics formula, clipped to search bounds)
-    complexity = DESIGN_COMPLEXITY[design]
-    sag_f      = MAT_SAG[material]
-    w_opt      = W_OPTIMAL[material]
-    flow       = max(0.1, 1.0 - KAPPA * (water_ratio - w_opt) ** 2)
-    spd_opt    = float(np.clip(np.sqrt(THETA * sag_f / (DELTA * complexity * flow)), 20.0, 60.0))
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    fig.suptitle(
-        f"Path Deviation vs Print Speed\n"
-        f"design={design}   material={material}   water_ratio={water_ratio:.2f}",
-        fontsize=11, fontweight="bold",
-    )
-
-    ax.plot(speeds, mean_devs, color=_PHASE_COLORS["inference"], linewidth=2.2,
-            label="Physics model (mean over segments)")
-
-    # Vertical: actual experiment speed
-    act_dev = float(np.interp(act_speed, speeds, mean_devs))
-    ax.axvline(act_speed, color=_PHASE_COLORS["exploration"], linestyle="-", linewidth=1.5,
-               label=f"Experiment speed ({act_speed:.1f} mm/s)")
-    ax.scatter([act_speed], [act_dev], color=_PHASE_COLORS["exploration"], s=55, zorder=5)
-
-    # Vertical: theoretical optimum
-    opt_dev = float(np.interp(spd_opt, speeds, mean_devs))
-    ax.axvline(spd_opt, color=_PHASE_COLORS["baseline"], linestyle="--", linewidth=1.5,
-               label=f"Optimal speed ({spd_opt:.1f} mm/s)")
-    ax.scatter([spd_opt], [opt_dev], color=_PHASE_COLORS["baseline"], s=55, zorder=5)
-
-    # Shade the low-speed (sag) and high-speed (overshoot) regions
-    ax.axvspan(20.0, spd_opt, alpha=0.06, color="#3377CC", label="Sag-dominated")
-    ax.axvspan(spd_opt, 60.0, alpha=0.06, color="#CC3333", label="Inertia-dominated")
-
-    ax.set_xlabel("Print Speed [mm/s]", fontsize=10)
-    ax.set_ylabel("Mean Path Deviation [m]", fontsize=10)
-    ax.legend(fontsize=8, loc="upper right")
-    ax.grid(True, alpha=0.25)
-
-    _save(os.path.join(save_dir, "physics_landscape.png"))
-
-
-# ── Phase 1: Feature heatmaps ─────────────────────────────────────────────────
-
-def plot_feature_heatmaps(exp_data: ExperimentData, save_dir: str = "./plots/phase_1_baseline") -> None:
-    """2-panel (5×4) heatmaps of path_deviation and energy_per_segment with value labels."""
-    n_layers, n_segments = 5, 4
-    features_cfg = [
-        ("path_deviation",     "Path Deviation [m]",      "RdYlGn_r"),
-        ("energy_per_segment", "Energy per Segment [J]",  "plasma"),
-    ]
-
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4))
-    fig.suptitle(f"Feature Heatmaps — {exp_data.code}", fontsize=12, fontweight="bold")
-
-    for ax, (fname, label, cmap_name) in zip(axes, features_cfg):
-        grid = exp_data.features.get_value(fname)  # type: ignore[return-value]
-        im = ax.imshow(grid, aspect="auto", cmap=cmap_name)
-        ax.set_xlabel("Segment", fontsize=9)
-        ax.set_ylabel("Layer",   fontsize=9)
-        ax.set_title(label, fontsize=10)
-        ax.set_xticks(range(n_segments))
-        ax.set_xticklabels([f"S{i}" for i in range(n_segments)])
-        ax.set_yticks(range(n_layers))
-        ax.set_yticklabels([f"L{i}" for i in range(n_layers)])
-        plt.colorbar(im, ax=ax, fraction=0.04, pad=0.04)
-        _annotate_heatmap(ax, grid)
-
-    _save(os.path.join(save_dir, "feature_heatmaps.png"))
 
 
 # ── Phase 2: Prediction accuracy ─────────────────────────────────────────────
@@ -264,9 +86,6 @@ def plot_prediction_accuracy(
 
     Returns a dict mapping feature name → R² on the validation set.
     """
-    from sklearn.metrics import r2_score
-    from pred_fab.utils import SplitType  # type: ignore[attr-defined]
-
     pred_system = agent.pred_system
     outputs     = pred_system.get_system_outputs()
 
@@ -522,7 +341,6 @@ def plot_path_comparison_3d(
     ghost so the measured path (solid, coloured by deviation) reads clearly in front.
     Layer drift accumulates upward — the colour shift from green → red tells the story.
     """
-    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
     N_LAYERS, N_SEGMENTS, N_PTS = 5, 4, 5
     SEG_LENGTH = (N_PTS - 1) * 0.01
@@ -599,18 +417,33 @@ def plot_path_comparison_3d(
     design   = params.get("design",      "?")
     material = params.get("material",    "?")
     speed    = params.get("print_speed", 0.0)
+    water    = params.get("water_ratio", 0.0)
 
     ax.set_xlabel("Along-path [m]",    labelpad=10, fontsize=9)   # type: ignore[union-attr]
-    ax.set_ylabel(f"Lateral offset [m ×{Y_SCALE:.0f}]", labelpad=10, fontsize=9)  # type: ignore[union-attr]
+    ax.set_ylabel(f"Lateral offset [m] (×{Y_SCALE:.0f})", labelpad=10, fontsize=9)  # type: ignore[union-attr]
     ax.set_zticks([i * LAYER_STEP for i in range(N_LAYERS)])      # type: ignore[union-attr]
-    ax.set_zticklabels([f"L{i}" for i in range(N_LAYERS)])        # type: ignore[union-attr]
-    ax.set_title(  # type: ignore[union-attr]
-        f"As-Printed vs As-Designed — 3D Tube View  ·  {exp_data.code}\n"
-        f"design={design}   material={material}   speed={speed:.1f} mm/s\n"
-        f"Blue wireframe = designed   Solid = as-printed   Colour = deviation   "
-        f"y ×{Y_SCALE:.0f} for visibility",
-        pad=12, fontsize=10,
+    ax.set_zticklabels([f"Layer {i}" for i in range(N_LAYERS)])        # type: ignore[union-attr]
+    
+    # Clean title structure
+    fig.suptitle(
+        f"3D Path Comparison — {exp_data.code}",
+        fontsize=12, fontweight="bold"
     )
+    ax.set_title(
+        f"Design {design} · {material} · {speed:.1f} mm/s · water_ratio={water:.2f}",
+        fontsize=9, pad=12
+    )
+    
+    # Add legend
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], color="#AACCFF", linestyle="--", linewidth=1.5, 
+               label="Designed path"),
+        Line2D([0], [0], color="#666666", linewidth=3, 
+               label="As-printed (colored by deviation)"),
+    ]
+    ax.legend(handles=legend_elements, loc="upper left", fontsize=8, framealpha=0.9)
+    
     ax.view_init(elev=28, azim=-62)  # type: ignore[union-attr]
     _save(os.path.join(save_dir, "path_comparison_3d.png"))
 
@@ -713,15 +546,13 @@ def plot_filament_volume(
 
             x_off += SEG_LENGTH + SEG_GAP
 
-        # Layer annotations omitted — z-tick labels already identify L0 / L4
-
     # Box aspect: x wide, y and z enlarged relative to data
     ax.set_box_aspect([5, 2.5, 2.0])  # type: ignore[union-attr]
 
     sm = ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     cb = fig.colorbar(sm, ax=ax, pad=0.09, shrink=0.50, aspect=16)
-    cb.set_label("Path Deviation [m]  (real)", fontsize=9)
+    cb.set_label("Path Deviation [m]", fontsize=9)
 
     design   = params.get("design",      "?")
     material = params.get("material",    "?")
@@ -729,17 +560,31 @@ def plot_filament_volume(
     water    = params.get("water_ratio", 0.0)
 
     ax.set_xlabel("Along-path [m]",          labelpad=10, fontsize=9)  # type: ignore[union-attr]
-    ax.set_ylabel(f"Lateral offset [m ×{Y_SCALE:.0f}]", labelpad=10, fontsize=9)  # type: ignore[union-attr]
+    ax.set_ylabel(f"Lateral offset [m] (×{Y_SCALE:.0f})", labelpad=10, fontsize=9)  # type: ignore[union-attr]
     ax.set_zticks([i * LAYER_STEP for i in range(len(SHOW_LAYERS))])  # type: ignore[union-attr]
-    ax.set_zticklabels([f"L{li}" for li in SHOW_LAYERS])               # type: ignore[union-attr]
-    ax.set_title(  # type: ignore[union-attr]
-        f"Filament Volume — Segments 1 & 2 · Layers 0 vs 4  ·  {exp_data.code}\n"
-        f"design={design}   material={material}   speed={speed:.1f} mm/s   "
-        f"water_ratio={water:.2f}\n"
-        f"Wireframe = designed   Solid = as-printed   "
-        f"Red arrows = deviation (y ×{Y_SCALE:.0f} for visibility)",
-        pad=12, fontsize=9,
+    ax.set_zticklabels([f"Layer {li}" for li in SHOW_LAYERS])               # type: ignore[union-attr]
+    
+    # Clean title structure
+    fig.suptitle(
+        f"Filament Volume Comparison — {exp_data.code}",
+        fontsize=12, fontweight="bold"
     )
+    ax.set_title(
+        f"Design {design} · {material} · {speed:.1f} mm/s · water_ratio={water:.2f}",
+        fontsize=9, pad=12
+    )
+    
+    # Add legend
+    legend_elements = [
+        Line2D([0], [0], color="#4488CC", linestyle="--", linewidth=1.5, 
+               label="Designed path"),
+        Line2D([0], [0], color="#666666", linewidth=3, 
+               label="As-printed (colored by deviation)"),
+        Line2D([0], [0], color="#FF2222", marker=">", linestyle="None",
+               markersize=8, label="Deviation arrows"),
+    ]
+    ax.legend(handles=legend_elements, loc="upper left", fontsize=8, framealpha=0.9)
+    
     ax.view_init(elev=18, azim=-72)  # type: ignore[union-attr]
     _save(os.path.join(save_dir, "filament_volume.png"))
 
@@ -903,6 +748,11 @@ def plot_acquisition_topology(
         "design": design, "material": material,
         "n_layers": n_layers, "n_segments": n_segs,
     }
+    
+    # Extract performance weights from calibration system
+    perf_weights = agent.calibration_system.performance_weights
+    perf_names = agent.calibration_system.perf_names_order
+    total_weight = sum(perf_weights.values())
 
     for si in range(N_S):
         for wi in range(N_W):
@@ -911,9 +761,12 @@ def plot_acquisition_topology(
                  "print_speed": float(S_mesh[si, wi])}
             try:
                 perf_dict = agent.calibration_system.perf_fn(p)
-                acc = float(perf_dict.get("path_accuracy",    0.0) or 0.0)
-                eff = float(perf_dict.get("energy_efficiency", 0.0) or 0.0)
-                perf_grid[si, wi] = 0.5 * acc + 0.5 * eff
+                # Compute weighted sum using actual calibration weights
+                weighted_sum = sum(
+                    perf_weights.get(name, 0.0) * float(perf_dict.get(name, 0.0) or 0.0)
+                    for name in perf_names
+                )
+                perf_grid[si, wi] = weighted_sum / total_weight
             except Exception:
                 perf_grid[si, wi] = 0.0
             try:
@@ -975,8 +828,9 @@ def plot_acquisition_topology(
             )
 
         if mark_proposed:
-            ax.scatter([prop_w], [prop_spd], s=160, marker="*", color="#FFD700",
-                       edgecolors="#333333", linewidths=0.8, zorder=10,
+            # Use cross (x) instead of star
+            ax.scatter([prop_w], [prop_spd], s=180, marker="x", color="#FFD700",
+                       linewidths=3.0, zorder=10,
                        label=f"Proposed  (w={prop_w:.2f}, spd={prop_spd:.1f})")
             ax.legend(fontsize=7, loc="lower right")
 
@@ -992,21 +846,32 @@ def plot_acquisition_topology(
 
 # ── Phase 1: Physics topology grid ────────────────────────────────────────────
 
-def plot_physics_topology(save_dir: str = "./plots/phase_1_baseline") -> None:
+def plot_physics_topology(
+    agent: PfabAgent,
+    save_dir: str = "./plots/phase_1_baseline",
+) -> None:
     """4×4 grid showing true physics performance landscapes for all design+material combos.
 
     Rows: (A,clay), (A,concrete), (B,clay), (B,concrete).
-    Columns: path_accuracy, energy_efficiency, production_rate, combined (2:1:1 weights).
+    Columns: path_accuracy, energy_efficiency, production_rate, combined (weighted).
     Uses the physics functions directly — no ML model involved.
+    
+    Args:
+        agent: PfabAgent with configured calibration system (for performance weights).
+        save_dir: Directory to save the plot.
     """
-    from sensors.physics import (  # type: ignore[import-not-found]
-        path_deviation as _phys_dev,
-        energy_per_segment as _phys_eng,
-    )
-    from models.evaluation_models import PathAccuracyModel, EnergyConsumptionModel, ProductionRateModel
+    # Extract weights from calibration system
+    perf_weights = agent.calibration_system.performance_weights
+    w_acc = perf_weights.get("path_accuracy", 1.0)
+    w_eff = perf_weights.get("energy_efficiency", 1.0)
+    w_rate = perf_weights.get("production_rate", 1.0)
+    total_weight = w_acc + w_eff + w_rate
+    
+    # Format weights for display
+    weights_str = f"({w_acc:.0f}:{w_eff:.0f}:{w_rate:.0f})"
 
     COMBOS = [("A", "clay"), ("A", "concrete"), ("B", "clay"), ("B", "concrete")]
-    N_W, N_S = 20, 20
+    N_W, N_S = 40, 40  # increased resolution for smoother topology
     water_vals = np.linspace(0.30, 0.50, N_W)
     speed_vals = np.linspace(20.0, 60.0, N_S)
     W_mesh, S_mesh = np.meshgrid(water_vals, speed_vals)
@@ -1018,15 +883,21 @@ def plot_physics_topology(save_dir: str = "./plots/phase_1_baseline") -> None:
 
     n_rows = len(COMBOS)
     n_cols = 4
-    col_titles = ["Path Accuracy", "Energy Efficiency", "Production Rate", "Combined (2:1:1)"]
-    row_labels  = [f"{d}/{m}" for d, m in COMBOS]
+    col_titles = ["Path Accuracy", "Energy Efficiency", "Production Rate", f"Combined {weights_str}"]
+    row_labels  = [f"Design {d}\nMaterial: {m}" for d, m in COMBOS]
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, 12))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(18, 13))
     fig.suptitle("Physics Performance Topology — All Design × Material Combos",
-                 fontsize=13, fontweight="bold")
+                 fontsize=14, fontweight="bold", y=0.995)
 
-    col_cmaps = ["YlGn", "PuBu", "YlOrRd", "RdYlGn"]
+    # Use plasma colormap for individual metrics (better topology visibility)
+    # and RdYlGn for combined
+    individual_cmap = "plasma"
+    combined_cmap = "RdYlGn"
 
+    # Store all grids to compute global bounds per column
+    all_grids: List[List[np.ndarray]] = []
+    
     # Precompute grids for each combo and column
     for row_idx, (design, material) in enumerate(COMBOS):
         acc_grid  = np.zeros((N_S, N_W))
@@ -1040,7 +911,7 @@ def plot_physics_topology(save_dir: str = "./plots/phase_1_baseline") -> None:
 
                 # Path accuracy: avg deviation over 5 layers × 4 segments
                 devs = [
-                    _phys_dev(spd, design, seg_i, w, material, li)
+                    path_deviation(spd, design, seg_i, w, material, li)
                     for li in range(5) for seg_i in range(4)
                 ]
                 avg_dev = float(np.mean(devs))
@@ -1048,7 +919,7 @@ def plot_physics_topology(save_dir: str = "./plots/phase_1_baseline") -> None:
 
                 # Energy efficiency
                 energies = [
-                    _phys_eng(spd, material, design, w, seg_i, li)
+                    energy_per_segment(spd, material, design, w, seg_i, li)
                     for li in range(5) for seg_i in range(4)
                 ]
                 avg_e = float(np.mean(energies))
@@ -1057,28 +928,60 @@ def plot_physics_topology(save_dir: str = "./plots/phase_1_baseline") -> None:
                 # Production rate
                 rate_grid[si, wi] = spd / max_spd
 
-        combined_grid = (2 * acc_grid + eff_grid + rate_grid) / 4
-
-        grids = [acc_grid, eff_grid, rate_grid, combined_grid]
-        for col_idx, (grid, cmap_name) in enumerate(zip(grids, col_cmaps)):
+        # Use actual calibration weights for combined score
+        combined_grid = (w_acc * acc_grid + w_eff * eff_grid + w_rate * rate_grid) / total_weight
+        all_grids.append([acc_grid, eff_grid, rate_grid, combined_grid])
+    
+    # Compute global bounds for each column (same bounds vertically stacked)
+    col_vmins = []
+    col_vmaxs = []
+    for col_idx in range(n_cols):
+        col_values = np.concatenate([all_grids[row_idx][col_idx].flatten() for row_idx in range(n_rows)])
+        col_vmins.append(float(np.min(col_values)))
+        col_vmaxs.append(float(np.max(col_values)))
+    
+    # Plot all grids with consistent column bounds
+    for row_idx in range(n_rows):
+        grids = all_grids[row_idx]
+        cmaps = [individual_cmap, individual_cmap, individual_cmap, combined_cmap]
+        
+        for col_idx, (grid, cmap_name) in enumerate(zip(grids, cmaps)):
             ax = axes[row_idx, col_idx]
-            cf = ax.contourf(W_mesh, S_mesh, grid, levels=20, cmap=cmap_name, vmin=0.0, vmax=1.0)
-            ax.contour(W_mesh, S_mesh, grid, levels=5, colors="white", alpha=0.20, linewidths=0.4)
-            fig.colorbar(cf, ax=ax, pad=0.02, fraction=0.045)
+            
+            vmin = col_vmins[col_idx]
+            vmax = col_vmaxs[col_idx]
+            
+            # Use more levels for smoother appearance
+            cf = ax.contourf(W_mesh, S_mesh, grid, levels=30, cmap=cmap_name, 
+                           vmin=vmin, vmax=vmax)
+            
+            # Add contour lines for better topology visibility
+            contour_levels = 8
+            ax.contour(W_mesh, S_mesh, grid, levels=contour_levels, 
+                      colors="white", alpha=0.4, linewidths=0.7)
+            
+            # Add colorbar with better sizing
+            cb = fig.colorbar(cf, ax=ax, pad=0.02, fraction=0.046, aspect=20)
+            cb.ax.tick_params(labelsize=7)
 
+            # Titles and labels
             if row_idx == 0:
-                ax.set_title(col_titles[col_idx], fontsize=10, fontweight="bold")
+                ax.set_title(col_titles[col_idx], fontsize=11, fontweight="bold", pad=8)
+            
+            # Enhanced row labels for better category visibility
             if col_idx == 0:
-                ax.set_ylabel(f"{row_labels[row_idx]}\nPrint Speed [mm/s]", fontsize=8)
+                ax.set_ylabel(f"{row_labels[row_idx]}\nPrint Speed [mm/s]", 
+                            fontsize=9, fontweight="bold")
             else:
                 ax.set_ylabel("Print Speed [mm/s]", fontsize=8)
+            
             ax.set_xlabel("Water Ratio", fontsize=8)
             ax.set_xlim(0.30, 0.50)
             ax.set_ylim(20.0, 60.0)
             ax.tick_params(labelsize=7)
-            ax.grid(True, alpha=0.10)
+            ax.grid(True, alpha=0.12, linestyle=":", linewidth=0.5)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.tight_layout(rect=[0, 0, 1, 0.985])
     _save(os.path.join(save_dir, "physics_topology.png"))
 
 
@@ -1088,68 +991,63 @@ def plot_baseline_scatter(
     experiments: List[Tuple[str, Dict[str, Any], Dict[str, float]]],
     save_dir: str = "./plots/phase_1_baseline",
 ) -> None:
-    """3D scatter: z-axis = design+material combo (4 levels), x/y = water_ratio/print_speed.
+    """2D scatter: water_ratio vs print_speed, colored by design+material combination.
 
-    Each experiment appears as a point on its design+material floor.
-    Point color = combined performance score (2:1:1 weights).
+    Each experiment appears as a point. Color distinguishes design+material combo.
+    All points are circles with uniform size for clean visual appearance.
     """
     COMBOS = [("A", "clay"), ("A", "concrete"), ("B", "clay"), ("B", "concrete")]
-    combo_z = {combo: i for i, combo in enumerate(COMBOS)}
-    z_labels = [f"{d}/{m}" for d, m in COMBOS]
-
-    def _combined(perf: Dict[str, float]) -> float:
-        return (
-            2 * perf.get("path_accuracy",    0.0)
-            +   perf.get("energy_efficiency", 0.0)
-            +   perf.get("production_rate",   0.0)
-        ) / 4
-
-    xs, ys, zs, cs, labels_list = [], [], [], [], []
+    # Coherent color palette: greens and blues (distinguishable but harmonious)
+    COMBO_COLORS = ["#2E7D32", "#1976D2", "#66BB6A", "#42A5F5"]
+    
+    # Organize data by combo
+    combo_data: Dict[Tuple[str, str], List] = {c: [] for c in COMBOS}
+    
     for code, params, perf in experiments:
         design   = str(params.get("design",   "A"))
         material = str(params.get("material", "clay"))
-        z = float(combo_z.get((design, material), 0))
-        xs.append(float(params.get("water_ratio", 0.0)))
-        ys.append(float(params.get("print_speed",  0.0)))
-        zs.append(z)
-        cs.append(_combined(perf))
-        labels_list.append(code)
+        combo = (design, material)
+        
+        x = float(params.get("water_ratio", 0.0))
+        y = float(params.get("print_speed",  0.0))
+        
+        combo_data[combo].append((x, y, code))
 
-    fig = plt.figure(figsize=(11, 7))
-    ax  = fig.add_subplot(111, projection="3d")
-    fig.suptitle("Baseline Experiments — Parameter & Performance Scatter",
-                 fontsize=12, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(10, 7))
+    fig.suptitle("Baseline Experiments — Parameter Space",
+                 fontsize=13, fontweight="bold")
 
-    # Semi-transparent floor planes at each z level
-    for z_level in range(len(COMBOS)):
-        xx = np.array([0.30, 0.50, 0.50, 0.30])
-        yy = np.array([20.0, 20.0, 60.0, 60.0])
-        zz = np.full(4, float(z_level))
-        verts = [list(zip(xx, yy, zz))]
-        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-        poly = Poly3DCollection(verts, alpha=0.06, facecolor="#888888", edgecolor="#999999")
-        ax.add_collection3d(poly)  # type: ignore[union-attr]
+    # Plot each combo separately for legend
+    for combo_idx, combo in enumerate(COMBOS):
+        data = combo_data[combo]
+        if not data:
+            continue
+            
+        xs = [d[0] for d in data]
+        ys = [d[1] for d in data]
+        labels = [d[2] for d in data]
+        
+        design, material = combo
+        label = f"Design {design} / {material}"
+        color = COMBO_COLORS[combo_idx]
+        
+        ax.scatter(xs, ys, s=120, c=color, marker="o", 
+                  alpha=0.80, edgecolors="white", linewidths=1.8,
+                  label=label, zorder=3)
+        
+        # Add experiment labels
+        for x, y, lbl in zip(xs, ys, labels):
+            ax.annotate(lbl, (x, y), xytext=(4, 4), textcoords="offset points",
+                       fontsize=7, alpha=0.75)
 
-    cmap = plt.cm.RdYlGn  # type: ignore[attr-defined]
-    sc = ax.scatter(  # type: ignore[union-attr]
-        xs, ys, zs,
-        c=cs, cmap=cmap, vmin=0.0, vmax=1.0,
-        s=80, edgecolors="white", linewidths=0.8, zorder=5,
-    )
-
-    for x, y, z, lbl in zip(xs, ys, zs, labels_list):
-        ax.text(x, y, z + 0.08, lbl, fontsize=7, ha="center", zorder=6)  # type: ignore[union-attr]
-
-    cb = fig.colorbar(sc, ax=ax, pad=0.12, shrink=0.55, aspect=18)
-    cb.set_label("Combined Score (2:1:1)", fontsize=9)
-
-    ax.set_xlabel("Water Ratio",        labelpad=8, fontsize=9)   # type: ignore[union-attr]
-    ax.set_ylabel("Print Speed [mm/s]", labelpad=8, fontsize=9)   # type: ignore[union-attr]
-    ax.set_zticks(list(range(len(COMBOS))))                        # type: ignore[union-attr]
-    ax.set_zticklabels(z_labels, fontsize=8)                       # type: ignore[union-attr]
-    ax.set_xlim(0.30, 0.50)  # type: ignore[union-attr]
-    ax.set_ylim(20.0, 60.0)  # type: ignore[union-attr]
-    ax.set_zlim(-0.3, len(COMBOS) - 0.7)  # type: ignore[union-attr]
-    ax.view_init(elev=20, azim=-55)  # type: ignore[union-attr]
-
+    ax.set_xlabel("Water Ratio", fontsize=11)
+    ax.set_ylabel("Print Speed [mm/s]", fontsize=11)
+    ax.set_xlim(0.28, 0.52)
+    ax.set_ylim(18.0, 62.0)
+    ax.grid(True, alpha=0.25, linestyle=":", linewidth=0.8)
+    
+    # Single legend for design × material combinations
+    ax.legend(loc="upper left", fontsize=9, framealpha=0.95, 
+             title="Design × Material", title_fontsize=10)
+    
     _save(os.path.join(save_dir, "baseline_scatter.png"))
