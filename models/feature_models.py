@@ -8,6 +8,7 @@ from pred_fab.utils import PfabLogger
 
 from sensors.camera import CameraSystem
 from sensors.energy import EnergySensor
+from sensors.physics import production_rate as _physics_production_rate
 
 
 class PrintingFeatureModel(IFeatureModel):
@@ -71,14 +72,18 @@ class EnergyFeatureModel(IFeatureModel):
 
 
 class ProductionRateFeatureModel(IFeatureModel):
-    """Returns print_speed as the production_rate proxy at each spatial position."""
+    """Effective production rate per position, accounting for nozzle-slip at high water ratios.
+
+    At low-to-moderate water ratios, rate tracks print_speed. Above the slip threshold
+    (W_SLIP in physics.py) extrusion rate falls below commanded speed.
+    """
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
 
     @property
     def input_parameters(self) -> List[str]:
-        return ["print_speed"]
+        return ["print_speed", "water_ratio", "material"]
 
     @property
     def outputs(self) -> List[str]:
@@ -90,4 +95,9 @@ class ProductionRateFeatureModel(IFeatureModel):
     def _compute_feature_logic(
         self, data: Dict, params: Dict, visualize: bool = False, **dimensions: Any
     ) -> Dict[str, float]:
-        return {"production_rate": float(params["print_speed"])}
+        rate = _physics_production_rate(
+            print_speed=float(params["print_speed"]),
+            water_ratio=float(params["water_ratio"]),
+            material=str(params["material"]),
+        )
+        return {"production_rate": rate}

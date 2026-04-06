@@ -130,21 +130,22 @@ class EnergyPredictionModel(IPredictionModel):
 
 
 class ProductionRatePredictionModel(IPredictionModel):
-    """Deterministic production_rate prediction: rate = print_speed / 60.
+    """Predicts production_rate from print_speed, water_ratio, and material.
 
-    No ML needed — forward_pass implements the formula directly.
-    The input is normalized print_speed (schema bounds [20, 60] → [0, 1]).
+    production_rate is no longer a trivial speed proxy: nozzle-slip above W_SLIP
+    (see physics.py) makes water_ratio and material relevant inputs.  An MLP is
+    used to learn the slip response from data, exactly as for the other features.
     """
-
-    SPEED_MIN = 20.0
-    SPEED_MAX = 60.0
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
+        self._model: Optional[Pipeline] = None
+        self._is_trained = False
 
     @property
     def input_parameters(self) -> List[str]:
-        return ["print_speed"]
+        # production_rate depends on speed (linear baseline) and water_ratio/material (slip term)
+        return ["print_speed", "water_ratio", "material"]
 
     @property
     def input_features(self) -> List[str]:
@@ -160,12 +161,26 @@ class ProductionRatePredictionModel(IPredictionModel):
         val_batches: List[Tuple[np.ndarray, np.ndarray]],
         **kwargs: Any,
     ) -> None:
-        pass  # deterministic — no training needed
+        if not train_batches:
+            self.logger.warning("ProductionRatePredictionModel.train() called with no training data.")
+            return
+        X = np.vstack([b[0] for b in train_batches])
+        y = np.vstack([b[1] for b in train_batches]).ravel()
+        self._model = Pipeline([
+            ("scaler", StandardScaler()),
+            ("mlp", MLPRegressor(
+                hidden_layer_sizes=(32, 16), max_iter=1000,
+                random_state=42, alpha=0.01,
+            )),
+        ])
+        self._model.fit(X, y)
+        self._is_trained = True
+        self.logger.info(f"ProductionRatePredictionModel trained on {len(X)} samples.")
 
     def forward_pass(self, X: np.ndarray) -> np.ndarray:
-        # DataModule uses z-score normalization. production_rate = print_speed / 60 is a
-        # linear transform, so z-score(production_rate) == z-score(print_speed) exactly.
-        return X[:, [0]]
+        if self._model is None or not self._is_trained:
+            return np.zeros((X.shape[0], 1))
+        return self._model.predict(X).reshape(-1, 1)  # type: ignore[return-value]
 
     def encode(self, X: np.ndarray) -> np.ndarray:
         return X

@@ -92,7 +92,7 @@ def _make_fresh_env(data_root: str) -> Tuple[Any, Any, Any, Dataset]:
     schema = build_schema(root_folder=data_root)
     fab    = FabricationSystem(CameraSystem(), EnergySensor())
     agent  = build_agent(schema, fab.camera, fab.energy)
-    agent.configure_calibration(bounds=CAL_BOUNDS, performance_weights=PERF_WEIGHTS)
+    agent.configure(bounds=CAL_BOUNDS, performance_weights=PERF_WEIGHTS)
     dataset = Dataset(schema=schema)
     agent.logger.set_console_output(False)
     return agent, fab, schema, dataset
@@ -254,7 +254,7 @@ def run_exploration_workflow(
     Returns (training_sizes, r2_per_step, cumulative_nfev_per_step).
     """
     agent, fab2, schema, dataset = _make_fresh_env(DATA_ROOT + f"_explore_{optimizer}")
-    agent.calibration_system.optimizer = optimizer
+    agent.configure(optimizer=optimizer)
 
     # Phase 1: Baseline
     specs = agent.baseline_step(n=N_BASELINE)
@@ -277,7 +277,7 @@ def run_exploration_workflow(
     # Phase 2: Exploration rounds
     for i in range(N_EXPLORE):
         spec = agent.exploration_step(dm, w_explore=W_EXPLORE)
-        nfev_step = agent.calibration_system.last_opt_nfev
+        nfev_step = agent.last_opt_nfev
         params = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab2)
         _run_and_evaluate(dataset, agent, fab2, params, f"explore_{i+1:02d}")
         dm.update()

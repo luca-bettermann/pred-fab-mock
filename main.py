@@ -96,7 +96,7 @@ def main() -> None:
     fab    = FabricationSystem(CameraSystem(), EnergySensor())
     agent  = build_agent(schema, fab.camera, fab.energy)
 
-    agent.configure_calibration(
+    agent.configure(
         bounds={
             "water_ratio": (0.30, 0.50),
             "print_speed": (20.0, 60.0),
@@ -130,8 +130,8 @@ def main() -> None:
         print_experiment_row(exp_code, params, perf)
 
     print_phase_summary(baseline_log)
-    plot_path_comparison_3d(baseline_exps[-1], fab.camera, params, save_dir=_D1)
-    plot_filament_volume(baseline_exps[-1], fab.camera, params, save_dir=_D1)
+    plot_path_comparison_3d(baseline_exps[-1], fab.camera, params, save_dir=_D1)  # type: ignore[possibly-undefined]
+    plot_filament_volume(baseline_exps[-1], fab.camera, params, save_dir=_D1)  # type: ignore[possibly-undefined]
     plot_physics_topology(agent, save_dir=_D1)
     plot_baseline_scatter(baseline_log, save_dir=_D1)
     print_section(f"4 plots saved to {_D1}/")
@@ -170,22 +170,8 @@ def main() -> None:
         spec = agent.exploration_step(datamodule, w_explore=W_EXPLORE)
         agent.logger.set_console_output(True)
 
-        cs = agent.calibration_system
-        # Evaluate perf and uncertainty at the proposed point
         _proposed_p = {**prev_params, **params_from_spec(spec), "n_layers": 5, "n_segments": 4}
-        _perf_at_proposed = cs.perf_fn(_proposed_p)
-        _perf_combined = (
-            2 * _perf_at_proposed.get("path_accuracy",    0.0)  # type: ignore[operator]
-            +   _perf_at_proposed.get("energy_efficiency", 0.0)  # type: ignore[operator]
-            +   _perf_at_proposed.get("production_rate",   0.0)  # type: ignore[operator]
-        ) / 4
-        _dm = cs._active_datamodule  # type: ignore[attr-defined]
-        _u_at_proposed = (
-            float(agent.pred_system.uncertainty(_dm.params_to_array(_proposed_p)))
-            if _dm is not None else 0.0
-        )
-
-        params   = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
+        params = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
         exp_code = f"explore_{i+1:02d}"
 
         # Topology plot before running the experiment (shows what the model "sees")
@@ -209,8 +195,9 @@ def main() -> None:
         perf_history.append((params, perf))
         explore_log.append((exp_code, params, perf))
         prev_params = params
-        print_explore_row(exp_code, params, perf, _u_at_proposed, cs.last_opt_score, W_EXPLORE)
-        print_optimizer_row(cs.last_opt_n_starts, cs.last_opt_nfev)
+        _u_at_proposed = agent.predict_uncertainty(_proposed_p, datamodule)
+        print_explore_row(exp_code, params, perf, _u_at_proposed, agent.last_opt_score, W_EXPLORE)
+        print_optimizer_row(agent.last_opt_n_starts, agent.last_opt_nfev)
 
     print_phase_summary(explore_log)
     plot_parameter_space(all_params, all_phases, perf_history, save_dir=_D3)
@@ -220,7 +207,7 @@ def main() -> None:
     DESIGN_INTENT = {"design": "A", "material": "concrete"}
     print_phase_header(4, "Inference",
                        f"{_n_infer} rounds  ·  intent fixed: {DESIGN_INTENT}  ·  model optimises w_explore=0")
-    agent.configure_calibration(fixed_params=DESIGN_INTENT)
+    agent.configure(fixed_params=DESIGN_INTENT)
     params = _with_dimensions({**prev_params, **DESIGN_INTENT}, fab)
 
     infer_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
@@ -254,9 +241,8 @@ def main() -> None:
         all_codes.append(exp_code)
         perf_history.append((params, perf))
         infer_log.append((exp_code, params, perf))
-        cs_infer = agent.calibration_system
-        print_infer_row(exp_code, params, perf, cs_infer.last_opt_score)
-        print_optimizer_row(cs_infer.last_opt_n_starts, cs_infer.last_opt_nfev)
+        print_infer_row(exp_code, params, perf, agent.last_opt_score)
+        print_optimizer_row(agent.last_opt_n_starts, agent.last_opt_nfev)
         params = next_params
 
     prev_params = params
@@ -268,8 +254,10 @@ def main() -> None:
     # ── Phase 5: Online Adaptation ─────────────────────────────────────────────
     print_phase_header(5, "Online Adaptation",
                        "print_speed adjusted after each layer based on live deviation feedback")
-    agent.configure_step_parameter("print_speed", "n_layers")
-    agent.configure_calibration(adaptation_delta={"print_speed": 5.0})
+    agent.configure(
+        step_parameters={"print_speed": "n_layers"},
+        adaptation_delta={"print_speed": 5.0},
+    )
 
     adapt_params = _with_dimensions({**prev_params, "print_speed": 40.0}, fab)
     adapt_exp    = dataset.create_experiment("adapt_01", parameters=adapt_params)
@@ -301,7 +289,7 @@ def main() -> None:
             agent.logger.set_console_output(True)
             new_speed = float(spec.initial_params.get("print_speed", speed_before))
             adapt_params["print_speed"] = new_speed
-            n_evals = agent.calibration_system.last_opt_nfev
+            n_evals = agent.last_opt_nfev
             print_adaptation_row(layer_idx, speed_before, layer_dev, speed_after=new_speed, n_evals=n_evals)
         else:
             print_adaptation_row(layer_idx, speed_before, layer_dev)
