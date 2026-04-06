@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 
 from pred_fab.core import Dataset
+from pred_fab.orchestration import Optimizer
 
 from schema import build_schema
 from agent_setup import build_agent
@@ -97,11 +98,20 @@ def main() -> None:
     agent  = build_agent(schema, fab.camera, fab.energy)
 
     agent.configure(
+        # Search space
         bounds={
             "water_ratio": (0.30, 0.50),
             "print_speed": (20.0, 60.0),
         },
+        # Calibration objective weights
         performance_weights={"path_accuracy": 2, "energy_efficiency": 1, "production_rate": 1},
+        # KDE uncertainty: bubble size c → h = c·√d/√N, γ = max(1, c·√N)
+        exploration_radius=0.5,
+        # MPC lookahead: 0 = greedy, N = N-step discounted lookahead
+        mpc_lookahead=0,
+        mpc_discount=0.9,
+        # Optimizer backend
+        optimizer=Optimizer.LBFGSB,
     )
 
     dataset = Dataset(schema=schema)
