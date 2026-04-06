@@ -775,7 +775,15 @@ def plot_acquisition_topology(
             except Exception:
                 unc_grid[si, wi] = 1.0
 
-    combined_grid = (1.0 - w_explore) * perf_grid + w_explore * unc_grid
+    # Min-max normalize both surfaces so w_explore has calibrated influence
+    # (matches the normalization used in the actual acquisition function)
+    p_min, p_max = float(perf_grid.min()), float(perf_grid.max())
+    u_min, u_max = float(unc_grid.min()), float(unc_grid.max())
+    p_span = p_max - p_min if (p_max - p_min) > 1e-10 else 1.0
+    u_span = u_max - u_min if (u_max - u_min) > 1e-10 else 1.0
+    perf_norm = (perf_grid - p_min) / p_span
+    unc_norm  = (unc_grid  - u_min) / u_span
+    combined_grid = (1.0 - w_explore) * perf_norm + w_explore * unc_norm
 
     # ── Figure ────────────────────────────────────────────────────────────────
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
