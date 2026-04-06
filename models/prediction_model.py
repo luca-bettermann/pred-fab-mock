@@ -74,8 +74,8 @@ class DeviationPredictionModel(IPredictionModel):
 class EnergyPredictionModel(IPredictionModel):
     """Predicts energy_per_segment from energy-relevant process parameters.
 
-    Energy scales with print_speed, material stiffness, and design path length.
-    water_ratio has no effect on energy and is excluded.
+    Energy has a U-shaped water_ratio response (W_ENERGY_OPT differs from W_OPTIMAL
+    for deviation), creating a genuine Pareto conflict with path accuracy.
     """
 
     def __init__(self, logger: PfabLogger) -> None:
@@ -85,10 +85,10 @@ class EnergyPredictionModel(IPredictionModel):
 
     @property
     def input_parameters(self) -> List[str]:
-        # energy depends on print_speed, material stiffness, and design path length
-        # (see DESIGN_ENERGY_SCALE in physics.py).
+        # energy depends on print_speed, water_ratio (U-shaped penalty), material, and design
+        # (see W_ENERGY_OPT, KAPPA_E, DESIGN_ENERGY_SCALE in physics.py).
         # n_layers=layer_idx (0-4), n_segments=segment_idx (0-3) for per-position prediction.
-        return ["design", "material", "print_speed", "n_layers", "n_segments"]
+        return ["design", "material", "print_speed", "water_ratio", "n_layers", "n_segments"]
 
     @property
     def input_features(self) -> List[str]:
@@ -163,9 +163,9 @@ class ProductionRatePredictionModel(IPredictionModel):
         pass  # deterministic — no training needed
 
     def forward_pass(self, X: np.ndarray) -> np.ndarray:
-        # X[:,0] = normalized print_speed in [0,1] via min-max on [20, 60]
-        speed = X[:, 0] * (self.SPEED_MAX - self.SPEED_MIN) + self.SPEED_MIN
-        return (speed / self.SPEED_MAX).reshape(-1, 1)
+        # DataModule uses z-score normalization. production_rate = print_speed / 60 is a
+        # linear transform, so z-score(production_rate) == z-score(print_speed) exactly.
+        return X[:, [0]]
 
     def encode(self, X: np.ndarray) -> np.ndarray:
         return X

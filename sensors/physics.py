@@ -54,6 +54,11 @@ LAYER_DRIFT_COUPLING = 0.000015 # m/layer per mm/s speed error
 ETA = 0.8    # base energy per segment [J]
 PHI = 0.18   # energy per unit print speed [J / (mm/s)]
 
+# Water-ratio optimum for energy (different from W_OPTIMAL for deviation — creates Pareto conflict).
+# Too little water → high pump resistance; too much → heat of vaporisation load.
+W_ENERGY_OPT = {"clay": 0.38, "concrete": 0.32}
+KAPPA_E      = 15.0   # curvature of energy penalty well
+
 # ── Visualization ──────────────────────────────────────────────────────────────
 FILAMENT_RADIUS = 0.004  # m — fixed filament radius for 3D plots
 
@@ -108,12 +113,14 @@ def energy_per_segment(
 ) -> float:
     """Deterministic energy consumed per segment [J].
 
-    Energy scales monotonically with print speed, material stiffness, and design
-    path length. Upper layers and curved segments consume slightly more.
+    Energy scales with print speed, material stiffness, and design path length.
+    A U-shaped water_ratio term (W_ENERGY_OPT differs from W_OPTIMAL) creates a
+    genuine Pareto conflict between minimising deviation and minimising energy.
     """
     mat_e  = MAT_ENERGY[material]
     des_e  = DESIGN_ENERGY_SCALE[design]
     curv   = segment_curvature(segment_idx)
     avg_curv = 1.025  # mean of curvature(0..3)
     pos_scale = (curv / avg_curv) * (1.0 + 0.03 * layer_idx)
-    return (ETA + PHI * print_speed) * mat_e * des_e * pos_scale
+    water_factor = 1.0 + KAPPA_E * (water_ratio - W_ENERGY_OPT[material]) ** 2
+    return (ETA + PHI * print_speed) * mat_e * des_e * pos_scale * water_factor
