@@ -42,7 +42,7 @@ PERFORMANCE_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "producti
 EXPLORATION_RADIUS  = 0.5                    # KDE bubble size c → h = c·√d/√N, γ = max(1, c·√N)
 MPC_LOOKAHEAD       = 0                      # 0 = greedy, N = N-step discounted lookahead
 MPC_DISCOUNT        = 0.9                    # discount factor γ for MPC
-OPTIMIZER           = Optimizer.LBFGSB       # LBFGSB (gradient, fast) or DE (global, slower)
+OPTIMIZER           = Optimizer.DE           # LBFGSB (gradient, fast) or DE (global, slower)
 
 # Step-level parameters (per-call, overridable)
 W_EXPLORE             = 0.7                  # exploration weight κ ∈ (0, 1]

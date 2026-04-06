@@ -7,12 +7,15 @@ Self-contained showcase of the full PFAB journey (baseline → exploration → i
 
 | File / Folder | Description |
 |---|---|
-| `main.py` | Full journey script — Phases 0–5 |
+| `main.py` | Full journey script — configuration + phase orchestration |
+| `workflow.py` | Workflow helpers: `JourneyState`, `run_baseline_phase`, `run_exploration_round`, `run_inference_round`, `run_adaptation_phase` |
 | `schema.py` | `build_schema()` → DatasetSchema |
 | `agent_setup.py` | `build_agent(schema, camera, energy)` → configured PfabAgent |
+| `utils.py` | Small helpers: `params_from_spec`, `get_performance` |
 | `sensors/` | Simulated sensor systems (camera, energy) and physics |
 | `models/` | Feature, evaluation, and prediction model implementations |
-| `visualization/` | Per-phase plotting helpers |
+| `visualization/` | Per-phase plotting and console output (plots.py + console.py) |
+| `dev/` | Benchmark scripts: `eval_exploration.py` (L-BFGS-B vs DE vs random) |
 
 ## Key Points
 - Schema v4: 2 designs (A, B) × 2 materials (clay, concrete); 3 features (path_deviation, energy_per_segment, production_rate); 3 performance attributes (path_accuracy, energy_efficiency, production_rate).

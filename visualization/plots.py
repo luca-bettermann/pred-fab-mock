@@ -31,7 +31,7 @@ _PHASE_COLORS = {"baseline": "#4C72B0", "exploration": "#DD8452", "inference": "
 def _save(path: str) -> None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     plt.tight_layout()
-    plt.savefig(path, dpi=120, bbox_inches="tight")
+    plt.savefig(path, dpi=200, bbox_inches="tight")
     plt.close()
 
 
@@ -128,8 +128,8 @@ def plot_prediction_accuracy(
         ax.scatter(y_val[:, i], y_pred[:, i], alpha=0.7,
                    color=_PHASE_COLORS["exploration"], edgecolors="white", linewidths=0.4)
         ax.plot(lim, lim, "k--", linewidth=1.2, label="Perfect prediction")
-        ax.set_xlabel("Actual",    fontsize=10)
-        ax.set_ylabel("Predicted", fontsize=10)
+        ax.set_xlabel("Actual (standardized)",    fontsize=10)
+        ax.set_ylabel("Predicted (standardized)", fontsize=10)
         ax.set_title(f"{name}\nR² = {r2:.3f}", fontsize=10)
         ax.set_xlim(lim); ax.set_ylim(lim)
         ax.legend(fontsize=8)
@@ -241,7 +241,7 @@ def plot_performance_trajectory(
     prod_rate  = [pp[1].get("production_rate",   float("nan")) for pp in exp_params_and_perf]
     xs = list(range(1, len(path_acc) + 1))
 
-    fig, ax = plt.subplots(figsize=(11, 4))
+    fig, ax = plt.subplots(figsize=(14, 4.5))
     fig.suptitle("Performance Trajectory", fontsize=12, fontweight="bold")
 
     # Shade phase regions
@@ -270,7 +270,7 @@ def plot_performance_trajectory(
     # X-tick labels: experiment codes if supplied, otherwise numbers
     if exp_codes and len(exp_codes) == len(xs):
         ax.set_xticks(xs)
-        ax.set_xticklabels(exp_codes, rotation=35, ha="right", fontsize=7)
+        ax.set_xticklabels(exp_codes, rotation=70, ha="right", fontsize=6)
     else:
         ax.set_xlabel("Experiment #", fontsize=10)
 
@@ -325,6 +325,7 @@ def plot_adaptation(
         )
     ax_dev.set_xlabel("Layer", fontsize=10)
     ax_dev.set_ylabel("Avg Path Deviation [m]", fontsize=10)
+    ax_dev.ticklabel_format(axis="y", style="scientific", scilimits=(-3, -3))
     ax_dev.legend(fontsize=9, loc="upper left")
     ax_dev.grid(True, alpha=0.25)
     ax_dev.set_xticks(layers)
@@ -679,8 +680,8 @@ def plot_inference_convergence(
     codes = [c for c, _, _ in infer_log]
     perfs = [pf for _, _, pf in infer_log]
 
-    # Alternate label offsets to avoid overlap when points are close
-    offsets = [(10, 8), (-10, -18), (10, -18)]
+    # Spread labels radially to avoid overlap when points cluster
+    offsets = [(50, 40), (-60, -30), (45, -45), (-50, 35)]
     for i, (w, spd, code, perf) in enumerate(zip(ws, spds, codes, perfs)):
         comb_val = 0.5 * perf.get("path_accuracy", 0.0) + 0.5 * perf.get("energy_efficiency", 0.0)
         ax.scatter([w], [spd], s=100, marker="D",
@@ -688,10 +689,11 @@ def plot_inference_convergence(
                    edgecolors="white", linewidths=0.8, zorder=9)
         ofs = offsets[i % len(offsets)]
         ax.annotate(
-            f"{code}\n({comb_val:.2f})",
+            f"{code}  ({comb_val:.2f})",
             (w, spd), xytext=ofs, textcoords="offset points",
-            fontsize=7, color="white", fontweight="bold",
-            arrowprops=dict(arrowstyle="-", color="white", lw=0.5, alpha=0.5),
+            fontsize=8, color="white", fontweight="bold",
+            bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.5, ec="none"),
+            arrowprops=dict(arrowstyle="-|>", color="white", lw=0.8, alpha=0.7),
         )
         if i > 0:
             ax.annotate(
