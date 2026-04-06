@@ -37,6 +37,7 @@ from sklearn.metrics import r2_score
 # ── make local modules importable when running from dev/ ──────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from pred_fab import Optimizer
 from pred_fab.core import Dataset
 from pred_fab.utils import SplitType  # type: ignore[attr-defined]
 
@@ -246,14 +247,14 @@ def run_exploration_workflow(
     fab: "FabricationSystem",
     test_dataset: Dataset,
     test_params: List[Dict[str, Any]],
-    optimizer: str = "lbfgsb",
+    optimizer: Optimizer = Optimizer.LBFGSB,
 ) -> Tuple[List[int], List[Dict[str, float]], List[int]]:
     """Baseline + incremental exploration.
 
     After each new experiment, train and evaluate R² on the test set.
     Returns (training_sizes, r2_per_step, cumulative_nfev_per_step).
     """
-    agent, fab2, schema, dataset = _make_fresh_env(DATA_ROOT + f"_explore_{optimizer}")
+    agent, fab2, schema, dataset = _make_fresh_env(DATA_ROOT + f"_explore_{optimizer.value}")
     agent.configure(optimizer=optimizer)
 
     # Phase 1: Baseline
@@ -292,7 +293,7 @@ def run_exploration_workflow(
         nfev_cumulative.append(cumulative)
         print(f"    n={n_total}: {r2}  |  nfev_step={nfev_step}, cumulative={cumulative}")
 
-    shutil.rmtree(DATA_ROOT + f"_explore_{optimizer}", ignore_errors=True)
+    shutil.rmtree(DATA_ROOT + f"_explore_{optimizer.value}", ignore_errors=True)
     return training_sizes, r2_history, nfev_cumulative
 
 
@@ -464,13 +465,13 @@ def main() -> None:
 
     print(f"\n[3/5] Exploration (L-BFGS-B): baseline={N_BASELINE}, explore={N_EXPLORE}...")
     lbfgsb_sizes, lbfgsb_r2s, lbfgsb_nfev = run_exploration_workflow(
-        fab_test, test_dataset, test_params, optimizer="lbfgsb"
+        fab_test, test_dataset, test_params, optimizer=Optimizer.LBFGSB
     )
     print(f"  Total forward passes (L-BFGS-B): {lbfgsb_nfev[-1]}")
 
     print(f"\n[4/5] Exploration (DE): baseline={N_BASELINE}, explore={N_EXPLORE}...")
     de_sizes, de_r2s, de_nfev = run_exploration_workflow(
-        fab_test, test_dataset, test_params, optimizer="de"
+        fab_test, test_dataset, test_params, optimizer=Optimizer.DE
     )
     print(f"  Total forward passes (DE): {de_nfev[-1]}")
 
