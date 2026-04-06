@@ -1,7 +1,7 @@
 """Simulated energy meter readings for extrusion printing segments."""
 
 import numpy as np
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 from .physics import energy_per_segment as physics_energy
 
@@ -13,7 +13,7 @@ class EnergySensor:
     reads per-segment energy via get_segment_energy().
     """
 
-    NOISE_ENERGY = 0.5  # J (~4% of typical 12 J per segment)
+    NOISE_ENERGY = 0.3  # J (~3% of typical 10 J per segment)
 
     def __init__(self, random_seed: int = 99) -> None:
         self._rng = np.random.RandomState(random_seed)
@@ -22,7 +22,7 @@ class EnergySensor:
     def _cache_key(self, params: Dict[str, Any], layer_idx: int, segment_idx: int) -> Tuple:
         return (
             params["print_speed"], params["design"], params["material"],
-            layer_idx, segment_idx,
+            params["water_ratio"], layer_idx, segment_idx,
         )
 
     def run_experiment(self, params: Dict[str, Any]) -> None:
@@ -42,10 +42,9 @@ class EnergySensor:
     def _simulate_segment(
         self, params: Dict[str, Any], layer_idx: int, segment_idx: int
     ) -> Dict:
-        # Deterministic energy + noise
         e = physics_energy(
-            params["print_speed"], params["material"],
-            segment_idx=segment_idx, layer_idx=layer_idx,
+            params["print_speed"], params["material"], params["design"],
+            params["water_ratio"], segment_idx=segment_idx, layer_idx=layer_idx,
         )
         energy_noisy = e + self._rng.normal(0, self.NOISE_ENERGY)
         return {"energy_per_segment": float(max(0.0, energy_noisy))}

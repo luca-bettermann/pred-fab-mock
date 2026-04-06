@@ -82,22 +82,35 @@ def print_phase_summary(
     )
 
 
+def print_training_summary(r2_scores: Dict[str, float]) -> None:
+    """Print R² scores for each prediction model output."""
+    parts = "  ".join(
+        f"{name}: R²={_score_color(max(0.0, r2))}{r2:.3f}{_R}"
+        for name, r2 in r2_scores.items()
+    )
+    print(f"\n  {_B}Model quality{_R}  {parts}")
+
+
 def print_adaptation_row(
     layer_idx: int,
     speed_before: float,
     deviation: float,
     speed_after: Optional[float] = None,
+    n_evals: Optional[int] = None,
 ) -> None:
     """Print one layer's adaptation step result."""
     dev_color = _score_color(max(0.0, 1.0 - deviation / 0.003))
     dev_str   = f"{dev_color}{deviation:.5f}{_R}"
 
-    if speed_after is not None:
-        spd_str = f"{speed_before:.1f} → {_B}{speed_after:.1f}{_R}"
-    else:
-        spd_str = f"{speed_before:.1f}"
+    evals_str = f"  {_D}({n_evals} evals){_R}" if n_evals is not None else ""
 
-    print(f"  Layer {layer_idx}  │  speed={spd_str}  │  dev={dev_str}")
+    if speed_after is not None:
+        spd_str = f"{speed_before:.1f} → {_B}{speed_after:.1f}{_R} mm/s"
+        print(f"  Layer {layer_idx}  │  speed={spd_str}  │  dev={dev_str}{evals_str}")
+    else:
+        # Last layer — no adaptation, align columns with a fixed-width speed field
+        spd_str = f"{speed_before:.1f} mm/s{' ' * 13}"
+        print(f"  Layer {layer_idx}  │  speed={spd_str}  │  dev={dev_str}")
 
 
 def print_run_summary(

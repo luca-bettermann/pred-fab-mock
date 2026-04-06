@@ -15,7 +15,9 @@ Self-contained showcase of the full PFAB journey (baseline → exploration → i
 | `visualization/` | Per-phase plotting helpers |
 
 ## Key Points
-- `design` / `material` categorical parameters are used by feature models but **excluded from the prediction model** because DataModule one-hot encodes them (`design_A`, etc.) and `_filter_batches_for_model` searches by original code name.
+- Schema v3: 2 designs (A, B) × 2 materials (clay, concrete); no layer_width feature.
+- Physics: 4 optima (A,clay≈40, B,clay≈33, A,concrete≈25, B,concrete≈20 mm/s). Layer drift makes deviation grow when speed deviates from the layer-specific optimum — makes adaptation meaningful.
 - Feature tensors are stored as `(n_layers, n_segments)` 2D arrays — not flat tables.
 - Phase 5 (online adaptation) reads deviation directly from the feature tensor without calling `run_evaluation` on partial data, since partial evaluation has NaN rows that break `nanmean`.
 - Categorical parameters must be carried over explicitly by passing `current_params` to `exploration_step` / `inference_step`.
+- `design` and `material` are included in both prediction models (one-hot encoded by DataModule; recognized by column prefix matching).

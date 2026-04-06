@@ -165,12 +165,12 @@ def plot_physics_landscape(params: Dict[str, Any], save_dir: str = "./plots/phas
     """
     from sensors.physics import (  # type: ignore[import-not-found]
         path_deviation as _phys_dev,
-        DELTA, THETA, DESIGN_COMPLEXITY, MATERIAL_VISCOSITY, KAPPA, W_OPTIMAL_WATER,
+        DELTA, THETA, DESIGN_COMPLEXITY, MAT_SAG, KAPPA, W_OPTIMAL,
     )
 
     design      = str(params.get("design",      "B"))
-    material    = str(params.get("material",    "standard"))
-    water_ratio = float(params.get("water_ratio", 0.40))
+    material    = str(params.get("material",    "clay"))
+    water_ratio = float(params.get("water_ratio", 0.42))
     act_speed   = float(params.get("print_speed", 40.0))
     n_segments  = int(params.get("n_segments",    4))
 
@@ -184,10 +184,10 @@ def plot_physics_landscape(params: Dict[str, Any], save_dir: str = "./plots/phas
 
     # Theoretical optimal speed (from physics formula, clipped to search bounds)
     complexity = DESIGN_COMPLEXITY[design]
-    viscosity  = MATERIAL_VISCOSITY[material]
-    w_opt      = W_OPTIMAL_WATER[material]
+    sag_f      = MAT_SAG[material]
+    w_opt      = W_OPTIMAL[material]
     flow       = max(0.1, 1.0 - KAPPA * (water_ratio - w_opt) ** 2)
-    spd_opt    = float(np.clip(np.sqrt(THETA * viscosity / (DELTA * complexity * flow)), 20.0, 60.0))
+    spd_opt    = float(np.clip(np.sqrt(THETA * sag_f / (DELTA * complexity * flow)), 20.0, 60.0))
 
     fig, ax = plt.subplots(figsize=(8, 4))
     fig.suptitle(
@@ -254,8 +254,15 @@ def plot_feature_heatmaps(exp_data: ExperimentData, save_dir: str = "./plots/pha
 
 # ── Phase 2: Prediction accuracy ─────────────────────────────────────────────
 
-def plot_prediction_accuracy(agent: PfabAgent, datamodule: DataModule, save_dir: str = "./plots/phase_2_training") -> None:
-    """Scatter of predicted vs actual for both output features with R² annotation."""
+def plot_prediction_accuracy(
+    agent: PfabAgent,
+    datamodule: DataModule,
+    save_dir: str = "./plots/phase_2_training",
+) -> Dict[str, float]:
+    """Scatter of predicted vs actual for both output features with R² annotation.
+
+    Returns a dict mapping feature name → R² on the validation set.
+    """
     from sklearn.metrics import r2_score
     from pred_fab.utils import SplitType  # type: ignore[attr-defined]
 
@@ -265,7 +272,7 @@ def plot_prediction_accuracy(agent: PfabAgent, datamodule: DataModule, save_dir:
     val_batches = datamodule.get_batches(SplitType.VAL)
     if not val_batches:
         print("[plot_prediction_accuracy] No validation batches available.")
-        return
+        return {}
 
     # Each prediction model may use a different subset of input columns —
     # replicate the same filtering the PredictionSystem uses during training.
@@ -288,10 +295,12 @@ def plot_prediction_accuracy(agent: PfabAgent, datamodule: DataModule, save_dir:
 
     fig.suptitle("Prediction Accuracy — validation set", fontsize=12, fontweight="bold")
 
+    r2_scores: Dict[str, float] = {}
     for i, (ax, name) in enumerate(zip(axes, outputs)):
         if i >= y_pred.shape[1] or i >= y_val.shape[1]:
             break
         r2  = r2_score(y_val[:, i], y_pred[:, i])
+        r2_scores[name] = float(r2)
         lim = [
             min(float(y_val[:, i].min()), float(y_pred[:, i].min())),
             max(float(y_val[:, i].max()), float(y_pred[:, i].max())),
@@ -306,6 +315,7 @@ def plot_prediction_accuracy(agent: PfabAgent, datamodule: DataModule, save_dir:
         ax.legend(fontsize=8)
 
     _save(os.path.join(save_dir, "prediction_accuracy.png"))
+    return r2_scores
 
 
 # ── Phase 3: Parameter space ──────────────────────────────────────────────────
@@ -517,8 +527,8 @@ def plot_path_comparison_3d(
     SEG_LENGTH = (N_PTS - 1) * 0.01
     SEG_GAP    = 0.008
 
-    sample_data = camera.get_segment_data(params, 0, 0)
-    radius     = float(np.mean(sample_data["width_readings"])) / 2.0
+    from sensors.physics import FILAMENT_RADIUS  # type: ignore[import-not-found]
+    radius     = FILAMENT_RADIUS
     LAYER_STEP = radius * 2.6   # gap > diameter so layers don't touch visually
 
     cache: Dict[Tuple[int, int], Dict] = {}
@@ -628,8 +638,8 @@ def plot_filament_volume(
     LAYER_STEP   = 0.022     # vertical gap between the two displayed layers
     Y_SCALE      = 3.0       # exaggerate y for visibility
 
-    sample_data  = camera.get_segment_data(params, 0, SHOW_SEGS[0])
-    radius       = float(np.mean(sample_data["width_readings"])) / 2.0
+    from sensors.physics import FILAMENT_RADIUS  # type: ignore[import-not-found]
+    radius = FILAMENT_RADIUS
 
     all_devs: List[float] = []
     for li in SHOW_LAYERS:
@@ -654,9 +664,8 @@ def plot_filament_volume(
             d      = camera.get_segment_data(params, li, si)
             dp     = d["designed_path"]
             mp     = d["measured_path"]
-            widths = d["width_readings"]
 
-            seg_radius = float(np.mean(widths)) / 2.0
+            seg_radius = radius
 
             xs         = [p[0] + x_off for p in dp]
             ys_des     = [0.0] * len(dp)
@@ -752,14 +761,14 @@ def plot_inference_convergence(
     from sensors.physics import (  # type: ignore[import-not-found]
         path_deviation as _phys_dev,
         energy_per_segment as _phys_eng,
-        DELTA, THETA, DESIGN_COMPLEXITY, MATERIAL_VISCOSITY, KAPPA, W_OPTIMAL_WATER,
+        DELTA, THETA, DESIGN_COMPLEXITY, MAT_SAG, KAPPA, W_OPTIMAL,
     )
 
     design   = str(design_intent.get("design",   "B"))
-    material = str(design_intent.get("material", "flexible"))
+    material = str(design_intent.get("material", "clay"))
 
     # Physics background grid
-    n_grid = 50
+    n_grid = 35
     water_vals = np.linspace(0.30, 0.50, n_grid)
     speed_vals = np.linspace(20.0, 60.0, n_grid)
     W, S = np.meshgrid(water_vals, speed_vals)
@@ -775,7 +784,7 @@ def plot_inference_convergence(
                 for si in range(N_SEGS)
             ]))
             eng_grid[i, j] = float(np.mean([
-                _phys_eng(spd, material, si, 0)
+                _phys_eng(spd, material, design, w, si, 0)
                 for si in range(N_SEGS)
             ]))
 
@@ -789,11 +798,10 @@ def plot_inference_convergence(
     combined  = 0.5 * acc_grid + 0.5 * eff_grid
 
     # Theoretical optimal speed at the material's best water_ratio
-    w_opt      = W_OPTIMAL_WATER[material]
+    w_opt      = W_OPTIMAL[material]
     complexity = DESIGN_COMPLEXITY[design]
-    viscosity  = MATERIAL_VISCOSITY[material]
-    flow_opt   = max(0.1, 1.0 - KAPPA * (w_opt - w_opt) ** 2)  # = 1.0
-    spd_opt    = float(np.clip(np.sqrt(THETA * viscosity / (DELTA * complexity * flow_opt)), 20.0, 60.0))
+    sag_f      = MAT_SAG[material]
+    spd_opt    = float(np.clip(np.sqrt(THETA * sag_f / (DELTA * complexity)), 20.0, 60.0))
 
     fig, ax = plt.subplots(figsize=(9, 6))
     intent_str = f"design={design}   material={material}"
@@ -878,11 +886,11 @@ def plot_acquisition_topology(
         return  # model not yet fitted
 
     design   = str(fixed.get("design",     proposed.get("design",   "B")))
-    material = str(fixed.get("material",   proposed.get("material", "standard")))
+    material = str(fixed.get("material",   proposed.get("material", "clay")))
     n_layers = int(fixed.get("n_layers",   proposed.get("n_layers",   5)))
     n_segs   = int(fixed.get("n_segments", proposed.get("n_segments", 4)))
 
-    N_W, N_S = 28, 28
+    N_W, N_S = 20, 20
     water_grid = np.linspace(0.30, 0.50, N_W)
     speed_grid = np.linspace(20.0, 60.0, N_S)
     W_mesh, S_mesh = np.meshgrid(water_grid, speed_grid)

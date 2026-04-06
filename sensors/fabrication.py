@@ -15,8 +15,7 @@ from .energy import EnergySensor
 #
 DESIGN_CONFIG: Dict[str, Dict] = {
     "A": {"n_layers": 5, "n_segments": 4, "target_height": 0.040, "path_length": 0.40},
-    "B": {"n_layers": 5, "n_segments": 4, "target_height": 0.045, "path_length": 0.48},
-    "C": {"n_layers": 5, "n_segments": 4, "target_height": 0.050, "path_length": 0.60},
+    "B": {"n_layers": 5, "n_segments": 4, "target_height": 0.045, "path_length": 0.50},
 }
 
 

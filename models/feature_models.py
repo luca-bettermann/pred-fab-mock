@@ -11,7 +11,7 @@ from sensors.energy import EnergySensor
 
 
 class PrintingFeatureModel(IFeatureModel):
-    """Extracts layer_width and path_deviation from CameraSystem per (layer, segment)."""
+    """Extracts path_deviation from CameraSystem per (layer, segment)."""
 
     def __init__(self, logger: PfabLogger, camera: CameraSystem) -> None:
         self.camera = camera
@@ -23,7 +23,7 @@ class PrintingFeatureModel(IFeatureModel):
 
     @property
     def outputs(self) -> List[str]:
-        return ["layer_width", "path_deviation"]
+        return ["path_deviation"]
 
     def _load_data(self, params: Dict, **dimensions: Any) -> Dict:
         return self.camera.get_segment_data(
@@ -35,12 +35,11 @@ class PrintingFeatureModel(IFeatureModel):
     def _compute_feature_logic(
         self, data: Dict, params: Dict, visualize: bool = False, **dimensions: Any
     ) -> Dict[str, float]:
-        width = float(np.mean(data["width_readings"]))
         deviation = float(np.mean([
             np.linalg.norm(np.array(p) - np.array(t))
             for p, t in zip(data["measured_path"], data["designed_path"])
         ]))
-        return {"layer_width": width, "path_deviation": deviation}
+        return {"path_deviation": deviation}
 
 
 class EnergyFeatureModel(IFeatureModel):

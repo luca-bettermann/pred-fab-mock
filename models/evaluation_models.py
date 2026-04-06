@@ -34,10 +34,15 @@ class PathAccuracyModel(IEvaluationModel):
 
 
 class EnergyConsumptionModel(IEvaluationModel):
-    """Scores energy_per_segment against a target energy consumption."""
+    """Scores energy_per_segment against a target energy consumption.
 
-    TARGET_ENERGY = 14.0  # J  — achieved at ~speed=35 mm/s, standard material
-    MAX_ENERGY = 40.0     # J  — max physically reachable (~speed=60, reinforced)
+    TARGET_ENERGY is the minimum achievable (~speed=20, clay, A).
+    Scores fall off linearly as energy rises toward MAX_ENERGY (speed=60, concrete, B).
+    Lower speed is always better for energy, creating genuine tension with path accuracy.
+    """
+
+    TARGET_ENERGY = 4.5   # J  — minimum achievable (low speed, clay, simple design)
+    MAX_ENERGY = 24.0     # J  — max physically reachable (~speed=60, concrete, B)
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)

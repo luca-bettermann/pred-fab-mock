@@ -74,8 +74,8 @@ class DeviationPredictionModel(IPredictionModel):
 class EnergyPredictionModel(IPredictionModel):
     """Predicts energy_per_segment from energy-relevant process parameters.
 
-    Energy depends on design (layer_height, path_length), material (viscosity),
-    print_speed, and the (layer, segment) position. water_ratio is excluded.
+    Energy scales with print_speed, material stiffness, and design path length.
+    water_ratio has no effect on energy and is excluded.
     """
 
     def __init__(self, logger: PfabLogger) -> None:
@@ -85,10 +85,10 @@ class EnergyPredictionModel(IPredictionModel):
 
     @property
     def input_parameters(self) -> List[str]:
-        # energy ∝ (ETA + PHI*print_speed) × viscosity(material) (see physics.py).
-        # design is deliberately excluded — it does not appear in the energy formula.
+        # energy depends on print_speed, material stiffness, and design path length
+        # (see DESIGN_ENERGY_SCALE in physics.py).
         # n_layers=layer_idx (0-4), n_segments=segment_idx (0-3) for per-position prediction.
-        return ["material", "print_speed", "n_layers", "n_segments"]
+        return ["design", "material", "print_speed", "n_layers", "n_segments"]
 
     @property
     def input_features(self) -> List[str]:

@@ -14,7 +14,7 @@ from pred_fab.core import (
 )
 
 ROOT_FOLDER = "./pfab_data"
-SCHEMA_NAME = "extrusion_printing_v2"
+SCHEMA_NAME = "extrusion_printing_v3"
 
 
 def build_schema() -> DatasetSchema:
@@ -22,8 +22,8 @@ def build_schema() -> DatasetSchema:
     # --- Parameters (optimization parameters only — no dimension params) ---
     params = Parameters([
         Parameter.real("water_ratio", min_val=0.30, max_val=0.50),
-        Parameter.categorical("design",   ["A", "B", "C"]),
-        Parameter.categorical("material", ["standard", "reinforced", "flexible"]),
+        Parameter.categorical("design",   ["A", "B"]),
+        Parameter.categorical("material", ["clay", "concrete"]),
         Parameter.real("print_speed", min_val=20.0, max_val=60.0, runtime=True),
     ])
 
@@ -38,7 +38,6 @@ def build_schema() -> DatasetSchema:
 
     # --- Features (tied to domain; depth=None means full domain depth) ---
     features = Features([
-        Feature.array("layer_width",        domain=spatial),
         Feature.array("path_deviation",     domain=spatial),
         Feature.array("energy_per_segment", domain=spatial),
     ])
@@ -56,6 +55,3 @@ def build_schema() -> DatasetSchema:
         performance=performance,
         domains=domains,
     )
-
-# Note: layer_width has no evaluation model (no width-accuracy metric), so a
-# "layer_width unused" warning is expected and intentional.

@@ -37,6 +37,7 @@ from visualization import (
     print_section,
     print_experiment_row,
     print_phase_summary,
+    print_training_summary,
     print_adaptation_row,
     print_run_summary,
     print_done,
@@ -74,9 +75,9 @@ def _with_dimensions(params: Dict[str, Any], fab: FabricationSystem) -> Dict[str
 
 
 def _opt_info(agent: Any) -> str:
-    """One-line optimizer summary: starts × evals."""
+    """One-line optimizer summary: starts × evals, best acquisition score."""
     cs = agent.calibration_system
-    return f"optimizer: {cs.last_opt_n_starts} starts · {cs.last_opt_nfev} evals"
+    return f"optimizer: {cs.last_opt_n_starts} starts · {cs.last_opt_nfev} evals · obj={cs.last_opt_score:.4f}"
 
 
 def main() -> None:
@@ -128,15 +129,11 @@ def main() -> None:
 
     print_phase_summary(baseline_log)
     plot_path_comparison(baseline_exps[-1], fab.camera, last_params, save_dir=_D1)
-    print_section(f"→ {_D1}/path_comparison.png  —  per-layer measured vs designed path")
     plot_path_comparison_3d(baseline_exps[-1], fab.camera, last_params, save_dir=_D1)
-    print_section(f"→ {_D1}/path_comparison_3d.png  —  3D tube stack, layer drift by colour")
     plot_filament_volume(baseline_exps[-1], fab.camera, last_params, save_dir=_D1)
-    print_section(f"→ {_D1}/filament_volume.png  —  close-up filament volume, designed vs as-printed")
     plot_feature_heatmaps(baseline_exps[-1], save_dir=_D1)
-    print_section(f"→ {_D1}/feature_heatmaps.png  —  path_deviation and energy over layers/segments")
     plot_physics_landscape(last_params, save_dir=_D1)
-    print_section(f"→ {_D1}/physics_landscape.png  —  U-shaped deviation vs speed curve")
+    print_section(f"5 plots saved to {_D1}/")
 
     # ── Phase 2: Initial Training ──────────────────────────────────────────────
     print_phase_header(2, "Initial Training",
@@ -146,9 +143,9 @@ def main() -> None:
     agent.logger.set_console_output(False)
     agent.train(datamodule, validate=True)
     agent.logger.set_console_output(True)
-    print_section("Models fitted  (check prediction_accuracy.png for R²)")
-    plot_prediction_accuracy(agent, datamodule, save_dir=_D2)
-    print_section(f"→ {_D2}/prediction_accuracy.png  —  predicted vs actual scatter with R²")
+    r2_scores = plot_prediction_accuracy(agent, datamodule, save_dir=_D2)
+    print_training_summary(r2_scores)
+    print_section(f"1 plot saved to {_D2}/")
 
     # Tracking lists for Phase 3/4
     all_params: List[Dict[str, Any]] = [params_from_spec(s) for s in baseline_specs]
@@ -171,7 +168,26 @@ def main() -> None:
         spec = agent.exploration_step(datamodule, w_explore=W_EXPLORE)
         agent.logger.set_console_output(True)
 
+        cs       = agent.calibration_system
         opt_info = _opt_info(agent)
+        # Evaluate perf and uncertainty at the proposed point
+        _proposed_p = {**prev_params, **params_from_spec(spec), "n_layers": 5, "n_segments": 4}
+        _perf_at_proposed = cs.perf_fn(_proposed_p)
+        _perf_combined = sum(
+            _perf_at_proposed.get(k, 0.0) * 0.5  # type: ignore[operator]
+            for k in ("path_accuracy", "energy_efficiency")
+        )
+        _dm = cs._active_datamodule  # type: ignore[attr-defined]
+        _u_at_proposed = (
+            float(agent.pred_system.uncertainty(_dm.params_to_array(_proposed_p)))
+            if _dm is not None else 0.0
+        )
+        acq_detail = (
+            f"perf={_perf_combined:.4f}  "
+            f"u={_u_at_proposed:.4f}  "
+            f"combined={cs.last_opt_score:.4f}"
+        )
+
         params   = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
         exp_code = f"explore_{i+1:02d}"
 
@@ -196,14 +212,15 @@ def main() -> None:
         explore_log.append((exp_code, params, perf))
         prev_params = params
         print_experiment_row(exp_code, params, perf)
-        print_section(f"  {opt_info}  ·  topology → {_D3}/{exp_code}_topology.png")
+        print_section(f"  {opt_info}")
+        print_section(f"  acquisition  {acq_detail}")
 
     print_phase_summary(explore_log)
     plot_parameter_space(all_params, all_phases, perf_history, save_dir=_D3)
-    print_section(f"→ {_D3}/parameter_space.png  —  water_ratio vs speed scatter, phase/design encoded")
+    print_section(f"7 plots saved to {_D3}/")
 
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
-    DESIGN_INTENT = {"design": "B", "material": "flexible"}
+    DESIGN_INTENT = {"design": "A", "material": "concrete"}
     print_phase_header(4, "Inference",
                        f"3 rounds  ·  intent fixed: {DESIGN_INTENT}  ·  model optimises w_explore=0")
     agent.configure_calibration(fixed_params=DESIGN_INTENT)
@@ -242,15 +259,14 @@ def main() -> None:
         perf_history.append((params, perf))
         infer_log.append((exp_code, params, perf))
         print_experiment_row(exp_code, params, perf)
-        print_section(f"  {opt_info}  ·  topology → {_D4}/{exp_code}_topology.png")
+        print_section(f"  {opt_info}")
         params = next_params
 
     prev_params = params
     print_phase_summary(infer_log)
     plot_performance_trajectory(perf_history, all_phases, exp_codes=all_codes, save_dir=_D4)
-    print_section(f"→ {_D4}/performance_trajectory.png  —  score history across all phases")
     plot_inference_convergence(infer_log, DESIGN_INTENT, save_dir=_D4)
-    print_section(f"→ {_D4}/inference_convergence.png  —  physics score landscape with inference trajectory")
+    print_section(f"5 plots saved to {_D4}/")
 
     # ── Phase 5: Online Adaptation ─────────────────────────────────────────────
     print_phase_header(5, "Online Adaptation",
@@ -288,7 +304,8 @@ def main() -> None:
             agent.logger.set_console_output(True)
             new_speed = float(spec.initial_params.get("print_speed", speed_before))
             adapt_params["print_speed"] = new_speed
-            print_adaptation_row(layer_idx, speed_before, layer_dev, speed_after=new_speed)
+            n_evals = agent.calibration_system.last_opt_nfev
+            print_adaptation_row(layer_idx, speed_before, layer_dev, speed_after=new_speed, n_evals=n_evals)
         else:
             print_adaptation_row(layer_idx, speed_before, layer_dev)
 
@@ -298,9 +315,9 @@ def main() -> None:
 
     # Counterfactual at constant speed=40
     from sensors.physics import path_deviation as _phys_dev
-    no_adapt_design   = str(adapt_params.get("design", "B"))
-    no_adapt_water    = float(adapt_params.get("water_ratio", 0.40))
-    no_adapt_material = str(adapt_params.get("material", "standard"))
+    no_adapt_design   = str(adapt_params.get("design", "A"))
+    no_adapt_water    = float(adapt_params.get("water_ratio", 0.36))
+    no_adapt_material = str(adapt_params.get("material", "concrete"))
     fixed_dev = [
         float(
             sum(
@@ -313,18 +330,18 @@ def main() -> None:
     ]
 
     plot_adaptation(layer_speeds, layer_deviations, no_adapt_deviations=fixed_dev, save_dir=_D5)
-    print_section(f"→ {_D5}/adaptation.png  —  adapted speed vs counterfactual deviation")
+    print_section(f"1 plot saved to {_D5}/")
 
     # ── Run summary ────────────────────────────────────────────────────────────
     from sensors.physics import (  # type: ignore[import-not-found]
-        DELTA, THETA, DESIGN_COMPLEXITY, MATERIAL_VISCOSITY, KAPPA, W_OPTIMAL_WATER,
+        DELTA, THETA, DESIGN_COMPLEXITY, MAT_SAG, W_OPTIMAL,
     )
-    _di = DESIGN_INTENT
+    _di         = DESIGN_INTENT
     _complexity = DESIGN_COMPLEXITY[str(_di["design"])]
-    _viscosity  = MATERIAL_VISCOSITY[str(_di["material"])]
-    _w_opt      = W_OPTIMAL_WATER[str(_di["material"])]
+    _sag        = MAT_SAG[str(_di["material"])]
+    _w_opt      = W_OPTIMAL[str(_di["material"])]
     _spd_opt    = float(np.clip(
-        np.sqrt(THETA * _viscosity / (DELTA * _complexity * 1.0)), 20.0, 60.0
+        np.sqrt(THETA * _sag / (DELTA * _complexity)), 20.0, 60.0
     ))
     print_run_summary(
         perf_history, all_phases, all_codes, DESIGN_INTENT,
