@@ -178,13 +178,12 @@ def production_rate(
     water_ratio: float,
     material: str,
 ) -> float:
-    """Effective production rate [mm/s normalised to 1 at max speed].
+    """Effective production rate [mm/s].
 
     At low-to-moderate water ratios, rate tracks print_speed linearly.
     Above W_SLIP the mix becomes too fluid: the nozzle loses back-pressure and
     actual extrusion rate falls below the commanded speed (nozzle-slip effect).
-    This creates a third axis of conflict with path_accuracy (which prefers higher
-    water) and energy_efficiency (which has its own separate water optimum).
+    Range: [SLIP_FLOOR × print_speed_min, 60] ≈ [14, 60] mm/s.
     """
     slip_factor = max(SLIP_FLOOR, 1.0 - OMEGA * max(0.0, water_ratio - W_SLIP[material]) ** 2)
-    return (print_speed / 60.0) * slip_factor
+    return print_speed * slip_factor

@@ -67,13 +67,13 @@ class EnergyConsumptionModel(IEvaluationModel):
 
 
 class ProductionRateModel(IEvaluationModel):
-    """Scores production_rate (print_speed) against maximum achievable speed.
+    """Scores effective production_rate [mm/s] against maximum achievable rate.
 
-    Higher speed = higher production rate = higher score.
-    score = print_speed / MAX_SPEED, via target=MAX_SPEED, scaling=MAX_SPEED.
+    production_rate = print_speed × slip_factor, so MAX_RATE = 60 mm/s (no slip, full speed).
+    score = rate / MAX_RATE — higher is better.
     """
 
-    MAX_SPEED = 60.0  # mm/s
+    MAX_RATE = 60.0  # mm/s — max achievable (no slip, print_speed=60)
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
@@ -91,7 +91,7 @@ class ProductionRateModel(IEvaluationModel):
         return "production_rate"
 
     def _compute_target_value(self, params: Dict, **dimensions: Any) -> float:
-        return self.MAX_SPEED
+        return self.MAX_RATE
 
     def _compute_scaling_factor(self, params: Dict, **dimensions: Any) -> Optional[float]:
-        return self.MAX_SPEED
+        return self.MAX_RATE

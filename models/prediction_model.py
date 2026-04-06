@@ -7,8 +7,24 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from pred_fab import IPredictionModel
+from pred_fab import IPredictionModel, IDeterministicModel
 from pred_fab.utils import PfabLogger
+
+from sensors.physics import production_rate as _physics_production_rate
+
+
+def _penultimate_activations(pipeline: Pipeline, X: np.ndarray) -> np.ndarray:
+    """Extract last hidden layer activations from a StandardScaler + MLPRegressor pipeline.
+
+    Passes X through the scaler and all hidden layers (ReLU), stopping before the
+    output layer.  Returns the penultimate representation used for KDE uncertainty.
+    """
+    scaler = pipeline.named_steps["scaler"]
+    mlp = pipeline.named_steps["mlp"]
+    activation = scaler.transform(X)
+    for W, b in zip(mlp.coefs_[:-1], mlp.intercepts_[:-1]):
+        activation = np.maximum(0.0, activation @ W + b)
+    return activation
 
 
 class DeviationPredictionModel(IPredictionModel):
@@ -17,7 +33,8 @@ class DeviationPredictionModel(IPredictionModel):
     path_deviation has a U-shaped response to print_speed (see physics.py):
     too slow causes material sag, too fast causes inertia overshoot.  The
     optimal speed varies by design complexity, material viscosity, and
-    water_ratio (via flowability).
+    water_ratio via shear-thinning coupling (diagonal valley in speed×water
+    space).  Three hidden layers capture these cross-term interactions.
     """
 
     def __init__(self, logger: PfabLogger) -> None:
@@ -27,9 +44,6 @@ class DeviationPredictionModel(IPredictionModel):
 
     @property
     def input_parameters(self) -> List[str]:
-        # deviation depends on print_speed, design complexity, water_ratio (flowability),
-        # and material viscosity (see physics.py).
-        # n_layers=layer_idx (0-4), n_segments=segment_idx (0-3) for per-position prediction.
         return ["design", "print_speed", "water_ratio", "material", "n_layers", "n_segments"]
 
     @property
@@ -54,7 +68,7 @@ class DeviationPredictionModel(IPredictionModel):
         self._model = Pipeline([
             ("scaler", StandardScaler()),
             ("mlp", MLPRegressor(
-                hidden_layer_sizes=(64, 32), max_iter=2000,
+                hidden_layer_sizes=(64, 32, 16), max_iter=2000,
                 random_state=42, alpha=0.01,
             )),
         ])
@@ -68,14 +82,18 @@ class DeviationPredictionModel(IPredictionModel):
         return self._model.predict(X).reshape(-1, 1)  # type: ignore[return-value]
 
     def encode(self, X: np.ndarray) -> np.ndarray:
-        return X
+        """Return penultimate hidden layer activations as learned latent representation."""
+        if self._model is None or not self._is_trained:
+            return X
+        return _penultimate_activations(self._model, X)
 
 
 class EnergyPredictionModel(IPredictionModel):
     """Predicts energy_per_segment from energy-relevant process parameters.
 
     Energy has a U-shaped water_ratio response (W_ENERGY_OPT differs from W_OPTIMAL
-    for deviation), creating a genuine Pareto conflict with path accuracy.
+    for deviation), creating a genuine Pareto conflict with path accuracy.  The
+    layer slope is material-specific (clay dries → less load; concrete cures → more).
     """
 
     def __init__(self, logger: PfabLogger) -> None:
@@ -85,9 +103,6 @@ class EnergyPredictionModel(IPredictionModel):
 
     @property
     def input_parameters(self) -> List[str]:
-        # energy depends on print_speed, water_ratio (U-shaped penalty), material, and design
-        # (see W_ENERGY_OPT, KAPPA_E, DESIGN_ENERGY_SCALE in physics.py).
-        # n_layers=layer_idx (0-4), n_segments=segment_idx (0-3) for per-position prediction.
         return ["design", "material", "print_speed", "water_ratio", "n_layers", "n_segments"]
 
     @property
@@ -112,7 +127,7 @@ class EnergyPredictionModel(IPredictionModel):
         self._model = Pipeline([
             ("scaler", StandardScaler()),
             ("mlp", MLPRegressor(
-                hidden_layer_sizes=(64, 32), max_iter=2000,
+                hidden_layer_sizes=(32, 16), max_iter=2000,
                 random_state=42, alpha=0.01,
             )),
         ])
@@ -126,25 +141,24 @@ class EnergyPredictionModel(IPredictionModel):
         return self._model.predict(X).reshape(-1, 1)  # type: ignore[return-value]
 
     def encode(self, X: np.ndarray) -> np.ndarray:
-        return X
+        """Return penultimate hidden layer activations as learned latent representation."""
+        if self._model is None or not self._is_trained:
+            return X
+        return _penultimate_activations(self._model, X)
 
 
-class ProductionRatePredictionModel(IPredictionModel):
-    """Predicts production_rate from print_speed, water_ratio, and material.
+class ProductionRatePredictionModel(IDeterministicModel):
+    """Deterministic production_rate [mm/s] from physics formula.
 
-    production_rate is no longer a trivial speed proxy: nozzle-slip above W_SLIP
-    (see physics.py) makes water_ratio and material relevant inputs.  An MLP is
-    used to learn the slip response from data, exactly as for the other features.
+    Uses ``sensors.physics.production_rate`` directly: rate = print_speed × slip_factor.
+    No learned parameters — the formula is exact.
     """
 
-    def __init__(self, logger: PfabLogger) -> None:
-        super().__init__(logger)
-        self._model: Optional[Pipeline] = None
-        self._is_trained = False
+    # Material categories in sorted order (must match schema).
+    _MATERIALS = ["clay", "concrete"]
 
     @property
     def input_parameters(self) -> List[str]:
-        # production_rate depends on speed (linear baseline) and water_ratio/material (slip term)
         return ["print_speed", "water_ratio", "material"]
 
     @property
@@ -155,32 +169,12 @@ class ProductionRatePredictionModel(IPredictionModel):
     def outputs(self) -> List[str]:
         return ["production_rate"]
 
-    def train(
-        self,
-        train_batches: List[Tuple[np.ndarray, np.ndarray]],
-        val_batches: List[Tuple[np.ndarray, np.ndarray]],
-        **kwargs: Any,
-    ) -> None:
-        if not train_batches:
-            self.logger.warning("ProductionRatePredictionModel.train() called with no training data.")
-            return
-        X = np.vstack([b[0] for b in train_batches])
-        y = np.vstack([b[1] for b in train_batches]).ravel()
-        self._model = Pipeline([
-            ("scaler", StandardScaler()),
-            ("mlp", MLPRegressor(
-                hidden_layer_sizes=(32, 16), max_iter=1000,
-                random_state=42, alpha=0.01,
-            )),
-        ])
-        self._model.fit(X, y)
-        self._is_trained = True
-        self.logger.info(f"ProductionRatePredictionModel trained on {len(X)} samples.")
-
-    def forward_pass(self, X: np.ndarray) -> np.ndarray:
-        if self._model is None or not self._is_trained:
-            return np.zeros((X.shape[0], 1))
-        return self._model.predict(X).reshape(-1, 1)  # type: ignore[return-value]
-
-    def encode(self, X: np.ndarray) -> np.ndarray:
-        return X
+    def formula(self, X: np.ndarray) -> np.ndarray:
+        """X columns: [print_speed, water_ratio, material_idx]."""
+        results = np.empty(X.shape[0])
+        for i in range(X.shape[0]):
+            ps = float(X[i, 0])
+            wr = float(X[i, 1])
+            mat = self._MATERIALS[int(round(X[i, 2]))]
+            results[i] = _physics_production_rate(ps, wr, mat)
+        return results.reshape(-1, 1)

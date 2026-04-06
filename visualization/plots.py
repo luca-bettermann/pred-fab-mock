@@ -879,7 +879,7 @@ def plot_physics_topology(
     max_dev  = PathAccuracyModel.MAX_DEVIATION
     target_e = EnergyConsumptionModel.TARGET_ENERGY
     max_e    = EnergyConsumptionModel.MAX_ENERGY
-    max_spd  = ProductionRateModel.MAX_SPEED
+    max_spd  = ProductionRateModel.MAX_RATE
 
     n_rows = len(COMBOS)
     n_cols = 4
@@ -981,7 +981,7 @@ def plot_physics_topology(
             ax.tick_params(labelsize=7)
             ax.grid(True, alpha=0.12, linestyle=":", linewidth=0.5)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.985])
+    plt.tight_layout(rect=(0, 0, 1, 0.985))
     _save(os.path.join(save_dir, "physics_topology.png"))
 
 

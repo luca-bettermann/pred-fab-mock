@@ -36,11 +36,14 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
     ])
     domains = Domains([spatial])
 
-    # --- Features (tied to domain; depth=None means full domain depth) ---
+    # --- Features ---
+    # path_deviation and energy_per_segment vary per (layer, segment) position.
+    # production_rate is constant across positions (depends only on process params),
+    # so it is declared as a scalar feature with no spatial domain.
     features = Features([
         Feature.array("path_deviation",     domain=spatial),
         Feature.array("energy_per_segment", domain=spatial),
-        Feature.array("production_rate",    domain=spatial),
+        Feature.array("production_rate"),
     ])
     # --- Performance ---
     performance = PerformanceAttributes([
