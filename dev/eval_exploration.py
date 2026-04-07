@@ -55,6 +55,8 @@ N_RANDOM      = 10     # random-LHS baseline (same total as baseline + explore)
 W_EXPLORE     = 0.7    # exploration weight for UCB acquisition (not used in evaluation)
 ALPHA         = 0.0    # importance weight floor for R²_adj (0=pure importance, 1=standard R²)
 SYMMETRIC     = True   # importance = max(true, pred); False = true only
+MATERIAL      = "clay"  # fixed material for mock
+MODEL_TYPE    = "mlp"   # "mlp" or "rf" — prediction model architecture
 PERF_WEIGHTS: Dict[str, float] = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 CAL_BOUNDS    = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 
@@ -94,8 +96,9 @@ def _make_fresh_env(data_root: str) -> Tuple[Any, Any, Any, Dataset]:
         shutil.rmtree(data_root)
     schema = build_schema(root_folder=data_root)
     fab    = FabricationSystem(CameraSystem(), EnergySensor())
-    agent  = build_agent(schema, fab.camera, fab.energy)
-    agent.configure(bounds=CAL_BOUNDS, performance_weights=PERF_WEIGHTS)
+    agent  = build_agent(schema, fab.camera, fab.energy, model_type=MODEL_TYPE)
+    agent.configure(bounds=CAL_BOUNDS, performance_weights=PERF_WEIGHTS,
+                     fixed_params={"material": MATERIAL})
     dataset = Dataset(schema=schema)
     agent.logger.set_console_output(False)
     return agent, fab, schema, dataset
@@ -124,8 +127,8 @@ def _with_dimensions(params: Dict[str, Any], fab: "FabricationSystem") -> Dict[s
 def _build_test_dataset(fab: "FabricationSystem") -> List[Dict[str, Any]]:
     """Generate N_TEST parameter combinations on a jittered uniform grid."""
     designs   = ["A", "B"]
-    materials = ["clay", "concrete"]
-    n_per_combo = N_TEST // 4
+    materials = [MATERIAL]
+    n_per_combo = N_TEST // (len(designs) * len(materials))
 
     test_params: List[Dict[str, Any]] = []
     rng = np.random.default_rng(seed=999)

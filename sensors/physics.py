@@ -91,6 +91,26 @@ W_SLIP     = {"clay": 0.45, "concrete": 0.41}  # onset of nozzle-slip [water_rat
 OMEGA      = 80.0    # strength of slip penalty
 SLIP_FLOOR = 0.70    # minimum achievable production rate factor
 
+# ── Sharp features (realistic AM discontinuities) ────────────────────────────
+# These create thresholds and interaction effects that smooth models struggle
+# with, making exploration more valuable than uniform sampling.
+
+# Layer adhesion threshold: above this speed, fresh layer doesn't bond properly.
+# Clay (softer, longer open time) tolerates higher speed than concrete.
+ADHESION_SPEED    = {"clay": 52.0, "concrete": 40.0}     # mm/s
+ADHESION_PENALTY  = 0.0006                                 # m — deviation jump
+
+# Workability floor: below this water ratio, material is too stiff to extrude.
+# Creates a steep ramp, not a smooth quadratic.
+W_WORKABILITY       = {"clay": 0.33, "concrete": 0.31}
+WORKABILITY_PENALTY = 0.0010                               # m
+
+# Pump cavitation: high speed + high water simultaneously → air entrainment.
+# Rectangular interaction region in parameter space.
+CAVITATION_SPEED  = 48.0                                   # mm/s
+CAVITATION_WATER  = {"clay": 0.46, "concrete": 0.42}
+CAVITATION_ENERGY = 2.5                                    # J — energy spike
+
 # ── Visualization ──────────────────────────────────────────────────────────────
 FILAMENT_RADIUS = 0.004  # m — fixed filament radius for 3D plots
 
@@ -142,7 +162,18 @@ def path_deviation(
     # Drift compounds when speed deviates from the layer optimum
     drift = (LAYER_DRIFT_BASE + LAYER_DRIFT_COUPLING * abs(print_speed - spd_opt_layer)) * layer_idx
 
-    return deviation_speed + deviation_sag + drift
+    deviation = deviation_speed + deviation_sag + drift
+
+    # Sharp feature: layer adhesion failure at high speed (amplifies with height)
+    if print_speed > ADHESION_SPEED[material]:
+        deviation += ADHESION_PENALTY * (1.0 + 0.2 * layer_idx)
+
+    # Sharp feature: workability floor at low water ratio (steep ramp)
+    if water_ratio < W_WORKABILITY[material]:
+        shortfall = (W_WORKABILITY[material] - water_ratio) / 0.05
+        deviation += WORKABILITY_PENALTY * shortfall
+
+    return deviation
 
 
 def energy_per_segment(
@@ -170,7 +201,13 @@ def energy_per_segment(
     layer_scale = 1.0 + ENERGY_LAYER_SLOPE[material] * layer_idx
     pos_scale = (curv / avg_curv) * layer_scale
     water_factor = 1.0 + KAPPA_E * (water_ratio - W_ENERGY_OPT[material]) ** 2
-    return (ETA + PHI * print_speed) * mat_e * des_e * pos_scale * water_factor
+    energy = (ETA + PHI * print_speed) * mat_e * des_e * pos_scale * water_factor
+
+    # Sharp feature: pump cavitation at high speed + high water simultaneously
+    if print_speed > CAVITATION_SPEED and water_ratio > CAVITATION_WATER[material]:
+        energy += CAVITATION_ENERGY
+
+    return energy
 
 
 def production_rate(

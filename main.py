@@ -47,7 +47,8 @@ W_EXPLORE             = 0.7                  # exploration weight κ ∈ (0, 1]
 N_OPTIMIZATION_ROUNDS = 5                    # L-BFGS-B random restarts (ignored by DE)
 
 # Design intent for inference phase
-DESIGN_INTENT = {"design": "A", "material": "concrete"}
+MATERIAL      = "clay"                                     # fixed material for mock
+DESIGN_INTENT = {"design": "A", "material": MATERIAL}
 
 # Adaptation
 ADAPTATION_START_SPEED = 40.0
@@ -77,11 +78,12 @@ def main() -> None:
         mpc_lookahead=MPC_LOOKAHEAD,
         mpc_discount=MPC_DISCOUNT,
         optimizer=OPTIMIZER,
+        fixed_params={"material": MATERIAL},
     )
 
     # ── Phase 1: Baseline ────────────────────────────────────────────────────
     print_phase_header(1, "Baseline Sampling",
-                       f"{N_BASELINE} Latin-hypercube experiments — no model yet, space-filling only")
+                       f"{N_BASELINE} Sobol-sequence experiments — no model yet, space-filling only")
 
     specs = agent.baseline_step(n=N_BASELINE)
 

@@ -5,6 +5,7 @@ import warnings
 import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
 
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -52,7 +53,7 @@ class DeviationPredictionModel(IPredictionModel):
 
     @property
     def input_features(self) -> List[str]:
-        return []
+        return ["prev_layer_deviation", "prev_segment_deviation"]
 
     @property
     def outputs(self) -> List[str]:
@@ -182,3 +183,105 @@ class ProductionRatePredictionModel(IDeterministicModel):
             mat = self._MATERIALS[int(round(X[i, 2]))]
             results[i] = _physics_production_rate(ps, wr, mat)
         return results.reshape(-1, 1)
+
+
+class DeviationRFModel(IPredictionModel):
+    """Random Forest model for path_deviation — same inputs/outputs as the MLP variant."""
+
+    def __init__(self, logger: PfabLogger) -> None:
+        super().__init__(logger)
+        self._model: Optional[Pipeline] = None
+        self._is_trained = False
+
+    @property
+    def input_parameters(self) -> List[str]:
+        return ["design", "print_speed", "water_ratio", "material", "n_layers", "n_segments"]
+
+    @property
+    def input_features(self) -> List[str]:
+        return ["prev_layer_deviation", "prev_segment_deviation"]
+
+    @property
+    def outputs(self) -> List[str]:
+        return ["path_deviation"]
+
+    def train(
+        self,
+        train_batches: List[Tuple[np.ndarray, np.ndarray]],
+        val_batches: List[Tuple[np.ndarray, np.ndarray]],
+        **kwargs: Any,
+    ) -> None:
+        if not train_batches:
+            self.logger.warning("DeviationRFModel.train() called with no training data.")
+            return
+        X = np.vstack([b[0] for b in train_batches])
+        y = np.vstack([b[1] for b in train_batches]).ravel()
+        self._model = Pipeline([
+            ("scaler", StandardScaler()),
+            ("rf", RandomForestRegressor(n_estimators=100, min_samples_leaf=2)),
+        ])
+        self._model.fit(X, y)
+        self._is_trained = True
+        self.logger.info(f"DeviationRFModel trained on {len(X)} samples.")
+
+    def forward_pass(self, X: np.ndarray) -> np.ndarray:
+        if self._model is None or not self._is_trained:
+            return np.zeros((X.shape[0], 1))
+        return self._model.predict(X).reshape(-1, 1)  # type: ignore[return-value]
+
+    def encode(self, X: np.ndarray) -> np.ndarray:
+        """Return scaler-transformed features for raw-space KDE."""
+        if self._model is None or not self._is_trained:
+            return X
+        return self._model.named_steps["scaler"].transform(X)
+
+
+class EnergyRFModel(IPredictionModel):
+    """Random Forest model for energy_per_segment — same inputs/outputs as the MLP variant."""
+
+    def __init__(self, logger: PfabLogger) -> None:
+        super().__init__(logger)
+        self._model: Optional[Pipeline] = None
+        self._is_trained = False
+
+    @property
+    def input_parameters(self) -> List[str]:
+        return ["design", "material", "print_speed", "water_ratio", "n_layers", "n_segments"]
+
+    @property
+    def input_features(self) -> List[str]:
+        return []
+
+    @property
+    def outputs(self) -> List[str]:
+        return ["energy_per_segment"]
+
+    def train(
+        self,
+        train_batches: List[Tuple[np.ndarray, np.ndarray]],
+        val_batches: List[Tuple[np.ndarray, np.ndarray]],
+        **kwargs: Any,
+    ) -> None:
+        if not train_batches:
+            self.logger.warning("EnergyRFModel.train() called with no training data.")
+            return
+        X = np.vstack([b[0] for b in train_batches])
+        y = np.vstack([b[1] for b in train_batches]).ravel()
+        self._model = Pipeline([
+            ("scaler", StandardScaler()),
+            ("rf", RandomForestRegressor(n_estimators=100, min_samples_leaf=2)),
+        ])
+        self._model.fit(X, y)
+        self._is_trained = True
+        self.logger.info(f"EnergyRFModel trained on {len(X)} samples.")
+
+    def forward_pass(self, X: np.ndarray) -> np.ndarray:
+        if self._model is None or not self._is_trained:
+            return np.zeros((X.shape[0], 1))
+        return self._model.predict(X).reshape(-1, 1)  # type: ignore[return-value]
+
+    def encode(self, X: np.ndarray) -> np.ndarray:
+        """Return scaler-transformed features for raw-space KDE."""
+        if self._model is None or not self._is_trained:
+            return X
+        return self._model.named_steps["scaler"].transform(X)

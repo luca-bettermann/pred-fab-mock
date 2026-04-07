@@ -14,7 +14,7 @@ from pred_fab.core import (
 )
 
 ROOT_FOLDER = "./pfab_data"
-SCHEMA_NAME = "extrusion_printing_v4"
+SCHEMA_NAME = "extrusion_printing_v5"
 
 
 def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
@@ -44,6 +44,8 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
         Feature.array("path_deviation",     domain=spatial),
         Feature.array("energy_per_segment", domain=spatial),
         Feature.array("production_rate"),
+        Feature.context("prev_layer_deviation",   domain=spatial),
+        Feature.context("prev_segment_deviation", domain=spatial),
     ])
     # --- Performance ---
     performance = PerformanceAttributes([
