@@ -27,6 +27,7 @@ Uses the same schema, agent, sensors, and models as main.py.
 import os
 import sys
 import shutil
+import warnings
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -499,6 +500,9 @@ def plot_forward_passes(
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    # Suppress sklearn numerical warnings from MLP training on tiny datasets
+    warnings.filterwarnings("ignore", category=RuntimeWarning, module="sklearn")
+
     os.makedirs(DATA_ROOT, exist_ok=True)
     os.makedirs(PLOT_DIR, exist_ok=True)
 
