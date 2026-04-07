@@ -3,27 +3,25 @@
 Configure the parameters below, then run: python main.py
 """
 
+import numpy as np
+
 from pred_fab.orchestration import Optimizer
+from pred_fab.core import Dataset
 
 from schema import build_schema
 from agent_setup import build_agent
 from sensors import CameraSystem, EnergySensor, FabricationSystem
-from pred_fab.core import Dataset
-from utils import params_from_spec, quiet_console
+from sensors.physics import path_deviation as physics_deviation
+from utils import params_from_spec
 from workflow import (
     JourneyState, clean_artifacts, with_dimensions,
-    run_baseline_phase, run_exploration_round, run_inference_round,
-    run_adaptation_phase, get_physics_optimum,
+    run_and_evaluate,
 )
-from visualization import (
-    plot_path_comparison_3d, plot_filament_volume, plot_prediction_accuracy,
-    plot_parameter_space, plot_performance_trajectory, plot_adaptation,
-    plot_inference_convergence, plot_acquisition_topology, plot_physics_topology,
-    plot_baseline_scatter,
-    print_phase_header, print_section, print_experiment_row, print_phase_summary,
-    print_training_summary, print_adaptation_row, print_run_summary, print_done,
-    print_explore_row, print_infer_row, print_optimizer_row,
-)
+from reporting import PLOT_DIRS, report_baseline, report_training, \
+    report_exploration_round, report_exploration_summary, \
+    report_inference_round, report_inference_summary, \
+    report_adaptation, report_summary
+from visualization import print_phase_header
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CONFIGURATION — tweak these values to experiment with different settings
@@ -55,15 +53,6 @@ DESIGN_INTENT = {"design": "A", "material": "concrete"}
 ADAPTATION_START_SPEED = 40.0
 ADAPTATION_DELTA       = {"print_speed": 5.0}
 
-# Plot directories
-PLOT_DIRS = {
-    "baseline":    "./plots/phase_1_baseline",
-    "training":    "./plots/phase_2_training",
-    "exploration": "./plots/phase_3_exploration",
-    "inference":   "./plots/phase_4_inference",
-    "adaptation":  "./plots/phase_5_adaptation",
-}
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  WORKFLOW
@@ -72,13 +61,14 @@ PLOT_DIRS = {
 def main() -> None:
     clean_artifacts(list(PLOT_DIRS.values()))
     state = JourneyState()
-    d = PLOT_DIRS
+    fab   = FabricationSystem(CameraSystem(), EnergySensor())
 
-    # ── Phase 0: Setup ────────────────────────────────────────────────────────
+    # ── Phase 0: Setup ───────────────────────────────────────────────────────
     print_phase_header(0, "Setup", "Configure agent, sensors, schema, and calibration bounds")
-    schema = build_schema()
-    fab    = FabricationSystem(CameraSystem(), EnergySensor())
-    agent  = build_agent(schema, fab.camera, fab.energy)
+
+    schema  = build_schema()
+    agent   = build_agent(schema, fab.camera, fab.energy)
+    dataset = Dataset(schema=schema)
 
     agent.configure(
         bounds=BOUNDS,
@@ -88,117 +78,162 @@ def main() -> None:
         mpc_discount=MPC_DISCOUNT,
         optimizer=OPTIMIZER,
     )
-    dataset = Dataset(schema=schema)
 
-    # ── Phase 1: Baseline ─────────────────────────────────────────────────────
+    # ── Phase 1: Baseline ────────────────────────────────────────────────────
     print_phase_header(1, "Baseline Sampling",
                        f"{N_BASELINE} Latin-hypercube experiments — no model yet, space-filling only")
 
-    baseline_log, baseline_exps, baseline_specs = run_baseline_phase(
-        agent, dataset, fab, N_BASELINE, state,
-    )
-    for code, params, perf in baseline_log:
-        print_experiment_row(code, params, perf)
+    specs = agent.baseline_step(n=N_BASELINE)
 
-    print_phase_summary(baseline_log)
-    plot_physics_topology(agent, save_dir=d["baseline"])
-    plot_baseline_scatter(baseline_log, save_dir=d["baseline"])
-    print_section(f"2 plots saved to {d['baseline']}/")
+    baseline_log = []
+    for i, spec in enumerate(specs):
+        params = with_dimensions(params_from_spec(spec), fab)
+        exp_code = f"baseline_{i+1:02d}"
+        exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
+        perf = exp_data.performance.get_values_dict()
+        baseline_log.append((exp_code, params, {k: float(v) for k, v in perf.items() if v is not None}))
+        state.record("baseline", exp_code, params_from_spec(spec), baseline_log[-1][2])
 
-    # ── Phase 2: Initial Training ─────────────────────────────────────────────
+    state.prev_params = with_dimensions(params_from_spec(specs[-1]), fab)
+    report_baseline(agent, baseline_log)
+
+    # ── Phase 2: Initial Training ────────────────────────────────────────────
     print_phase_header(2, "Initial Training",
                        "Fit prediction models (deviation + energy) on baseline data")
+
     datamodule = agent.create_datamodule(dataset)
     datamodule.prepare(val_size=0.25)
-    with quiet_console(agent.logger):
-        agent.train(datamodule, validate=True)
+    agent.train(datamodule, validate=True)
 
-    r2_scores = plot_prediction_accuracy(agent, datamodule, save_dir=d["training"])
-    print_training_summary(r2_scores)
-    print_section(f"1 plot saved to {d['training']}/")
+    report_training(agent, datamodule)
 
-    # ── Phase 3: Exploration ──────────────────────────────────────────────────
+    # ── Phase 3: Exploration ─────────────────────────────────────────────────
     print_phase_header(3, "Exploration",
                        f"{N_EXPLORE} rounds  (w_explore={W_EXPLORE}) — model guides search toward uncertain regions")
 
     explore_log = []
     for i in range(N_EXPLORE):
-        code, params, perf, u, proposed = run_exploration_round(
-            agent, dataset, fab, datamodule, state, i, W_EXPLORE, N_OPTIMIZATION_ROUNDS,
+        # Agent proposes next experiment
+        spec = agent.exploration_step(
+            datamodule, w_explore=W_EXPLORE, n_optimization_rounds=N_OPTIMIZATION_ROUNDS,
         )
-        explore_log.append((code, params, perf))
 
-        # Topology plot (shows what the model saw before this proposal)
-        plot_acquisition_topology(
-            agent, W_EXPLORE, proposed,
-            state.all_params, proposed, code, save_dir=d["exploration"],
-        )
-        print_explore_row(code, params, perf, u, agent.last_opt_score, W_EXPLORE)
-        print_optimizer_row(agent.last_opt_n_starts, agent.last_opt_nfev)
+        # Execute experiment
+        proposed = params_from_spec(spec)
+        params = with_dimensions({**state.prev_params, **proposed}, fab)
+        exp_code = f"explore_{i+1:02d}"
+        exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
 
-    print_phase_summary(explore_log)
-    plot_parameter_space(state.all_params, state.all_phases, state.perf_history,
-                         save_dir=d["exploration"])
-    print_section(f"{N_EXPLORE + 1} plots saved to {d['exploration']}/")
+        # Retrain on expanded dataset
+        datamodule.update()
+        agent.train(datamodule, validate=False)
 
-    # ── Phase 4: Inference ────────────────────────────────────────────────────
+        # Record results
+        perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
+        explore_log.append((exp_code, params, perf))
+        state.record("exploration", exp_code, params, perf)
+
+        proposed_full = {**state.prev_params, **proposed, "n_layers": 5, "n_segments": 4}
+        u = agent.predict_uncertainty(proposed_full, datamodule)
+
+        report_exploration_round(agent, state, exp_code, params, perf, u, proposed, W_EXPLORE)
+
+    report_exploration_summary(explore_log, state, N_EXPLORE)
+
+    # ── Phase 4: Inference ───────────────────────────────────────────────────
     print_phase_header(4, "Inference",
                        f"{N_INFER} rounds  ·  intent: {DESIGN_INTENT}  ·  w_explore=0")
+
     agent.configure(fixed_params=DESIGN_INTENT)
     state.prev_params = with_dimensions({**state.prev_params, **DESIGN_INTENT}, fab)
 
     infer_log = []
     last_exp_data = None
     for i in range(N_INFER):
-        code, params, perf, exp_data = run_inference_round(
-            agent, dataset, fab, datamodule, state, i, N_OPTIMIZATION_ROUNDS,
+        params = state.prev_params
+        exp_code = f"infer_{i+1:02d}"
+
+        # Execute current parameters
+        exp_data = dataset.create_experiment(exp_code, parameters=params)
+        fab.run_experiment(params)
+
+        # Agent evaluates and proposes improved parameters
+        agent.evaluate(exp_data)
+        spec = agent.inference_step(
+            exp_data, datamodule, w_explore=0.0,
+            n_optimization_rounds=N_OPTIMIZATION_ROUNDS, current_params=params,
         )
-        infer_log.append((code, params, perf))
+        next_params = with_dimensions({**params, **params_from_spec(spec)}, fab)
+
+        # Persist and retrain
+        dataset.save_experiment(exp_code)
+        datamodule.update()
+        agent.train(datamodule, validate=False)
+
+        perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
+        infer_log.append((exp_code, params, perf))
         last_exp_data = exp_data
-        print_infer_row(code, params, perf, agent.last_opt_score)
-        print_optimizer_row(agent.last_opt_n_starts, agent.last_opt_nfev)
+        state.record("inference", exp_code, params, perf)
+        state.prev_params = next_params
 
-        plot_acquisition_topology(
-            agent, 0.0, params, state.all_params, DESIGN_INTENT, code, save_dir=d["inference"],
-        )
+        report_inference_round(agent, state, exp_code, params, perf, DESIGN_INTENT)
 
-    print_phase_summary(infer_log)
-    if last_exp_data is not None:
-        plot_path_comparison_3d(last_exp_data, fab.camera, state.prev_params, save_dir=d["inference"])
-        plot_filament_volume(last_exp_data, fab.camera, state.prev_params, save_dir=d["inference"])
-    plot_performance_trajectory(state.perf_history, state.all_phases, exp_codes=state.all_codes,
-                                save_dir=d["inference"])
-    plot_inference_convergence(infer_log, DESIGN_INTENT, save_dir=d["inference"])
-    print_section(f"{N_INFER + 4} plots saved to {d['inference']}/")
+    report_inference_summary(infer_log, state, last_exp_data, fab.camera, DESIGN_INTENT, N_INFER)
 
-    # ── Phase 5: Online Adaptation ────────────────────────────────────────────
+    # ── Phase 5: Online Adaptation ───────────────────────────────────────────
     print_phase_header(5, "Online Adaptation",
                        "print_speed adjusted after each layer based on live deviation feedback")
+
     agent.configure(
         step_parameters={"print_speed": "n_layers"},
         adaptation_delta=ADAPTATION_DELTA,
     )
 
-    speeds, deviations, counterfactual = run_adaptation_phase(
-        agent, dataset, fab, state, start_speed=ADAPTATION_START_SPEED,
-    )
-    for li in range(len(speeds)):
-        if li < len(speeds) - 1:
-            print_adaptation_row(li, speeds[li], deviations[li],
-                                 speed_after=speeds[li + 1] if li + 1 < len(speeds) else None,
-                                 n_evals=agent.last_opt_nfev)
-        else:
-            print_adaptation_row(li, speeds[li], deviations[li])
+    # Set up adaptation experiment
+    adapt_params = with_dimensions({**state.prev_params, "print_speed": ADAPTATION_START_SPEED}, fab)
+    adapt_exp = dataset.create_experiment("adapt_01", parameters=adapt_params)
+    agent.set_active_experiment(adapt_exp)
 
-    plot_adaptation(speeds, deviations, no_adapt_deviations=counterfactual,
-                    save_dir=d["adaptation"])
-    print_section(f"1 plot saved to {d['adaptation']}/")
+    speeds = []
+    deviations = []
+    for layer_idx in range(int(adapt_params["n_layers"])):
+        # Fabricate one layer
+        fab.run_layer(adapt_params, layer_idx)
+        start, end = adapt_exp.parameters.get_start_and_end_indices("n_layers", layer_idx)
+        agent.feature_system.run_feature_extraction(  # type: ignore[union-attr]
+            adapt_exp, evaluate_from=start, evaluate_to=end,
+        )
 
-    # ── Summary ───────────────────────────────────────────────────────────────
-    spd_opt, w_opt = get_physics_optimum(DESIGN_INTENT)
-    print_run_summary(state.perf_history, state.all_phases, state.all_codes, DESIGN_INTENT,
-                      phys_opt_speed=spd_opt, phys_opt_water=w_opt)
-    print_done()
+        speed = float(adapt_params["print_speed"])
+        speeds.append(speed)
+        feat = adapt_exp.features.get_value("path_deviation")
+        deviations.append(float(np.mean(feat[layer_idx, :])))
+
+        # Agent adapts speed for next layer
+        if layer_idx < int(adapt_params["n_layers"]) - 1:
+            spec = agent.adaptation_step(
+                dimension="n_layers", step_index=layer_idx,
+                exp_data=adapt_exp, record=True,
+            )
+            adapt_params["print_speed"] = float(spec.initial_params.get("print_speed", speed))
+
+    dataset.save_experiment("adapt_01")
+
+    # Counterfactual: what would happen without adaptation
+    n_segs = int(adapt_params["n_segments"])
+    counterfactual = [
+        float(sum(
+            physics_deviation(ADAPTATION_START_SPEED, str(adapt_params["design"]), s,
+                              float(adapt_params["water_ratio"]), str(adapt_params["material"]), li)
+            for s in range(n_segs)
+        ) / n_segs)
+        for li in range(len(speeds))
+    ]
+
+    report_adaptation(agent, speeds, deviations, counterfactual)
+
+    # ── Summary ──────────────────────────────────────────────────────────────
+    report_summary(state, DESIGN_INTENT)
 
 
 if __name__ == "__main__":

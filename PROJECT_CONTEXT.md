@@ -7,8 +7,9 @@ Self-contained showcase of the full PFAB journey (baseline → exploration → i
 
 | File / Folder | Description |
 |---|---|
-| `main.py` | Full journey script — configuration + phase orchestration |
-| `workflow.py` | Workflow helpers: `JourneyState`, `run_baseline_phase`, `run_exploration_round`, `run_inference_round`, `run_adaptation_phase` |
+| `main.py` | Configuration + workflow with explicit agent calls (baseline_step, exploration_step, inference_step, adaptation_step) |
+| `reporting.py` | Phase-level reporting: bundles console output + plot generation per phase |
+| `workflow.py` | Workflow helpers: `JourneyState`, `run_and_evaluate`, `with_dimensions`, `clean_artifacts` |
 | `schema.py` | `build_schema()` → DatasetSchema |
 | `agent_setup.py` | `build_agent(schema, camera, energy)` → configured PfabAgent |
 | `utils.py` | Small helpers: `params_from_spec`, `get_performance` |

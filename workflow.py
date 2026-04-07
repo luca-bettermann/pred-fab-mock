@@ -63,9 +63,8 @@ def run_and_evaluate(
     """Create experiment, run fabrication, evaluate features + performance, persist."""
     exp_data = dataset.create_experiment(exp_code, parameters=params)
     fab.run_experiment(params)
-    with quiet_console(agent.logger):
-        agent.evaluate(exp_data)
-        dataset.save_experiment(exp_code)
+    agent.evaluate(exp_data)
+    dataset.save_experiment(exp_code)
     return exp_data
 
 
