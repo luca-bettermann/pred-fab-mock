@@ -13,12 +13,13 @@ Approach:
 
 Two metrics reported:
   - R²: standard coefficient of determination on a uniform test set.
-  - R²_adj: performance-adjusted R². Down-weights high-importance samples so
-    the gap (R²_adj − R²) reveals where prediction quality concentrates:
-      R²_adj > R² → high-importance samples predicted worse (exploration not helping)
-      R²_adj < R² → high-importance samples predicted better (exploration working)
-    importance_i = max(perf_true_i, perf_pred_i), symmetric so both actual and
-    predicted high-performers count. Gap scales with (1 − w_explore).
+  - R²_adj: importance-weighted R² that up-weights high-importance samples.
+    weight_i = alpha + (1 − alpha) · importance_i
+    Gap interpretation (R²_adj − R²):
+      gap > 0 → high-importance samples predicted better (exploration working)
+      gap < 0 → high-importance samples predicted worse
+    importance_i = max(perf_true_i, perf_pred_i) by default (symmetric),
+    or perf_true_i only for cross-method comparison (symmetric=False).
 
 Uses the same schema, agent, sensors, and models as main.py.
 """
@@ -46,11 +47,13 @@ from sensors import CameraSystem, EnergySensor, FabricationSystem
 from utils import params_from_spec
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-N_BASELINE    = 4      # baseline experiments (LHS)
-N_EXPLORE     = 10     # exploration rounds
+N_BASELINE    = 5      # baseline experiments (LHS)
+N_EXPLORE     = 5      # exploration rounds
 N_TEST        = 32     # test experiments (uniform grid, never used for training)
-N_RANDOM      = 20     # random-LHS baseline (larger pool for fairer comparison)
-W_EXPLORE     = 0.7
+N_RANDOM      = 10     # random-LHS baseline (same total as baseline + explore)
+W_EXPLORE     = 0.7    # exploration weight for UCB acquisition (not used in evaluation)
+ALPHA         = 0.0    # importance weight floor for R²_adj (0=pure importance, 1=standard R²)
+SYMMETRIC     = True   # importance = max(true, pred); False = true only
 PERF_WEIGHTS: Dict[str, float] = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 CAL_BOUNDS    = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 
@@ -200,20 +203,22 @@ def _compute_metrics_on_test(
     X_test = np.concatenate(X_list, axis=0)
     y_test = np.concatenate(y_list, axis=0)
 
-    # Compute importance per sample: max(true_perf, pred_perf) as combined score
+    # Compute importance per sample
     importance = np.zeros(len(X_test), dtype=float)
     for idx, (code, params) in enumerate(zip(test_codes, test_params)):
         exp = test_dataset.get_experiment(code)
         true_perf = exp.performance.get_values_dict()
         true_combined = _compute_combined_performance(true_perf)
 
-        try:
-            pred_perf = agent.predict_performance(params)
-            pred_combined = _compute_combined_performance(pred_perf)
-        except Exception:
-            pred_combined = 0.0
-
-        importance[idx] = max(true_combined, pred_combined)
+        if SYMMETRIC:
+            try:
+                pred_perf = agent.predict_performance(params)
+                pred_combined = _compute_combined_performance(pred_perf)
+            except Exception:
+                pred_combined = 0.0
+            importance[idx] = max(true_combined, pred_combined)
+        else:
+            importance[idx] = true_combined
 
     # Per-feature R² and R²_adj
     results: StepMetrics = {}
@@ -231,7 +236,8 @@ def _compute_metrics_on_test(
 
         for i, feat in enumerate(model.outputs):
             adj = Metrics.calculate_adjusted_r2(
-                y_true[:, i], y_pred[:, i], importance, w_explore=W_EXPLORE,
+                y_true[:, i], y_pred[:, i], importance,
+                alpha=ALPHA, symmetric=SYMMETRIC,
             )
             results[feat] = {"r2": adj["r2"], "r2_adj": adj["r2_adj"]}
 
@@ -329,21 +335,39 @@ def run_random_workflow(
     test_dataset: Dataset,
     test_params: List[Dict[str, Any]],
     n_total: int,
-) -> StepMetrics:
-    """Train on n_total random LHS experiments, return metrics on test set."""
+    eval_from: int = 4,
+) -> Tuple[List[int], List[StepMetrics]]:
+    """Train on 1..n_total random LHS experiments, evaluating incrementally.
+
+    Returns (training_sizes, metrics_per_step) starting from *eval_from*.
+    """
     agent, fab2, schema, dataset = _make_fresh_env(DATA_ROOT + "_random")
     specs = agent.baseline_step(n=n_total)
+
+    training_sizes: List[int] = []
+    metrics_history: List[StepMetrics] = []
+
     for i, spec in enumerate(specs):
         params = _with_dimensions(params_from_spec(spec), fab2)
         _run_and_evaluate(dataset, agent, fab2, params, f"random_{i+1:02d}")
 
-    dm = agent.create_datamodule(dataset)
-    dm.prepare(val_size=0.0)
-    agent.train(dm, validate=False)
+        n = i + 1
+        if n < eval_from:
+            continue
 
-    metrics = _compute_metrics_on_test(agent, dm, test_dataset, test_params)
+        dm = agent.create_datamodule(dataset)
+        dm.prepare(val_size=0.0)
+        agent.train(dm, validate=False)
+
+        m = _compute_metrics_on_test(agent, dm, test_dataset, test_params)
+        training_sizes.append(n)
+        metrics_history.append(m)
+        r2_s = _weighted_summary(m, "r2")
+        adj_s = _weighted_summary(m, "r2_adj")
+        print(f"    n={n}: R²={r2_s:.3f}  R²_adj={adj_s:.3f}")
+
     shutil.rmtree(DATA_ROOT + "_random", ignore_errors=True)
-    return metrics
+    return training_sizes, metrics_history
 
 
 # ── Plotting ──────────────────────────────────────────────────────────────────
@@ -353,98 +377,96 @@ def plot_learning_curves(
     lbfgsb_metrics: List[StepMetrics],
     de_sizes: List[int],
     de_metrics: List[StepMetrics],
-    baseline_metrics: StepMetrics,
-    random_metrics: StepMetrics,
+    random_sizes: List[int],
+    random_metrics: List[StepMetrics],
 ) -> None:
-    """Plot per-feature R² learning curves + summary R² vs R²_adj."""
+    """Plot R² and R²_adj learning curves for all methods side by side."""
     os.makedirs(PLOT_DIR, exist_ok=True)
-    features = sorted(FEATURE_PERF_MAP.keys())
-    n_feats = len(features)
-
-    import matplotlib.gridspec as gridspec
-    fig = plt.figure(figsize=(6 * n_feats, 10))
-    gs = gridspec.GridSpec(2, n_feats, figure=fig, hspace=0.4)
-
-    fig.suptitle(
-        "Prediction Model Quality: Exploration vs. Baseline\n"
-        f"(test set: {N_TEST} uniform experiments, seed=999)",
-        fontsize=12, fontweight="bold",
-    )
 
     colors = {
-        "lbfgsb":   "#DD8452",
-        "de":       "#C44E52",
-        "baseline": "#4C72B0",
-        "random":   "#55A868",
+        "lbfgsb": "#4878CF",   # blue
+        "de":     "#D65F5F",   # red
+        "random": "#6ACC65",   # green
     }
-    n_x = N_BASELINE + N_EXPLORE
+    labels = {
+        "lbfgsb": "Explore (L-BFGS-B)",
+        "de":     "Explore (DE)",
+        "random": "Random LHS",
+    }
 
-    # Row 0: per-feature R²
-    for col, feat in enumerate(features):
-        ax = fig.add_subplot(gs[0, col])
-        ax.plot(lbfgsb_sizes, [d.get(feat, {}).get("r2", np.nan) for d in lbfgsb_metrics],
-                "o-", color=colors["lbfgsb"], lw=2, ms=6, label="Explore (L-BFGS-B)")
-        ax.plot(de_sizes, [d.get(feat, {}).get("r2", np.nan) for d in de_metrics],
-                "s--", color=colors["de"], lw=2, ms=6, label="Explore (DE)")
-        ax.axhline(baseline_metrics.get(feat, {}).get("r2", np.nan), color=colors["baseline"],
-                   lw=1.5, ls="--", label=f"Baseline (n={N_BASELINE})")
-        ax.axhline(random_metrics.get(feat, {}).get("r2", np.nan), color=colors["random"],
-                   lw=1.5, ls=":", label=f"Random LHS (n={N_RANDOM})")
-        ax.set_title(feat.replace("_", " ").title(), fontsize=11)
-        ax.set_xlabel("Training set size", fontsize=9)
-        ax.set_ylabel("R²", fontsize=9)
-        ax.set_xlim(0, n_x + 1)
-        ax.set_ylim(-0.5, 1.05)
-        ax.axhline(0, color="grey", lw=0.8, alpha=0.4)
-        ax.grid(True, alpha=0.3)
-        if col == 0:
-            ax.legend(fontsize=7)
+    def _summaries(metrics: List[StepMetrics], key: str) -> List[float]:
+        return [_weighted_summary(m, key) for m in metrics]
 
-    # Row 1: weighted summary — R² (solid) vs R²_adj (dashed)
-    ax_sum = fig.add_subplot(gs[1, :])
+    # Collect all y-values to determine a sensible y-range
+    all_r2 = (_summaries(lbfgsb_metrics, "r2")
+              + _summaries(de_metrics, "r2")
+              + _summaries(random_metrics, "r2"))
+    all_adj = (_summaries(lbfgsb_metrics, "r2_adj")
+               + _summaries(de_metrics, "r2_adj")
+               + _summaries(random_metrics, "r2_adj"))
 
-    lbfgsb_r2  = [_weighted_summary(d, "r2") for d in lbfgsb_metrics]
-    lbfgsb_adj = [_weighted_summary(d, "r2_adj") for d in lbfgsb_metrics]
-    de_r2      = [_weighted_summary(d, "r2") for d in de_metrics]
-    de_adj     = [_weighted_summary(d, "r2_adj") for d in de_metrics]
-    bl_r2      = _weighted_summary(baseline_metrics, "r2")
-    bl_adj     = _weighted_summary(baseline_metrics, "r2_adj")
-    rnd_r2     = _weighted_summary(random_metrics, "r2")
-    rnd_adj    = _weighted_summary(random_metrics, "r2_adj")
+    x_min = min(
+        min(lbfgsb_sizes, default=99),
+        min(de_sizes, default=99),
+        min(random_sizes, default=99),
+    ) - 0.5
+    x_max = max(
+        max(lbfgsb_sizes, default=0),
+        max(de_sizes, default=0),
+        max(random_sizes, default=0),
+    ) + 0.5
 
-    # R² (solid)
-    ax_sum.plot(lbfgsb_sizes, lbfgsb_r2, "o-", color=colors["lbfgsb"], lw=2, ms=6,
-                label="R² — Explore (L-BFGS-B)")
-    ax_sum.plot(de_sizes, de_r2, "s-", color=colors["de"], lw=2, ms=6,
-                label="R² — Explore (DE)")
-    ax_sum.axhline(bl_r2,  color=colors["baseline"], lw=1.5, ls="--",
-                   label=f"R² — Baseline (n={N_BASELINE})")
-    ax_sum.axhline(rnd_r2, color=colors["random"],   lw=1.5, ls=":",
-                   label=f"R² — Random LHS (n={N_RANDOM})")
+    fig, (ax_r2, ax_adj) = plt.subplots(1, 2, figsize=(12, 4.5))
 
-    # R²_adj (dashed, diamond markers)
-    ax_sum.plot(lbfgsb_sizes, lbfgsb_adj, "D--", color=colors["lbfgsb"],
-                lw=2, ms=7, alpha=0.7, label="R²_adj — Explore (L-BFGS-B)")
-    ax_sum.plot(de_sizes, de_adj, "D--", color=colors["de"],
-                lw=2, ms=7, alpha=0.7, label="R²_adj — Explore (DE)")
-    ax_sum.axhline(bl_adj,  color=colors["baseline"], lw=1, ls="-.",
-                   alpha=0.5, label=f"R²_adj — Baseline (n={N_BASELINE})")
-    ax_sum.axhline(rnd_adj, color=colors["random"],   lw=1, ls="-.",
-                   alpha=0.5, label=f"R²_adj — Random LHS (n={N_RANDOM})")
-
-    ax_sum.set_title(
-        f"Weighted Summary  (weights: {PERF_WEIGHTS}, w_explore={W_EXPLORE})\n"
-        f"solid=R²  ·  dashed=R²_adj  ·  R²_adj < R² → better prediction on important samples",
-        fontsize=9,
+    fig.suptitle(
+        "Learning Curves: Exploration vs. Random Sampling",
+        fontsize=13, fontweight="bold", y=1.02,
     )
-    ax_sum.set_xlabel("Training set size", fontsize=9)
-    ax_sum.set_ylabel("Perf-weighted score", fontsize=9)
-    ax_sum.set_xlim(0, n_x + 1)
-    ax_sum.set_ylim(-0.2, 1.05)
-    ax_sum.axhline(0, color="grey", lw=0.8, alpha=0.4)
-    ax_sum.grid(True, alpha=0.3)
-    ax_sum.legend(fontsize=7, ncol=2)
 
+    datasets = [
+        ("lbfgsb", lbfgsb_sizes, lbfgsb_metrics, "o-"),
+        ("de", de_sizes, de_metrics, "s-"),
+        ("random", random_sizes, random_metrics, "^-"),
+    ]
+
+    for ax, key, title, y_vals in [
+        (ax_r2, "r2", "R² (uniform weighting)", all_r2),
+        (ax_adj, "r2_adj", "R²_adj (importance weighting)", all_adj),
+    ]:
+        for method, sizes, metrics, fmt in datasets:
+            ax.plot(sizes, _summaries(metrics, key), fmt,
+                    color=colors[method], lw=2, ms=6, label=labels[method],
+                    markeredgecolor="white", markeredgewidth=0.8)
+
+        # Shade baseline phase
+        ax.axvspan(x_min, N_BASELINE + 0.5, color="#f0f0f0", zorder=0)
+
+        ax.set_title(title, fontsize=11, pad=8)
+        ax.set_xlabel("Training experiments", fontsize=10)
+        ax.set_xlim(x_min, x_max)
+
+        # Auto y-range: show all data with some padding
+        y_lo = max(min(y_vals) - 0.15, -3.0)
+        ax.set_ylim(y_lo, 1.12)
+
+        ax.axhline(0, color="#cccccc", lw=0.8)
+        ax.axhline(1, color="#cccccc", lw=0.5, ls="--")
+        ax.grid(True, alpha=0.2, ls="--")
+        ax.legend(fontsize=8, loc="lower right", framealpha=0.9)
+
+        # Integer x-ticks
+        ax.set_xticks(range(int(x_min) + 1, int(x_max) + 1))
+
+    ax_r2.set_ylabel("Perf-weighted score", fontsize=10)
+
+    # Annotation: gap interpretation
+    fig.text(0.5, -0.04,
+             f"test set: {N_TEST} uniform experiments  ·  "
+             f"alpha={ALPHA}  ·  symmetric={SYMMETRIC}  ·  "
+             f"gap > 0 → better on important samples",
+             ha="center", fontsize=8, color="#888888")
+
+    plt.tight_layout()
     out = os.path.join(PLOT_DIR, "learning_curves.png")
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()
@@ -484,88 +506,77 @@ def main() -> None:
     _, fab, _, _ = _make_fresh_env(DATA_ROOT + "_setup")
     test_params = _build_test_dataset(fab)
 
-    print("\n[1/5] Building test dataset...")
+    print("\n[1/4] Building test dataset...")
     agent_test, fab_test, _, _ = _make_fresh_env(DATA_ROOT + "_setup")
     test_dataset = _run_test_dataset(fab_test, agent_test, DATA_ROOT + "_test", test_params)
     shutil.rmtree(DATA_ROOT + "_setup", ignore_errors=True)
 
-    print(f"\n[2/5] Baseline-only workflow (n={N_BASELINE})...")
-    baseline_metrics = run_baseline_workflow(fab_test, test_dataset, test_params, N_BASELINE)
-    print(f"  R²={_weighted_summary(baseline_metrics, 'r2'):.3f}  "
-          f"R²_adj={_weighted_summary(baseline_metrics, 'r2_adj'):.3f}")
-
-    print(f"\n[3/5] Exploration (L-BFGS-B): baseline={N_BASELINE}, explore={N_EXPLORE}...")
+    print(f"\n[2/4] Exploration (L-BFGS-B): baseline={N_BASELINE}, explore={N_EXPLORE}...")
     lbfgsb_sizes, lbfgsb_metrics, lbfgsb_nfev = run_exploration_workflow(
         fab_test, test_dataset, test_params, optimizer=Optimizer.LBFGSB
     )
     print(f"  Total forward passes (L-BFGS-B): {lbfgsb_nfev[-1]}")
 
-    print(f"\n[4/5] Exploration (DE): baseline={N_BASELINE}, explore={N_EXPLORE}...")
+    print(f"\n[3/4] Exploration (DE): baseline={N_BASELINE}, explore={N_EXPLORE}...")
     de_sizes, de_metrics, de_nfev = run_exploration_workflow(
         fab_test, test_dataset, test_params, optimizer=Optimizer.DE
     )
     print(f"  Total forward passes (DE): {de_nfev[-1]}")
 
-    print(f"\n[5/5] Random LHS workflow (n={N_RANDOM})...")
-    random_metrics = run_random_workflow(fab_test, test_dataset, test_params, N_RANDOM)
-    print(f"  R²={_weighted_summary(random_metrics, 'r2'):.3f}  "
-          f"R²_adj={_weighted_summary(random_metrics, 'r2_adj'):.3f}")
+    print(f"\n[4/4] Random LHS workflow (n={N_RANDOM}, incremental)...")
+    random_sizes, random_metrics = run_random_workflow(
+        fab_test, test_dataset, test_params, N_RANDOM, eval_from=N_BASELINE,
+    )
 
     # Plots
     plot_learning_curves(
         lbfgsb_sizes, lbfgsb_metrics,
         de_sizes, de_metrics,
-        baseline_metrics, random_metrics,
+        random_sizes, random_metrics,
     )
     plot_forward_passes(lbfgsb_sizes, lbfgsb_nfev, de_sizes, de_nfev)
 
     # Cleanup
     shutil.rmtree(DATA_ROOT + "_test", ignore_errors=True)
 
-    # Summary
-    print("\n══ Results Summary ══")
+    # Summary — final metrics for each method
+    print("\n══ Results Summary (at final training size) ══")
     feats = sorted(FEATURE_PERF_MAP.keys())
     col_w = 8
-    header = (f"  {'Feature':25s}  {'bl R²':>{col_w}}  {'lb R²':>{col_w}}  "
-              f"{'de R²':>{col_w}}  {'rnd R²':>{col_w}}  │  "
-              f"{'bl adj':>{col_w}}  {'lb adj':>{col_w}}  "
+    header = (f"  {'Feature':25s}  {'lb R²':>{col_w}}  {'de R²':>{col_w}}  "
+              f"{'rnd R²':>{col_w}}  │  {'lb adj':>{col_w}}  "
               f"{'de adj':>{col_w}}  {'rnd adj':>{col_w}}")
     sep = "  " + "─" * (len(header) - 2)
     print(header)
     print(sep)
     for feat in feats:
-        bl  = baseline_metrics.get(feat, {})
         lb  = lbfgsb_metrics[-1].get(feat, {})
         de  = de_metrics[-1].get(feat, {})
-        rnd = random_metrics.get(feat, {})
+        rnd = random_metrics[-1].get(feat, {})
         print(
             f"  {feat:25s}"
-            f"  {bl.get('r2', float('nan')):{col_w}.3f}"
             f"  {lb.get('r2', float('nan')):{col_w}.3f}"
             f"  {de.get('r2', float('nan')):{col_w}.3f}"
             f"  {rnd.get('r2', float('nan')):{col_w}.3f}"
             f"  │"
-            f"  {bl.get('r2_adj', float('nan')):{col_w}.3f}"
             f"  {lb.get('r2_adj', float('nan')):{col_w}.3f}"
             f"  {de.get('r2_adj', float('nan')):{col_w}.3f}"
             f"  {rnd.get('r2_adj', float('nan')):{col_w}.3f}"
         )
 
     print(f"\n  [perf-weighted summary]")
-    bl_r2  = _weighted_summary(baseline_metrics, "r2")
     lb_r2  = _weighted_summary(lbfgsb_metrics[-1], "r2")
     de_r2  = _weighted_summary(de_metrics[-1], "r2")
-    rnd_r2 = _weighted_summary(random_metrics, "r2")
-    bl_adj  = _weighted_summary(baseline_metrics, "r2_adj")
+    rnd_r2 = _weighted_summary(random_metrics[-1], "r2")
     lb_adj  = _weighted_summary(lbfgsb_metrics[-1], "r2_adj")
     de_adj  = _weighted_summary(de_metrics[-1], "r2_adj")
-    rnd_adj = _weighted_summary(random_metrics, "r2_adj")
-    print(f"  {'R²':25s}  {bl_r2:{col_w}.3f}  {lb_r2:{col_w}.3f}  {de_r2:{col_w}.3f}  {rnd_r2:{col_w}.3f}")
-    print(f"  {'R²_adj':25s}  {bl_adj:{col_w}.3f}  {lb_adj:{col_w}.3f}  {de_adj:{col_w}.3f}  {rnd_adj:{col_w}.3f}")
-    print(f"  {'gap (adj−r2)':25s}  {bl_adj-bl_r2:{col_w}.3f}  {lb_adj-lb_r2:{col_w}.3f}  {de_adj-de_r2:{col_w}.3f}  {rnd_adj-rnd_r2:{col_w}.3f}")
+    rnd_adj = _weighted_summary(random_metrics[-1], "r2_adj")
+    print(f"  {'R²':25s}  {lb_r2:{col_w}.3f}  {de_r2:{col_w}.3f}  {rnd_r2:{col_w}.3f}")
+    print(f"  {'R²_adj':25s}  {lb_adj:{col_w}.3f}  {de_adj:{col_w}.3f}  {rnd_adj:{col_w}.3f}")
+    print(f"  {'gap (adj−r2)':25s}  {lb_adj-lb_r2:{col_w}.3f}  {de_adj-de_r2:{col_w}.3f}  {rnd_adj-rnd_r2:{col_w}.3f}")
 
     print(f"\n  Cumulative forward passes — L-BFGS-B: {lbfgsb_nfev[-1]}, DE: {de_nfev[-1]}")
-    print(f"\n  Interpretation: gap < 0 → better prediction on important samples (exploration benefit)")
+    print(f"\n  Interpretation: gap > 0 → better prediction on important samples")
 
 
 if __name__ == "__main__":
