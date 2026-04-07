@@ -1,5 +1,7 @@
 """sklearn-based prediction models for the extrusion printing simulation."""
 
+import warnings
+
 import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -22,8 +24,10 @@ def _penultimate_activations(pipeline: Pipeline, X: np.ndarray) -> np.ndarray:
     scaler = pipeline.named_steps["scaler"]
     mlp = pipeline.named_steps["mlp"]
     activation = scaler.transform(X)
-    for W, b in zip(mlp.coefs_[:-1], mlp.intercepts_[:-1]):
-        activation = np.maximum(0.0, activation @ W + b)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        for W, b in zip(mlp.coefs_[:-1], mlp.intercepts_[:-1]):
+            activation = np.maximum(0.0, activation @ W + b)
     return activation
 
 
