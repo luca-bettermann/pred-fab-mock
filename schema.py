@@ -14,7 +14,7 @@ from pred_fab.core import (
 )
 
 ROOT_FOLDER = "./pfab_data"
-SCHEMA_NAME = "extrusion_printing_v5"
+SCHEMA_NAME = "extrusion_printing_v6"
 
 
 def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
@@ -40,12 +40,15 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
     # path_deviation and energy_per_segment vary per (layer, segment) position.
     # production_rate is constant across positions (depends only on process params),
     # so it is declared as a scalar feature with no spatial domain.
+    path_dev = Feature.array("path_deviation", domain=spatial)
+    layer_dim, segment_dim = spatial.axes
+
     features = Features([
-        Feature.array("path_deviation",     domain=spatial),
+        path_dev,
         Feature.array("energy_per_segment", domain=spatial),
         Feature.array("production_rate"),
-        Feature.context("prev_layer_deviation",   domain=spatial),
-        Feature.context("prev_segment_deviation", domain=spatial),
+        Feature.recursive("prev_layer_deviation",   source=path_dev, dimensions=(layer_dim,)),
+        Feature.recursive("prev_segment_deviation", source=path_dev, dimensions=(segment_dim,)),
     ])
     # --- Performance ---
     performance = PerformanceAttributes([

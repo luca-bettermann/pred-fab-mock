@@ -6,7 +6,7 @@ from pred_fab.core import DatasetSchema
 from sensors.camera import CameraSystem
 from sensors.energy import EnergySensor
 from models.feature_models import (
-    PrintingFeatureModel, EnergyFeatureModel, ProductionRateFeatureModel, ContextFeatureModel,
+    PrintingFeatureModel, EnergyFeatureModel, ProductionRateFeatureModel,
 )
 from models.evaluation_models import PathAccuracyModel, EnergyConsumptionModel, ProductionRateModel
 from models.prediction_model import (
@@ -28,7 +28,6 @@ def build_agent(
     agent.register_feature_model(PrintingFeatureModel, camera=camera)
     agent.register_feature_model(EnergyFeatureModel, energy_sensor=energy_sensor)
     agent.register_feature_model(ProductionRateFeatureModel)
-    agent.register_feature_model(ContextFeatureModel, camera=camera)
     agent.register_evaluation_model(PathAccuracyModel)
     agent.register_evaluation_model(EnergyConsumptionModel)
     agent.register_evaluation_model(ProductionRateModel)

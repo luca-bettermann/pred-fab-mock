@@ -1,7 +1,7 @@
 """Per-stage plotting helpers for the extrusion printing showcase."""
 
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import matplotlib
@@ -51,12 +51,12 @@ def _annotate_heatmap(ax: Any, grid: np.ndarray, fmt: str = "{:.4f}") -> None:
 # ── Filament tube helper ──────────────────────────────────────────────────────
 
 def _make_filament_tube(
-    xs: List[float],
-    ys: List[float],
+    xs: list[float],
+    ys: list[float],
     z_center: float,
     radius: float,
     n_circ: int = 24,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return (X, Y, Z) surface arrays for a cylindrical tube following (xs, ys) at z_center.
 
     The tube cross-section is circular with given radius. Suitable for plot_surface.
@@ -81,7 +81,7 @@ def plot_prediction_accuracy(
     agent: PfabAgent,
     datamodule: DataModule,
     save_dir: str = "./plots/phase_2_training",
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Scatter of predicted vs actual for both output features with R² annotation.
 
     Returns a dict mapping feature name → R² on the validation set.
@@ -99,7 +99,7 @@ def plot_prediction_accuracy(
     all_val_batches = list(val_batches)
     y_val = np.vstack([b[1] for b in all_val_batches])
 
-    y_pred_cols: List[np.ndarray] = []
+    y_pred_cols: list[np.ndarray] = []
     for model in pred_system.models:
         model_batches = pred_system._filter_batches_for_model(  # type: ignore[attr-defined]
             all_val_batches, model
@@ -115,8 +115,8 @@ def plot_prediction_accuracy(
 
     fig.suptitle("Prediction Accuracy — validation set", fontsize=12, fontweight="bold")
 
-    r2_scores: Dict[str, float] = {}
-    for i, (ax, name) in enumerate(zip(axes, outputs)):
+    r2_scores: dict[str, float] = {}
+    for i, (ax, name) in enumerate(zip(axes, outputs)):  # type: ignore[arg-type]
         if i >= y_pred.shape[1] or i >= y_val.shape[1]:
             break
         r2  = r2_score(y_val[:, i], y_pred[:, i])
@@ -141,9 +141,9 @@ def plot_prediction_accuracy(
 # ── Phase 3: Parameter space ──────────────────────────────────────────────────
 
 def plot_parameter_space(
-    all_params: List[Dict[str, Any]],
-    phases: List[str],
-    perf_history: Optional[List[Tuple[Dict[str, Any], Dict[str, float]]]] = None,
+    all_params: list[dict[str, Any]],
+    phases: list[str],
+    perf_history: list[tuple[dict[str, Any], dict[str, float]]] | None = None,
     save_dir: str = "./plots/phase_3_exploration",
 ) -> None:
     """2-D scatter of water_ratio vs print_speed.
@@ -158,9 +158,9 @@ def plot_parameter_space(
     n = len(all_params)
 
     # Build combined score array if perf_history supplied
-    scores: Optional[List[float]] = None
+    scores: list[float] | None = None
     if perf_history is not None and len(perf_history) == n:
-        def _combined(perf: Dict[str, float]) -> float:
+        def _combined(perf: dict[str, float]) -> float:
             acc = perf.get("path_accuracy", 0.0)
             eff = perf.get("energy_efficiency", 0.0)
             return 0.5 * acc + 0.5 * eff
@@ -230,9 +230,9 @@ def plot_parameter_space(
 # ── Phase 4: Performance trajectory ──────────────────────────────────────────
 
 def plot_performance_trajectory(
-    exp_params_and_perf: List[Tuple[Dict[str, Any], Dict[str, float]]],
-    phases: List[str],
-    exp_codes: Optional[List[str]] = None,
+    exp_params_and_perf: list[tuple[dict[str, Any], dict[str, float]]],
+    phases: list[str],
+    exp_codes: list[str] | None = None,
     save_dir: str = "./plots/phase_4_inference",
 ) -> None:
     """Dual-line plot with shaded phase bands, phase labels, and optional x-tick experiment codes."""
@@ -285,9 +285,9 @@ def plot_performance_trajectory(
 # ── Phase 5: Online adaptation ────────────────────────────────────────────────
 
 def plot_adaptation(
-    layer_speeds: List[float],
-    deviations: List[float],
-    no_adapt_deviations: Optional[List[float]] = None,
+    layer_speeds: list[float],
+    deviations: list[float],
+    no_adapt_deviations: list[float] | None = None,
     save_dir: str = "./plots/phase_5_adaptation",
 ) -> None:
     """Two stacked subplots: print_speed per layer (top) and path deviation (bottom).
@@ -339,7 +339,7 @@ def plot_adaptation(
 def plot_path_comparison_3d(
     exp_data: ExperimentData,
     camera: Any,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     save_dir: str = "./plots/phase_1_baseline",
 ) -> None:
     """3D stacked tube view: designed (grey wireframe) vs as-printed (coloured solid).
@@ -357,8 +357,8 @@ def plot_path_comparison_3d(
     radius     = FILAMENT_RADIUS
     LAYER_STEP = radius * 2.6   # gap > diameter so layers don't touch visually
 
-    cache: Dict[Tuple[int, int], Dict] = {}
-    all_devs: List[float] = []
+    cache: dict[tuple[int, int], dict] = {}
+    all_devs: list[float] = []
     for li in range(N_LAYERS):
         for si in range(N_SEGMENTS):
             d = camera.get_segment_data(params, li, si)
@@ -460,7 +460,7 @@ def plot_path_comparison_3d(
 def plot_filament_volume(
     exp_data: ExperimentData,
     camera: Any,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     save_dir: str = "./plots/phase_1_baseline",
 ) -> None:
     """Close-up 3D filament volume: designed (grey wireframe) vs as-printed (coloured solid).
@@ -482,7 +482,7 @@ def plot_filament_volume(
     from sensors.physics import FILAMENT_RADIUS  # type: ignore[import-not-found]
     radius = FILAMENT_RADIUS
 
-    all_devs: List[float] = []
+    all_devs: list[float] = []
     for li in SHOW_LAYERS:
         for si in SHOW_SEGS:
             d = camera.get_segment_data(params, li, si)
@@ -599,8 +599,8 @@ def plot_filament_volume(
 # ── Phase 4: Inference convergence ───────────────────────────────────────────
 
 def plot_inference_convergence(
-    infer_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]],
-    design_intent: Dict[str, Any],
+    infer_log: list[tuple[str, dict[str, Any], dict[str, float]]],
+    design_intent: dict[str, Any],
     save_dir: str = "./plots/phase_4_inference",
 ) -> None:
     """2D parameter space for the inference intent showing optimizer convergence.
@@ -718,9 +718,9 @@ def plot_inference_convergence(
 def plot_acquisition_topology(
     agent: PfabAgent,
     w_explore: float,
-    proposed: Dict[str, Any],
-    history: List[Dict[str, Any]],
-    fixed: Dict[str, Any],
+    proposed: dict[str, Any],
+    history: list[dict[str, Any]],
+    fixed: dict[str, Any],
     label: str,
     save_dir: str = "./plots",
 ) -> None:
@@ -796,6 +796,29 @@ def plot_acquisition_topology(
     perf_norm = (perf_grid - p_min) / p_span
     unc_norm  = (unc_grid  - u_min) / u_span
     combined_grid = (1.0 - w_explore) * perf_norm + w_explore * unc_norm
+
+    # Apply boundary buffer if configured on the calibration system
+    cal = agent.calibration_system
+    if cal.boundary_buffer_extent > 0:
+        extent = cal.boundary_buffer_extent
+        strength = cal.boundary_buffer_strength
+        exponent = cal.boundary_buffer_exponent
+        # Water ratio dimension
+        w_range = water_grid[-1] - water_grid[0]
+        for wi in range(N_W):
+            d_lo = (water_grid[wi] - water_grid[0]) / w_range
+            d_hi = (water_grid[-1] - water_grid[wi]) / w_range
+            d_w = min(d_lo, d_hi)
+            f_w = 1.0 if d_w >= extent else 1.0 - strength * (1.0 - (d_w / extent) ** exponent)
+            combined_grid[:, wi] *= f_w
+        # Speed dimension
+        s_range = speed_grid[-1] - speed_grid[0]
+        for si in range(N_S):
+            d_lo = (speed_grid[si] - speed_grid[0]) / s_range
+            d_hi = (speed_grid[-1] - speed_grid[si]) / s_range
+            d_s = min(d_lo, d_hi)
+            f_s = 1.0 if d_s >= extent else 1.0 - strength * (1.0 - (d_s / extent) ** exponent)
+            combined_grid[si, :] *= f_s
 
     # ── Figure ────────────────────────────────────────────────────────────────
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
@@ -917,7 +940,7 @@ def plot_physics_topology(
     combined_cmap = "RdYlGn"
 
     # Store all grids to compute global bounds per column
-    all_grids: List[List[np.ndarray]] = []
+    all_grids: list[list[np.ndarray]] = []
     
     # Precompute grids for each combo and column
     for row_idx, (design, material) in enumerate(COMBOS):
@@ -1014,7 +1037,7 @@ def plot_physics_topology(
 # ── Phase 1: Baseline parameter scatter ───────────────────────────────────────
 
 def plot_baseline_scatter(
-    experiments: List[Tuple[str, Dict[str, Any], Dict[str, float]]],
+    experiments: list[tuple[str, dict[str, Any], dict[str, float]]],
     save_dir: str = "./plots/phase_1_baseline",
 ) -> None:
     """2D scatter: water_ratio vs print_speed, colored by design+material combination.
@@ -1028,7 +1051,7 @@ def plot_baseline_scatter(
 
     # Organize data by combo
     COMBOS = [("A", "clay"), ("A", "concrete"), ("B", "clay"), ("B", "concrete")]
-    combo_data: Dict[Tuple[str, str], List] = {c: [] for c in COMBOS}
+    combo_data: dict[tuple[str, str], list] = {c: [] for c in COMBOS}
 
     for code, params, perf in experiments:
         design   = str(params.get("design",   "A"))

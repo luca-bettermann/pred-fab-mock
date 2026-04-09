@@ -41,6 +41,7 @@ EXPLORATION_RADIUS  = 0.5                    # KDE bubble size c → h = c·√d
 MPC_LOOKAHEAD       = 0                      # 0 = greedy, N = N-step discounted lookahead
 MPC_DISCOUNT        = 0.9                    # discount factor γ for MPC
 OPTIMIZER           = Optimizer.DE           # LBFGSB (gradient, fast) or DE (global, slower)
+BOUNDARY_BUFFER     = (0.10, 0.8, 2.0)      # (extent, strength, exponent) — penalise edge proposals
 
 # Step-level parameters (per-call, overridable)
 W_EXPLORE             = 0.7                  # exploration weight κ ∈ (0, 1]
@@ -78,6 +79,7 @@ def main() -> None:
         mpc_lookahead=MPC_LOOKAHEAD,
         mpc_discount=MPC_DISCOUNT,
         optimizer=OPTIMIZER,
+        boundary_buffer=BOUNDARY_BUFFER,
         fixed_params={"material": MATERIAL},
     )
 
@@ -124,21 +126,23 @@ def main() -> None:
         proposed = params_from_spec(spec)
         params = with_dimensions({**state.prev_params, **proposed}, fab)
         exp_code = f"explore_{i+1:02d}"
-        exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
 
-        # Retrain on expanded dataset
-        datamodule.update()
-        agent.train(datamodule, validate=False)
+        # Plot BEFORE retraining so the topology reflects the landscape the optimizer saw
+        proposed_full = {**state.prev_params, **proposed, "n_layers": 5, "n_segments": 4}
+        u = agent.predict_uncertainty(proposed_full, datamodule)
+
+        exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
 
         # Record results
         perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
         explore_log.append((exp_code, params, perf))
         state.record("exploration", exp_code, params, perf)
 
-        proposed_full = {**state.prev_params, **proposed, "n_layers": 5, "n_segments": 4}
-        u = agent.predict_uncertainty(proposed_full, datamodule)
-
         report_exploration_round(agent, state, exp_code, params, perf, u, proposed, W_EXPLORE)
+
+        # Retrain on expanded dataset (after plotting)
+        datamodule.update()
+        agent.train(datamodule, validate=False)
 
     report_exploration_summary(explore_log, state, N_EXPLORE)
 
