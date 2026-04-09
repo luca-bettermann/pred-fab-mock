@@ -6,7 +6,7 @@ so that main.py stays focused on the high-level agent operations.
 
 import os
 import shutil
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -17,20 +17,20 @@ from sensors import FabricationSystem
 from utils import params_from_spec, get_performance, quiet_console
 
 
-ExperimentLog = List[Tuple[str, Dict[str, Any], Dict[str, float]]]
+ExperimentLog = list[tuple[str, dict[str, Any], dict[str, float]]]
 
 
 class JourneyState:
     """Tracks experiment history and performance across all phases."""
 
     def __init__(self) -> None:
-        self.all_params: List[Dict[str, Any]] = []
-        self.all_phases: List[str] = []
-        self.all_codes: List[str] = []
-        self.perf_history: List[Tuple[Dict[str, Any], Dict[str, float]]] = []
-        self.prev_params: Dict[str, Any] = {}
+        self.all_params: list[dict[str, Any]] = []
+        self.all_phases: list[str] = []
+        self.all_codes: list[str] = []
+        self.perf_history: list[tuple[dict[str, Any], dict[str, float]]] = []
+        self.prev_params: dict[str, Any] = {}
 
-    def record(self, phase: str, code: str, params: Dict[str, Any], perf: Dict[str, float]) -> None:
+    def record(self, phase: str, code: str, params: dict[str, Any], perf: dict[str, float]) -> None:
         self.all_params.append(params)
         self.all_phases.append(phase)
         self.all_codes.append(code)
@@ -38,7 +38,7 @@ class JourneyState:
         self.prev_params = params
 
 
-def clean_artifacts(plot_dirs: List[str]) -> None:
+def clean_artifacts(plot_dirs: list[str]) -> None:
     """Remove previous run artefacts and create fresh plot directories."""
     for d in ["./pfab_data", "./plots"]:
         if os.path.exists(d):
@@ -47,7 +47,7 @@ def clean_artifacts(plot_dirs: List[str]) -> None:
         os.makedirs(d, exist_ok=True)
 
 
-def with_dimensions(params: Dict[str, Any], fab: FabricationSystem) -> Dict[str, Any]:
+def with_dimensions(params: dict[str, Any], fab: FabricationSystem) -> dict[str, Any]:
     """Return params with n_layers and n_segments derived from the design choice."""
     n_layers, n_segments = fab.get_dimensions(params["design"])
     return {**params, "n_layers": n_layers, "n_segments": n_segments}
@@ -57,7 +57,7 @@ def run_and_evaluate(
     dataset: Dataset,
     agent: PfabAgent,
     fab: FabricationSystem,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     exp_code: str,
 ) -> Any:
     """Create experiment, run fabrication, evaluate features + performance, persist."""
@@ -74,7 +74,7 @@ def run_baseline_phase(
     fab: FabricationSystem,
     n_baseline: int,
     state: JourneyState,
-) -> Tuple[ExperimentLog, List[Any], List[Any]]:
+) -> tuple[ExperimentLog, list[Any], list[Any]]:
     """Run baseline experiments and return (log, experiment_data_list, specs)."""
     with quiet_console(agent.logger):
         specs = agent.baseline_step(n=n_baseline)
@@ -103,7 +103,7 @@ def run_exploration_round(
     round_idx: int,
     w_explore: float,
     n_optimization_rounds: int,
-) -> Tuple[str, Dict[str, Any], Dict[str, float], float, Dict[str, Any]]:
+) -> tuple[str, dict[str, Any], dict[str, float], float, dict[str, Any]]:
     """Run one exploration round. Returns (code, params, perf, uncertainty, proposed_raw)."""
     with quiet_console(agent.logger):
         spec = agent.exploration_step(datamodule, w_explore=w_explore, n_optimization_rounds=n_optimization_rounds)
@@ -133,7 +133,7 @@ def run_inference_round(
     state: JourneyState,
     round_idx: int,
     n_optimization_rounds: int,
-) -> Tuple[str, Dict[str, Any], Dict[str, float], Any]:
+) -> tuple[str, dict[str, Any], dict[str, float], Any]:
     """Run one inference round. Returns (code, params, perf, exp_data)."""
     params = state.prev_params
     exp_code = f"infer_{round_idx+1:02d}"
@@ -164,14 +164,14 @@ def run_adaptation_phase(
     state: JourneyState,
     start_speed: float = 40.0,
     n_layers: int = 5,
-) -> Tuple[List[float], List[float], List[float]]:
+) -> tuple[list[float], list[float], list[float]]:
     """Run layer-by-layer adaptation. Returns (speeds, deviations, counterfactual_devs)."""
     adapt_params = with_dimensions({**state.prev_params, "print_speed": start_speed}, fab)
     adapt_exp = dataset.create_experiment("adapt_01", parameters=adapt_params)
     agent.set_active_experiment(adapt_exp)
 
-    speeds: List[float] = []
-    deviations: List[float] = []
+    speeds: list[float] = []
+    deviations: list[float] = []
 
     for layer_idx in range(n_layers):
         fab.run_layer(adapt_params, layer_idx)
@@ -214,7 +214,7 @@ def run_adaptation_phase(
     return speeds, deviations, counterfactual
 
 
-def get_physics_optimum(design_intent: Dict[str, Any]) -> Tuple[float, float]:
+def get_physics_optimum(design_intent: dict[str, Any]) -> tuple[float, float]:
     """Return (optimal_speed, optimal_water) for the given design intent."""
     from sensors.physics import DELTA, THETA, DESIGN_COMPLEXITY, MAT_SAG, W_OPTIMAL
     complexity = DESIGN_COMPLEXITY[str(design_intent["design"])]

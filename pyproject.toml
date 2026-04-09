@@ -1,13 +1,16 @@
 [project]
 name = "pred-fab-mock"
 version = "0.1.0"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
     "pred-fab",
     "matplotlib>=3.9.4",
     "numpy>=1.24",
     "scikit-learn>=1.3",
 ]
+
+[tool.setuptools.packages.find]
+include = ["models*", "sensors*", "visualization*"]
 
 [tool.uv.sources]
 pred-fab = { path = "../pred-fab", editable = true }

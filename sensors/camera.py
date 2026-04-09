@@ -1,7 +1,7 @@
 """Simulated camera-based geometry sensing for extrusion printing."""
 
 import numpy as np
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from .physics import path_deviation
 
@@ -18,22 +18,22 @@ class CameraSystem:
 
     def __init__(self, random_seed: int = 42) -> None:
         self._rng = np.random.RandomState(random_seed)
-        self._cache: Dict[Tuple, Dict] = {}
+        self._cache: dict[tuple, dict] = {}
 
-    def _cache_key(self, params: Dict[str, Any], layer_idx: int, segment_idx: int) -> Tuple:
+    def _cache_key(self, params: dict[str, Any], layer_idx: int, segment_idx: int) -> tuple:
         return (
             params["water_ratio"], params["print_speed"],
             params["design"], params["material"],
             layer_idx, segment_idx,
         )
 
-    def run_experiment(self, params: Dict[str, Any]) -> None:
+    def run_experiment(self, params: dict[str, Any]) -> None:
         """Simulate and cache all (layer, segment) positions for the given experiment params."""
         n_layers = int(params["n_layers"])
         for layer_idx in range(n_layers):
             self.run_layer(params, layer_idx)
 
-    def run_layer(self, params: Dict[str, Any], layer_idx: int) -> None:
+    def run_layer(self, params: dict[str, Any], layer_idx: int) -> None:
         """Simulate and cache all segments for a single layer."""
         n_segments = int(params["n_segments"])
         for segment_idx in range(n_segments):
@@ -42,8 +42,8 @@ class CameraSystem:
                 self._cache[key] = self._simulate_segment(params, layer_idx, segment_idx)
 
     def _simulate_segment(
-        self, params: Dict[str, Any], layer_idx: int, segment_idx: int
-    ) -> Dict:
+        self, params: dict[str, Any], layer_idx: int, segment_idx: int
+    ) -> dict:
         d = path_deviation(
             params["print_speed"], params["design"], segment_idx,
             params["water_ratio"], params["material"], layer_idx=layer_idx,
@@ -63,8 +63,8 @@ class CameraSystem:
         }
 
     def get_segment_data(
-        self, params: Dict[str, Any], layer_idx: int, segment_idx: int
-    ) -> Dict:
+        self, params: dict[str, Any], layer_idx: int, segment_idx: int
+    ) -> dict:
         """Return cached visual sensor data for a (layer, segment) position."""
         key = self._cache_key(params, layer_idx, segment_idx)
         if key not in self._cache:

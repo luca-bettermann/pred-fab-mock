@@ -1,6 +1,6 @@
 """Evaluation models for the extrusion printing simulation."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pred_fab import IEvaluationModel
 from pred_fab.utils import PfabLogger
@@ -15,7 +15,7 @@ class PathAccuracyModel(IEvaluationModel):
         super().__init__(logger)
 
     @property
-    def input_parameters(self) -> List[str]:
+    def input_parameters(self) -> list[str]:
         return []
 
     @property
@@ -26,10 +26,10 @@ class PathAccuracyModel(IEvaluationModel):
     def output_performance(self) -> str:
         return "path_accuracy"
 
-    def _compute_target_value(self, params: Dict, **dimensions: Any) -> float:
+    def _compute_target_value(self, params: dict, **dimensions: Any) -> float:
         return 0.0
 
-    def _compute_scaling_factor(self, params: Dict, **dimensions: Any) -> Optional[float]:
+    def _compute_scaling_factor(self, params: dict, **dimensions: Any) -> float | None:
         return self.MAX_DEVIATION
 
 
@@ -48,7 +48,7 @@ class EnergyConsumptionModel(IEvaluationModel):
         super().__init__(logger)
 
     @property
-    def input_parameters(self) -> List[str]:
+    def input_parameters(self) -> list[str]:
         return []
 
     @property
@@ -59,10 +59,10 @@ class EnergyConsumptionModel(IEvaluationModel):
     def output_performance(self) -> str:
         return "energy_efficiency"
 
-    def _compute_target_value(self, params: Dict, **dimensions: Any) -> float:
+    def _compute_target_value(self, params: dict, **dimensions: Any) -> float:
         return self.TARGET_ENERGY
 
-    def _compute_scaling_factor(self, params: Dict, **dimensions: Any) -> Optional[float]:
+    def _compute_scaling_factor(self, params: dict, **dimensions: Any) -> float | None:
         return self.MAX_ENERGY
 
 
@@ -79,7 +79,7 @@ class ProductionRateModel(IEvaluationModel):
         super().__init__(logger)
 
     @property
-    def input_parameters(self) -> List[str]:
+    def input_parameters(self) -> list[str]:
         return []
 
     @property
@@ -90,8 +90,8 @@ class ProductionRateModel(IEvaluationModel):
     def output_performance(self) -> str:
         return "production_rate"
 
-    def _compute_target_value(self, params: Dict, **dimensions: Any) -> float:
+    def _compute_target_value(self, params: dict, **dimensions: Any) -> float:
         return self.MAX_RATE
 
-    def _compute_scaling_factor(self, params: Dict, **dimensions: Any) -> Optional[float]:
+    def _compute_scaling_factor(self, params: dict, **dimensions: Any) -> float | None:
         return self.MAX_RATE

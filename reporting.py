@@ -4,7 +4,7 @@ Bundles the per-phase printing and plotting so that main.py
 stays focused on agent operations.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from pred_fab import PfabAgent
 from pred_fab.core import DataModule, ExperimentData
@@ -51,7 +51,7 @@ def report_baseline(
 def report_training(
     agent: PfabAgent,
     datamodule: DataModule,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Plot prediction accuracy and print R² summary. Returns R² scores."""
     r2_scores = plot_prediction_accuracy(agent, datamodule, save_dir=PLOT_DIRS["training"])
     print_training_summary(r2_scores)
@@ -63,10 +63,10 @@ def report_exploration_round(
     agent: PfabAgent,
     state: JourneyState,
     code: str,
-    params: Dict[str, Any],
-    perf: Dict[str, float],
+    params: dict[str, Any],
+    perf: dict[str, float],
     uncertainty: float,
-    proposed: Dict[str, Any],
+    proposed: dict[str, Any],
     w_explore: float,
 ) -> None:
     """Print one exploration row and save the topology plot."""
@@ -97,9 +97,9 @@ def report_inference_round(
     agent: PfabAgent,
     state: JourneyState,
     code: str,
-    params: Dict[str, Any],
-    perf: Dict[str, float],
-    design_intent: Dict[str, Any],
+    params: dict[str, Any],
+    perf: dict[str, float],
+    design_intent: dict[str, Any],
 ) -> None:
     """Print one inference row and save the topology plot."""
     print_infer_row(code, params, perf, agent.last_opt_score)
@@ -114,9 +114,9 @@ def report_inference_round(
 def report_inference_summary(
     log: ExperimentLog,
     state: JourneyState,
-    last_exp_data: Optional[ExperimentData],
+    last_exp_data: ExperimentData | None,
     camera: CameraSystem,
-    design_intent: Dict[str, Any],
+    design_intent: dict[str, Any],
     n_infer: int,
 ) -> None:
     """Print inference summary and save all inference-phase plots."""
@@ -136,9 +136,9 @@ def report_inference_summary(
 
 def report_adaptation(
     agent: PfabAgent,
-    speeds: List[float],
-    deviations: List[float],
-    counterfactual: List[float],
+    speeds: list[float],
+    deviations: list[float],
+    counterfactual: list[float],
 ) -> None:
     """Print adaptation rows and save the comparison plot."""
     for li in range(len(speeds)):
@@ -158,7 +158,7 @@ def report_adaptation(
 
 def report_summary(
     state: JourneyState,
-    design_intent: Dict[str, Any],
+    design_intent: dict[str, Any],
 ) -> None:
     """Print the final run summary table."""
     spd_opt, w_opt = get_physics_optimum(design_intent)

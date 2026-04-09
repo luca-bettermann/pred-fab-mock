@@ -1,6 +1,6 @@
 """FabricationSystem: coordinates all sensors for a single print run."""
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from .camera import CameraSystem
 from .energy import EnergySensor
@@ -13,7 +13,7 @@ from .energy import EnergySensor
 #   layer_height = target_height / n_layers   (preserves component height)
 #   layer_time   = path_length / print_speed  (derived from travel speed)
 #
-DESIGN_CONFIG: Dict[str, Dict] = {
+DESIGN_CONFIG: dict[str, dict] = {
     "A": {"n_layers": 5, "n_segments": 4, "target_height": 0.040, "path_length": 0.40},
     "B": {"n_layers": 5, "n_segments": 4, "target_height": 0.045, "path_length": 0.50},
 }
@@ -33,7 +33,7 @@ class FabricationSystem:
         self.camera = camera
         self.energy = energy
 
-    def get_dimensions(self, design: str) -> Tuple[int, int]:
+    def get_dimensions(self, design: str) -> tuple[int, int]:
         """Return (n_layers, n_segments) for the given design."""
         cfg = DESIGN_CONFIG[design]
         return cfg["n_layers"], cfg["n_segments"]
@@ -48,7 +48,7 @@ class FabricationSystem:
         cfg = DESIGN_CONFIG[design]
         return cfg["path_length"] / (print_speed * 1e-3)  # convert mm/s → m/s
 
-    def _effective_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _effective_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Merge derived fabrication quantities into params for sensor calls.
 
         Injects layer_height (from design geometry) and layer_time (from design
@@ -63,13 +63,13 @@ class FabricationSystem:
             "layer_time": self.get_layer_time(design, print_speed),
         }
 
-    def run_layer(self, params: Dict[str, Any], layer_idx: int) -> None:
+    def run_layer(self, params: dict[str, Any], layer_idx: int) -> None:
         """Populate sensor caches for all segments of a single layer."""
         effective = self._effective_params(params)
         self.camera.run_layer(effective, layer_idx)
         self.energy.run_layer(effective, layer_idx)
 
-    def run_experiment(self, params: Dict[str, Any]) -> None:
+    def run_experiment(self, params: dict[str, Any]) -> None:
         """Populate sensor caches for all layers of a full experiment."""
         n_layers, _ = self.get_dimensions(params["design"])
         for layer_idx in range(n_layers):

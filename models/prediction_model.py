@@ -3,7 +3,7 @@
 import warnings
 
 import numpy as np
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
@@ -44,25 +44,25 @@ class DeviationPredictionModel(IPredictionModel):
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
-        self._model: Optional[Pipeline] = None
+        self._model: Pipeline | None = None
         self._is_trained = False
 
     @property
-    def input_parameters(self) -> List[str]:
+    def input_parameters(self) -> list[str]:
         return ["design", "print_speed", "water_ratio", "material", "n_layers", "n_segments"]
 
     @property
-    def input_features(self) -> List[str]:
+    def input_features(self) -> list[str]:
         return ["prev_layer_deviation", "prev_segment_deviation"]
 
     @property
-    def outputs(self) -> List[str]:
+    def outputs(self) -> list[str]:
         return ["path_deviation"]
 
     def train(
         self,
-        train_batches: List[Tuple[np.ndarray, np.ndarray]],
-        val_batches: List[Tuple[np.ndarray, np.ndarray]],
+        train_batches: list[tuple[np.ndarray, np.ndarray]],
+        val_batches: list[tuple[np.ndarray, np.ndarray]],
         **kwargs: Any,
     ) -> None:
         if not train_batches:
@@ -103,25 +103,25 @@ class EnergyPredictionModel(IPredictionModel):
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
-        self._model: Optional[Pipeline] = None
+        self._model: Pipeline | None = None
         self._is_trained = False
 
     @property
-    def input_parameters(self) -> List[str]:
+    def input_parameters(self) -> list[str]:
         return ["design", "material", "print_speed", "water_ratio", "n_layers", "n_segments"]
 
     @property
-    def input_features(self) -> List[str]:
+    def input_features(self) -> list[str]:
         return []
 
     @property
-    def outputs(self) -> List[str]:
+    def outputs(self) -> list[str]:
         return ["energy_per_segment"]
 
     def train(
         self,
-        train_batches: List[Tuple[np.ndarray, np.ndarray]],
-        val_batches: List[Tuple[np.ndarray, np.ndarray]],
+        train_batches: list[tuple[np.ndarray, np.ndarray]],
+        val_batches: list[tuple[np.ndarray, np.ndarray]],
         **kwargs: Any,
     ) -> None:
         if not train_batches:
@@ -163,15 +163,15 @@ class ProductionRatePredictionModel(IDeterministicModel):
     _MATERIALS = ["clay", "concrete"]
 
     @property
-    def input_parameters(self) -> List[str]:
+    def input_parameters(self) -> list[str]:
         return ["print_speed", "water_ratio", "material"]
 
     @property
-    def input_features(self) -> List[str]:
+    def input_features(self) -> list[str]:
         return []
 
     @property
-    def outputs(self) -> List[str]:
+    def outputs(self) -> list[str]:
         return ["production_rate"]
 
     def formula(self, X: np.ndarray) -> np.ndarray:
@@ -190,25 +190,25 @@ class DeviationRFModel(IPredictionModel):
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
-        self._model: Optional[Pipeline] = None
+        self._model: Pipeline | None = None
         self._is_trained = False
 
     @property
-    def input_parameters(self) -> List[str]:
+    def input_parameters(self) -> list[str]:
         return ["design", "print_speed", "water_ratio", "material", "n_layers", "n_segments"]
 
     @property
-    def input_features(self) -> List[str]:
+    def input_features(self) -> list[str]:
         return ["prev_layer_deviation", "prev_segment_deviation"]
 
     @property
-    def outputs(self) -> List[str]:
+    def outputs(self) -> list[str]:
         return ["path_deviation"]
 
     def train(
         self,
-        train_batches: List[Tuple[np.ndarray, np.ndarray]],
-        val_batches: List[Tuple[np.ndarray, np.ndarray]],
+        train_batches: list[tuple[np.ndarray, np.ndarray]],
+        val_batches: list[tuple[np.ndarray, np.ndarray]],
         **kwargs: Any,
     ) -> None:
         if not train_batches:
@@ -241,25 +241,25 @@ class EnergyRFModel(IPredictionModel):
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
-        self._model: Optional[Pipeline] = None
+        self._model: Pipeline | None = None
         self._is_trained = False
 
     @property
-    def input_parameters(self) -> List[str]:
+    def input_parameters(self) -> list[str]:
         return ["design", "material", "print_speed", "water_ratio", "n_layers", "n_segments"]
 
     @property
-    def input_features(self) -> List[str]:
+    def input_features(self) -> list[str]:
         return []
 
     @property
-    def outputs(self) -> List[str]:
+    def outputs(self) -> list[str]:
         return ["energy_per_segment"]
 
     def train(
         self,
-        train_batches: List[Tuple[np.ndarray, np.ndarray]],
-        val_batches: List[Tuple[np.ndarray, np.ndarray]],
+        train_batches: list[tuple[np.ndarray, np.ndarray]],
+        val_batches: list[tuple[np.ndarray, np.ndarray]],
         **kwargs: Any,
     ) -> None:
         if not train_batches:

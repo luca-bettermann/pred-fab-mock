@@ -1,7 +1,7 @@
 """Terminal pretty-printing for the PFAB showcase flow."""
 
 import math
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Any
 
 # ANSI codes
 _R  = "\033[0m"   # reset
@@ -39,8 +39,8 @@ def print_section(title: str) -> None:
 
 def print_experiment_row(
     exp_code: str,
-    params: Dict[str, Any],
-    perf: Dict[str, float],
+    params: dict[str, Any],
+    perf: dict[str, float],
 ) -> None:
     """Print one formatted experiment result row."""
     design   = params.get("design",      "?")
@@ -69,8 +69,8 @@ def print_experiment_row(
 
 def print_explore_row(
     exp_code: str,
-    params: Dict[str, Any],
-    perf: Dict[str, float],
+    params: dict[str, Any],
+    perf: dict[str, float],
     u: float,
     obj: float,
     w_explore: float,
@@ -103,8 +103,8 @@ def print_explore_row(
 
 def print_infer_row(
     exp_code: str,
-    params: Dict[str, Any],
-    perf: Dict[str, float],
+    params: dict[str, Any],
+    perf: dict[str, float],
     obj: float,
 ) -> None:
     """One-line inference experiment result: params (dim) + perf scores + obj."""
@@ -137,7 +137,7 @@ def print_optimizer_row(n_starts: int, n_evals: int) -> None:
     print(f"  {_D}    {n_starts} starts · {n_evals} evals{_R}")
 
 
-def _combined_score(perf: Dict[str, float]) -> float:
+def _combined_score(perf: dict[str, float]) -> float:
     """2:1:1 weighted combined score across path_accuracy, energy_efficiency, production_rate."""
     return (
         2 * perf.get("path_accuracy",    0.0)
@@ -147,7 +147,7 @@ def _combined_score(perf: Dict[str, float]) -> float:
 
 
 def print_phase_summary(
-    experiments: List[Tuple[str, Dict[str, Any], Dict[str, float]]],
+    experiments: list[tuple[str, dict[str, Any], dict[str, float]]],
 ) -> None:
     """Print a one-line best-result summary at the end of a phase."""
     if not experiments:
@@ -169,7 +169,7 @@ def print_phase_summary(
     )
 
 
-def print_training_summary(r2_scores: Dict[str, float]) -> None:
+def print_training_summary(r2_scores: dict[str, float]) -> None:
     """Print R² scores for each prediction model output."""
     parts = "  ".join(
         f"{name}: R²={_score_color(max(0.0, r2))}{r2:.3f}{_R}"
@@ -182,8 +182,8 @@ def print_adaptation_row(
     layer_idx: int,
     speed_before: float,
     deviation: float,
-    speed_after: Optional[float] = None,
-    n_evals: Optional[int] = None,
+    speed_after: float | None = None,
+    n_evals: int | None = None,
 ) -> None:
     """Print one layer's adaptation step result."""
     dev_color = _score_color(max(0.0, 1.0 - deviation / 0.003))
@@ -201,10 +201,10 @@ def print_adaptation_row(
 
 
 def print_run_summary(
-    perf_history: List[Tuple[Dict[str, Any], Dict[str, float]]],
-    phases: List[str],
-    exp_codes: List[str],
-    design_intent: Dict[str, Any],
+    perf_history: list[tuple[dict[str, Any], dict[str, float]]],
+    phases: list[str],
+    exp_codes: list[str],
+    design_intent: dict[str, Any],
     phys_opt_speed: float,
     phys_opt_water: float,
 ) -> None:
@@ -225,7 +225,7 @@ def print_run_summary(
     print(f"  {_D}{header}{_R}")
     print(f"  {_D}{bar}{_R}")
 
-    def _row(label: str, code: str, params: Dict[str, Any], perf: Dict[str, float]) -> None:
+    def _row(label: str, code: str, params: dict[str, Any], perf: dict[str, float]) -> None:
         acc  = perf.get("path_accuracy",    float("nan"))
         eff  = perf.get("energy_efficiency", float("nan"))
         rate = perf.get("production_rate",   float("nan"))
