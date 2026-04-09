@@ -28,7 +28,7 @@ import os
 import sys
 import shutil
 import warnings
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import matplotlib
@@ -49,19 +49,20 @@ from utils import params_from_spec
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 N_BASELINE    = 5      # baseline experiments (LHS)
-N_EXPLORE     = 5      # exploration rounds
+N_EXPLORE     = 10     # exploration rounds
 N_TEST        = 32     # test experiments (uniform grid, never used for training)
-N_RANDOM      = 10     # random-LHS baseline (same total as baseline + explore)
+N_RANDOM      = 15     # random-LHS baseline (same total as baseline + explore)
 W_EXPLORE     = 0.7    # exploration weight for UCB acquisition (not used in evaluation)
 ALPHA         = 0.0    # importance weight floor for R²_adj (0=pure importance, 1=standard R²)
 SYMMETRIC     = True   # importance = max(true, pred); False = true only
 MATERIAL      = "clay"  # fixed material for mock
 MODEL_TYPE    = "mlp"   # "mlp" or "rf" — prediction model architecture
-PERF_WEIGHTS: Dict[str, float] = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
+PERF_WEIGHTS: dict[str, float] = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 CAL_BOUNDS    = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
+BOUNDARY_BUFFER = (0.10, 0.8, 2.0)  # (extent, strength, exponent) — penalise edge proposals
 
 # Maps each predicted feature to its corresponding performance attribute.
-FEATURE_PERF_MAP: Dict[str, str] = {
+FEATURE_PERF_MAP: dict[str, str] = {
     "path_deviation":    "path_accuracy",
     "energy_per_segment": "energy_efficiency",
     "production_rate":   "production_rate",
@@ -74,7 +75,7 @@ PLOT_DIR      = "./dev/plots"
 # ── Types ────────────────────────────────────────────────────────────────────
 
 # Per-step metrics: {feature_name: {"r2": float, "r2_adj": float}}
-StepMetrics = Dict[str, Dict[str, float]]
+StepMetrics = dict[str, dict[str, float]]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,15 +91,23 @@ def _weighted_summary(metrics: StepMetrics, key: str) -> float:
     return weighted_sum / total_w if total_w > 0 else 0.0
 
 
-def _make_fresh_env(data_root: str) -> Tuple[Any, Any, Any, Dataset]:
+def _make_fresh_env(
+    data_root: str,
+    boundary_buffer: tuple[float, float, float] | None = None,
+) -> tuple[Any, Any, Any, Dataset]:
     """Build a fresh agent+dataset for one workflow run."""
     if os.path.exists(data_root):
         shutil.rmtree(data_root)
     schema = build_schema(root_folder=data_root)
     fab    = FabricationSystem(CameraSystem(), EnergySensor())
     agent  = build_agent(schema, fab.camera, fab.energy, model_type=MODEL_TYPE)
-    agent.configure(bounds=CAL_BOUNDS, performance_weights=PERF_WEIGHTS,
-                     fixed_params={"material": MATERIAL})
+    configure_kwargs: dict[str, Any] = dict(
+        bounds=CAL_BOUNDS, performance_weights=PERF_WEIGHTS,
+        fixed_params={"material": MATERIAL},
+    )
+    if boundary_buffer is not None:
+        configure_kwargs["boundary_buffer"] = boundary_buffer
+    agent.configure(**configure_kwargs)
     dataset = Dataset(schema=schema)
     agent.logger.set_console_output(False)
     return agent, fab, schema, dataset
@@ -108,7 +117,7 @@ def _run_and_evaluate(
     dataset: Dataset,
     agent: Any,
     fab: "FabricationSystem",
-    params: Dict[str, Any],
+    params: dict[str, Any],
     exp_code: str,
 ) -> Any:
     """Run one fabrication experiment and evaluate features + performance."""
@@ -119,18 +128,18 @@ def _run_and_evaluate(
     return exp_data
 
 
-def _with_dimensions(params: Dict[str, Any], fab: "FabricationSystem") -> Dict[str, Any]:
+def _with_dimensions(params: dict[str, Any], fab: "FabricationSystem") -> dict[str, Any]:
     n_layers, n_segments = fab.get_dimensions(params["design"])
     return {**params, "n_layers": n_layers, "n_segments": n_segments}
 
 
-def _build_test_dataset(fab: "FabricationSystem") -> List[Dict[str, Any]]:
+def _build_test_dataset(fab: "FabricationSystem") -> list[dict[str, Any]]:
     """Generate N_TEST parameter combinations on a jittered uniform grid."""
     designs   = ["A", "B"]
     materials = [MATERIAL]
     n_per_combo = N_TEST // (len(designs) * len(materials))
 
-    test_params: List[Dict[str, Any]] = []
+    test_params: list[dict[str, Any]] = []
     rng = np.random.default_rng(seed=999)
 
     for design in designs:
@@ -154,7 +163,7 @@ def _run_test_dataset(
     fab: "FabricationSystem",
     agent: Any,
     test_root: str,
-    test_params: List[Dict[str, Any]],
+    test_params: list[dict[str, Any]],
 ) -> Dataset:
     """Populate and evaluate all test experiments into a SEPARATE dataset."""
     if os.path.exists(test_root):
@@ -170,7 +179,7 @@ def _run_test_dataset(
     return test_dataset
 
 
-def _compute_combined_performance(perf: Dict[str, Any]) -> float:
+def _compute_combined_performance(perf: dict[str, Any]) -> float:
     """Combined performance = weighted average using PERF_WEIGHTS, normalized to [0,1]."""
     total_w = sum(PERF_WEIGHTS.values())
     score = sum(PERF_WEIGHTS.get(k, 0.0) * float(v) for k, v in perf.items() if v is not None)
@@ -181,7 +190,7 @@ def _compute_metrics_on_test(
     agent: Any,
     train_dm: Any,
     test_dataset: Dataset,
-    test_params: List[Dict[str, Any]],
+    test_params: list[dict[str, Any]],
 ) -> StepMetrics:
     """Evaluate R² and R²_adj per feature on the fixed test set.
 
@@ -253,7 +262,7 @@ def _compute_metrics_on_test(
 def run_baseline_workflow(
     fab: "FabricationSystem",
     test_dataset: Dataset,
-    test_params: List[Dict[str, Any]],
+    test_params: list[dict[str, Any]],
     n_baseline: int,
 ) -> StepMetrics:
     """Train on n_baseline LHS experiments, return per-feature metrics on test set."""
@@ -278,19 +287,22 @@ def run_baseline_workflow(
 def run_exploration_workflow(
     fab: "FabricationSystem",
     test_dataset: Dataset,
-    test_params: List[Dict[str, Any]],
+    test_params: list[dict[str, Any]],
     optimizer: Optimizer = Optimizer.LBFGSB,
-) -> Tuple[List[int], List[StepMetrics], List[int]]:
+    boundary_buffer: tuple[float, float, float] | None = None,
+    tag_suffix: str = "",
+) -> tuple[list[int], list[StepMetrics], list[int]]:
     """Baseline + incremental exploration.
 
     Returns (training_sizes, metrics_per_step, cumulative_nfev_per_step).
     """
-    agent, fab2, schema, dataset = _make_fresh_env(DATA_ROOT + f"_explore_{optimizer.value}")
+    tag = f"_explore_{optimizer.value}{tag_suffix}"
+    agent, fab2, schema, dataset = _make_fresh_env(DATA_ROOT + tag, boundary_buffer=boundary_buffer)
     agent.configure(optimizer=optimizer)
 
     # Phase 1: Baseline
     specs = agent.baseline_step(n=N_BASELINE)
-    prev_params: Dict[str, Any] = {}
+    prev_params: dict[str, Any] = {}
     for i, spec in enumerate(specs):
         params = _with_dimensions(params_from_spec(spec), fab2)
         _run_and_evaluate(dataset, agent, fab2, params, f"baseline_{i+1:02d}")
@@ -328,7 +340,7 @@ def run_exploration_workflow(
         adj_s = _weighted_summary(m, "r2_adj")
         print(f"    n={n_total}: R²={r2_s:.3f}  R²_adj={adj_s:.3f}  |  nfev_step={nfev_step}, cumulative={cumulative}")
 
-    shutil.rmtree(DATA_ROOT + f"_explore_{optimizer.value}", ignore_errors=True)
+    shutil.rmtree(DATA_ROOT + tag, ignore_errors=True)
     return training_sizes, metrics_history, nfev_cumulative
 
 
@@ -337,10 +349,10 @@ def run_exploration_workflow(
 def run_random_workflow(
     fab: "FabricationSystem",
     test_dataset: Dataset,
-    test_params: List[Dict[str, Any]],
+    test_params: list[dict[str, Any]],
     n_total: int,
     eval_from: int = 4,
-) -> Tuple[List[int], List[StepMetrics]]:
+) -> tuple[list[int], list[StepMetrics]]:
     """Train on 1..n_total random LHS experiments, evaluating incrementally.
 
     Returns (training_sizes, metrics_per_step) starting from *eval_from*.
@@ -348,8 +360,8 @@ def run_random_workflow(
     agent, fab2, schema, dataset = _make_fresh_env(DATA_ROOT + "_random")
     specs = agent.baseline_step(n=n_total)
 
-    training_sizes: List[int] = []
-    metrics_history: List[StepMetrics] = []
+    training_sizes: list[int] = []
+    metrics_history: list[StepMetrics] = []
 
     for i, spec in enumerate(specs):
         params = _with_dimensions(params_from_spec(spec), fab2)
@@ -376,94 +388,66 @@ def run_random_workflow(
 
 # ── Plotting ──────────────────────────────────────────────────────────────────
 
+# (label, sizes, metrics, fmt, color)
+SeriesData = tuple[str, list[int], list[StepMetrics], str, str]
+
+
 def plot_learning_curves(
-    lbfgsb_sizes: List[int],
-    lbfgsb_metrics: List[StepMetrics],
-    de_sizes: List[int],
-    de_metrics: List[StepMetrics],
-    random_sizes: List[int],
-    random_metrics: List[StepMetrics],
+    series: list[SeriesData],
+    random_sizes: list[int],
+    random_metrics: list[StepMetrics],
+    filename: str = "learning_curves.png",
+    title: str = "Learning Curves: Exploration vs. Random Sampling",
 ) -> None:
     """Plot R² and R²_adj learning curves for all methods side by side."""
     os.makedirs(PLOT_DIR, exist_ok=True)
 
-    colors = {
-        "lbfgsb": "#4878CF",   # blue
-        "de":     "#D65F5F",   # red
-        "random": "#6ACC65",   # green
-    }
-    labels = {
-        "lbfgsb": "Explore (L-BFGS-B)",
-        "de":     "Explore (DE)",
-        "random": "Random LHS",
-    }
-
-    def _summaries(metrics: List[StepMetrics], key: str) -> List[float]:
+    def _summaries(metrics: list[StepMetrics], key: str) -> list[float]:
         return [_weighted_summary(m, key) for m in metrics]
 
-    # Collect all y-values to determine a sensible y-range
-    all_r2 = (_summaries(lbfgsb_metrics, "r2")
-              + _summaries(de_metrics, "r2")
-              + _summaries(random_metrics, "r2"))
-    all_adj = (_summaries(lbfgsb_metrics, "r2_adj")
-               + _summaries(de_metrics, "r2_adj")
-               + _summaries(random_metrics, "r2_adj"))
+    # Collect all y-values
+    all_r2: list[float] = _summaries(random_metrics, "r2")
+    all_adj: list[float] = _summaries(random_metrics, "r2_adj")
+    all_sizes = list(random_sizes)
+    for label, sizes, metrics, fmt, color in series:
+        all_r2 += _summaries(metrics, "r2")
+        all_adj += _summaries(metrics, "r2_adj")
+        all_sizes += sizes
 
-    x_min = min(
-        min(lbfgsb_sizes, default=99),
-        min(de_sizes, default=99),
-        min(random_sizes, default=99),
-    ) - 0.5
-    x_max = max(
-        max(lbfgsb_sizes, default=0),
-        max(de_sizes, default=0),
-        max(random_sizes, default=0),
-    ) + 0.5
+    x_min = min(all_sizes, default=5) - 0.5
+    x_max = max(all_sizes, default=10) + 0.5
 
     fig, (ax_r2, ax_adj) = plt.subplots(1, 2, figsize=(12, 4.5))
+    fig.suptitle(title, fontsize=13, fontweight="bold", y=1.02)
 
-    fig.suptitle(
-        "Learning Curves: Exploration vs. Random Sampling",
-        fontsize=13, fontweight="bold", y=1.02,
-    )
-
-    datasets = [
-        ("lbfgsb", lbfgsb_sizes, lbfgsb_metrics, "o-"),
-        ("de", de_sizes, de_metrics, "s-"),
-        ("random", random_sizes, random_metrics, "^-"),
-    ]
-
-    for ax, key, title, y_vals in [
+    for ax, key, ax_title, y_vals in [
         (ax_r2, "r2", "R² (uniform weighting)", all_r2),
         (ax_adj, "r2_adj", "R²_adj (importance weighting)", all_adj),
     ]:
-        for method, sizes, metrics, fmt in datasets:
+        # Random baseline
+        ax.plot(random_sizes, _summaries(random_metrics, key), "^-",
+                color="#6ACC65", lw=2, ms=6, label="Random LHS",
+                markeredgecolor="white", markeredgewidth=0.8)
+        # Exploration series
+        for label, sizes, metrics, fmt, color in series:
             ax.plot(sizes, _summaries(metrics, key), fmt,
-                    color=colors[method], lw=2, ms=6, label=labels[method],
+                    color=color, lw=2, ms=6, label=label,
                     markeredgecolor="white", markeredgewidth=0.8)
 
-        # Shade baseline phase
         ax.axvspan(x_min, N_BASELINE + 0.5, color="#f0f0f0", zorder=0)
-
-        ax.set_title(title, fontsize=11, pad=8)
+        ax.set_title(ax_title, fontsize=11, pad=8)
         ax.set_xlabel("Training experiments", fontsize=10)
         ax.set_xlim(x_min, x_max)
-
-        # Auto y-range: show all data with some padding
         y_lo = max(min(y_vals) - 0.15, -3.0)
         ax.set_ylim(y_lo, 1.12)
-
         ax.axhline(0, color="#cccccc", lw=0.8)
         ax.axhline(1, color="#cccccc", lw=0.5, ls="--")
         ax.grid(True, alpha=0.2, ls="--")
-        ax.legend(fontsize=8, loc="lower right", framealpha=0.9)
-
-        # Integer x-ticks
+        ax.legend(fontsize=7, loc="lower right", framealpha=0.9)
         ax.set_xticks(range(int(x_min) + 1, int(x_max) + 1))
 
     ax_r2.set_ylabel("Perf-weighted score", fontsize=10)
 
-    # Annotation: gap interpretation
     fig.text(0.5, -0.04,
              f"test set: {N_TEST} uniform experiments  ·  "
              f"alpha={ALPHA}  ·  symmetric={SYMMETRIC}  ·  "
@@ -471,17 +455,17 @@ def plot_learning_curves(
              ha="center", fontsize=8, color="#888888")
 
     plt.tight_layout()
-    out = os.path.join(PLOT_DIR, "learning_curves.png")
+    out = os.path.join(PLOT_DIR, filename)
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"\n  Saved: {out}")
 
 
 def plot_forward_passes(
-    lbfgsb_sizes: List[int],
-    lbfgsb_nfev: List[int],
-    de_sizes: List[int],
-    de_nfev: List[int],
+    lbfgsb_sizes: list[int],
+    lbfgsb_nfev: list[int],
+    de_sizes: list[int],
+    de_nfev: list[int],
 ) -> None:
     """Plot cumulative forward passes per optimizer over exploration rounds."""
     os.makedirs(PLOT_DIR, exist_ok=True)
@@ -500,7 +484,56 @@ def plot_forward_passes(
     print(f"  Saved: {out}")
 
 
+def _print_summary(
+    results: dict[str, list[StepMetrics]],
+    nfev: dict[str, list[int]] | None = None,
+) -> None:
+    """Print final R²/R²_adj metrics for all methods."""
+    feats = sorted(FEATURE_PERF_MAP.keys())
+    methods = list(results.keys())
+    col_w = 8
+
+    # Header
+    r2_cols = "  ".join(f"{m[:8]:>{col_w}}" for m in methods)
+    adj_cols = "  ".join(f"{m[:8]:>{col_w}}" for m in methods)
+    print(f"\n══ Results Summary (at final training size) ══")
+    print(f"  {'Feature':25s}  {r2_cols}  │  {adj_cols}")
+    print("  " + "─" * (28 + (col_w + 2) * len(methods) * 2 + 5))
+    for feat in feats:
+        r2_vals = "  ".join(
+            f"{results[m][-1].get(feat, {}).get('r2', float('nan')):{col_w}.3f}"
+            for m in methods
+        )
+        adj_vals = "  ".join(
+            f"{results[m][-1].get(feat, {}).get('r2_adj', float('nan')):{col_w}.3f}"
+            for m in methods
+        )
+        print(f"  {feat:25s}  {r2_vals}  │  {adj_vals}")
+
+    print(f"\n  [perf-weighted summary]")
+    r2_line = "  ".join(f"{_weighted_summary(results[m][-1], 'r2'):{col_w}.3f}" for m in methods)
+    adj_line = "  ".join(f"{_weighted_summary(results[m][-1], 'r2_adj'):{col_w}.3f}" for m in methods)
+    gap_line = "  ".join(
+        f"{_weighted_summary(results[m][-1], 'r2_adj') - _weighted_summary(results[m][-1], 'r2'):{col_w}.3f}"
+        for m in methods
+    )
+    print(f"  {'R²':25s}  {r2_line}")
+    print(f"  {'R²_adj':25s}  {adj_line}")
+    print(f"  {'gap (adj−r²)':25s}  {gap_line}")
+
+    if nfev:
+        parts = ", ".join(f"{m}: {v[-1]}" for m, v in nfev.items())
+        print(f"\n  Cumulative forward passes — {parts}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
+
+# Boundary buffer conditions to compare: (label, (extent, strength, exponent), color, fmt)
+BUFFER_CONDITIONS: list[tuple[str, tuple[float, float, float] | None, str, str]] = [
+    ("No buffer",        None,               "#4878CF", "o-"),
+    ("Default",          BOUNDARY_BUFFER,     "#D65F5F", "s-"),
+]
+
 
 def main() -> None:
     # Suppress sklearn numerical warnings from MLP training on tiny datasets
@@ -513,77 +546,50 @@ def main() -> None:
     _, fab, _, _ = _make_fresh_env(DATA_ROOT + "_setup")
     test_params = _build_test_dataset(fab)
 
-    print("\n[1/4] Building test dataset...")
+    print("\n[1] Building test dataset...")
     agent_test, fab_test, _, _ = _make_fresh_env(DATA_ROOT + "_setup")
     test_dataset = _run_test_dataset(fab_test, agent_test, DATA_ROOT + "_test", test_params)
     shutil.rmtree(DATA_ROOT + "_setup", ignore_errors=True)
 
-    print(f"\n[2/4] Exploration (L-BFGS-B): baseline={N_BASELINE}, explore={N_EXPLORE}...")
-    lbfgsb_sizes, lbfgsb_metrics, lbfgsb_nfev = run_exploration_workflow(
-        fab_test, test_dataset, test_params, optimizer=Optimizer.LBFGSB
-    )
-    print(f"  Total forward passes (L-BFGS-B): {lbfgsb_nfev[-1]}")
-
-    print(f"\n[3/4] Exploration (DE): baseline={N_BASELINE}, explore={N_EXPLORE}...")
-    de_sizes, de_metrics, de_nfev = run_exploration_workflow(
-        fab_test, test_dataset, test_params, optimizer=Optimizer.DE
-    )
-    print(f"  Total forward passes (DE): {de_nfev[-1]}")
-
-    print(f"\n[4/4] Random LHS workflow (n={N_RANDOM}, incremental)...")
+    # Random baseline (always needed)
+    n_total = N_BASELINE + N_EXPLORE
+    print(f"\n[2] Random LHS workflow (n={max(N_RANDOM, n_total)}, incremental)...")
     random_sizes, random_metrics = run_random_workflow(
-        fab_test, test_dataset, test_params, N_RANDOM, eval_from=N_BASELINE,
+        fab_test, test_dataset, test_params, max(N_RANDOM, n_total), eval_from=N_BASELINE,
     )
+
+    # Run each buffer condition with DE optimizer
+    all_results: dict[str, list[StepMetrics]] = {"random": random_metrics}
+    all_sizes: dict[str, list[int]] = {"random": random_sizes}
+    all_nfev: dict[str, list[int]] = {}
+    plot_series: list[SeriesData] = []
+
+    for idx, (label, buffer, color, fmt) in enumerate(BUFFER_CONDITIONS):
+        tag = f"_buf{idx}"
+        print(f"\n[{idx+3}] Exploration (DE, {label}): baseline={N_BASELINE}, explore={N_EXPLORE}...")
+        sizes, metrics, nfev = run_exploration_workflow(
+            fab_test, test_dataset, test_params,
+            optimizer=Optimizer.DE,
+            boundary_buffer=buffer,
+            tag_suffix=tag,
+        )
+        all_results[label] = metrics
+        all_sizes[label] = sizes
+        all_nfev[label] = nfev
+        plot_series.append((label, sizes, metrics, fmt, color))
+        print(f"  Total forward passes ({label}): {nfev[-1]}")
 
     # Plots
     plot_learning_curves(
-        lbfgsb_sizes, lbfgsb_metrics,
-        de_sizes, de_metrics,
-        random_sizes, random_metrics,
+        plot_series, random_sizes, random_metrics,
+        filename="learning_curves.png",
+        title="Boundary Buffer Comparison (DE optimizer)",
     )
-    plot_forward_passes(lbfgsb_sizes, lbfgsb_nfev, de_sizes, de_nfev)
 
     # Cleanup
     shutil.rmtree(DATA_ROOT + "_test", ignore_errors=True)
 
-    # Summary — final metrics for each method
-    print("\n══ Results Summary (at final training size) ══")
-    feats = sorted(FEATURE_PERF_MAP.keys())
-    col_w = 8
-    header = (f"  {'Feature':25s}  {'lb R²':>{col_w}}  {'de R²':>{col_w}}  "
-              f"{'rnd R²':>{col_w}}  │  {'lb adj':>{col_w}}  "
-              f"{'de adj':>{col_w}}  {'rnd adj':>{col_w}}")
-    sep = "  " + "─" * (len(header) - 2)
-    print(header)
-    print(sep)
-    for feat in feats:
-        lb  = lbfgsb_metrics[-1].get(feat, {})
-        de  = de_metrics[-1].get(feat, {})
-        rnd = random_metrics[-1].get(feat, {})
-        print(
-            f"  {feat:25s}"
-            f"  {lb.get('r2', float('nan')):{col_w}.3f}"
-            f"  {de.get('r2', float('nan')):{col_w}.3f}"
-            f"  {rnd.get('r2', float('nan')):{col_w}.3f}"
-            f"  │"
-            f"  {lb.get('r2_adj', float('nan')):{col_w}.3f}"
-            f"  {de.get('r2_adj', float('nan')):{col_w}.3f}"
-            f"  {rnd.get('r2_adj', float('nan')):{col_w}.3f}"
-        )
-
-    print(f"\n  [perf-weighted summary]")
-    lb_r2  = _weighted_summary(lbfgsb_metrics[-1], "r2")
-    de_r2  = _weighted_summary(de_metrics[-1], "r2")
-    rnd_r2 = _weighted_summary(random_metrics[-1], "r2")
-    lb_adj  = _weighted_summary(lbfgsb_metrics[-1], "r2_adj")
-    de_adj  = _weighted_summary(de_metrics[-1], "r2_adj")
-    rnd_adj = _weighted_summary(random_metrics[-1], "r2_adj")
-    print(f"  {'R²':25s}  {lb_r2:{col_w}.3f}  {de_r2:{col_w}.3f}  {rnd_r2:{col_w}.3f}")
-    print(f"  {'R²_adj':25s}  {lb_adj:{col_w}.3f}  {de_adj:{col_w}.3f}  {rnd_adj:{col_w}.3f}")
-    print(f"  {'gap (adj−r2)':25s}  {lb_adj-lb_r2:{col_w}.3f}  {de_adj-de_r2:{col_w}.3f}  {rnd_adj-rnd_r2:{col_w}.3f}")
-
-    print(f"\n  Cumulative forward passes — L-BFGS-B: {lbfgsb_nfev[-1]}, DE: {de_nfev[-1]}")
-    print(f"\n  Interpretation: gap > 0 → better prediction on important samples")
+    _print_summary(all_results, all_nfev)
 
 
 if __name__ == "__main__":
