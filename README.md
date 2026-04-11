@@ -58,14 +58,53 @@ python main.py
 
 Plots are saved to `./plots/`. The final console output includes a run summary comparing the best found parameters against the physics optimum.
 
+## CLI
+
+The CLI (`cli.py`) runs each phase as a separate command with JSON session persistence, so you can iterate on individual phases without re-running the entire journey.
+
+```bash
+# 1. Configure agent (bounds, weights, optimizer, material)
+python cli.py configure \
+  --bounds '{"water_ratio":[0.30,0.50],"print_speed":[20.0,60.0]}' \
+  --weights '{"path_accuracy":2.0,"energy_efficiency":1.0,"production_rate":1.0}' \
+  --material clay --optimizer de --buffer 0.10 0.8 2.0
+
+# 2. Run phases step by step
+python cli.py baseline --n 20
+python cli.py train --val-size 0.25
+python cli.py explore --n 10 --w-explore 0.7
+python cli.py infer --n 3 --intent '{"design":"A","material":"clay"}'
+python cli.py adapt --start-speed 40.0 --delta '{"print_speed":5.0}'
+
+# 3. Print summary and reset
+python cli.py summary
+python cli.py reset
+```
+
+| Command | Description |
+|---|---|
+| `configure` | Set bounds, performance weights, optimizer, material, boundary buffer, MPC settings |
+| `baseline --n N` | Run N Sobol-sequence baseline experiments |
+| `train --val-size F` | Train prediction models with validation split fraction F |
+| `explore --n N --w-explore W` | Run N exploration rounds with exploration weight W |
+| `infer --n N --intent '{...}'` | Run N inference rounds for a given design intent |
+| `adapt --start-speed S --delta '{...}'` | Run online adaptation from starting speed S |
+| `summary` | Print final run summary table |
+| `reset` | Clear session state, data, plots, and logs |
+
+Session state is stored in `.pfab_session.json` and persists across commands.
+
 ## Repository structure
 
 ```
 pred-fab-mock/
 ├── main.py               # Full journey Phases 0–5
+├── cli.py                # Step-by-step CLI with session persistence
 ├── schema.py             # build_schema()
 ├── agent_setup.py        # build_agent(schema, camera, energy)
 ├── utils.py              # Shared helpers (params_from_spec, get_performance)
+├── workflow.py           # JourneyState, run_and_evaluate, phase helpers
+├── reporting.py          # Phase reporters: console output + plot generation
 ├── sensors/
 │   ├── physics.py        # Pure deterministic physics (U-shaped deviation, energy)
 │   ├── camera.py         # CameraSystem — simulates path/width measurements
@@ -76,6 +115,5 @@ pred-fab-mock/
 │   ├── evaluation_models.py # PathAccuracyModel, EnergyConsumptionModel
 │   └── prediction_model.py  # DeviationPredictionModel, EnergyPredictionModel (sklearn MLP)
 └── visualization/
-    ├── plots.py          # Per-phase plot helpers (9 functions + tube helper)
-    └── console.py        # Terminal pretty-printing (phase banners, tables, summary)
+    └── plots.py          # Per-phase plot helpers (9 functions + tube helper)
 ```
