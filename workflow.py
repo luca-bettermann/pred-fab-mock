@@ -14,6 +14,7 @@ from pred_fab.core import Dataset
 from pred_fab.orchestration import PfabAgent
 
 from sensors import FabricationSystem
+from sensors.physics import DELTA, THETA, SAG, COMPLEXITY, W_OPTIMAL, N_LAYERS, N_SEGMENTS
 
 
 ExperimentLog = list[tuple[str, dict[str, Any], dict[str, float]]]
@@ -46,10 +47,9 @@ def clean_artifacts(plot_dirs: list[str]) -> None:
         os.makedirs(d, exist_ok=True)
 
 
-def with_dimensions(params: dict[str, Any], fab: FabricationSystem) -> dict[str, Any]:
-    """Return params with n_layers and n_segments derived from the design choice."""
-    n_layers, n_segments = fab.get_dimensions(params["design"])
-    return {**params, "n_layers": n_layers, "n_segments": n_segments}
+def with_dimensions(params: dict[str, Any]) -> dict[str, Any]:
+    """Return params with n_layers and n_segments added."""
+    return {**params, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
 
 
 def run_and_evaluate(
@@ -67,11 +67,7 @@ def run_and_evaluate(
     return exp_data
 
 
-def get_physics_optimum(design_intent: dict[str, Any]) -> tuple[float, float]:
-    """Return (optimal_speed, optimal_water) for the given design intent."""
-    from sensors.physics import DELTA, THETA, DESIGN_COMPLEXITY, MAT_SAG, W_OPTIMAL
-    complexity = DESIGN_COMPLEXITY[str(design_intent["design"])]
-    sag = MAT_SAG[str(design_intent["material"])]
-    w_opt = W_OPTIMAL[str(design_intent["material"])]
-    spd_opt = float(np.clip(np.sqrt(THETA * sag / (DELTA * complexity)), 20.0, 60.0))
-    return spd_opt, w_opt
+def get_physics_optimum() -> tuple[float, float]:
+    """Return (optimal_speed, optimal_water) for the single design configuration."""
+    spd_opt = float(np.clip(np.sqrt(THETA * SAG / (DELTA * COMPLEXITY)), 20.0, 60.0))
+    return spd_opt, W_OPTIMAL
