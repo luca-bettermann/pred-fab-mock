@@ -13,7 +13,7 @@ from pred_fab.core import (
     PerformanceAttribute,
 )
 
-ROOT_FOLDER = "./pfab_data"
+ROOT_FOLDER = "."
 SCHEMA_NAME = "extrusion_printing_v6"
 
 

@@ -13,9 +13,9 @@ Self-contained showcase of the full PFAB journey (baseline → exploration → i
 | `schema.py` | `build_schema()` → DatasetSchema |
 | `agent_setup.py` | `build_agent(schema, camera, energy)` → configured PfabAgent |
 | `utils.py` | Small helpers: `params_from_spec`, `get_performance` |
-| `sensors/` | Simulated sensor systems (camera, energy) and physics |
+| `sensors/` | Simulated sensor systems (camera, energy) and physics engine |
 | `models/` | Feature, evaluation, and prediction model implementations |
-| `visualization/` | Per-phase plotting and console output (plots.py + console.py) |
+| `visualization/` | Per-phase plotting (plots.py) |
 | `dev/` | Benchmark scripts: `eval_exploration.py` (L-BFGS-B vs DE vs random) |
 
 ## Key Points

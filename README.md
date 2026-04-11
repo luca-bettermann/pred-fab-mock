@@ -6,11 +6,11 @@ A self-contained showcase of the full [PFAB](../pred-fab) journey using a simula
 
 | Phase | Description |
 |---|---|
-| 0 — Setup | Schema, sensors, agent, calibration bounds (water_ratio, print_speed) |
-| 1 — Baseline | 4 space-filling experiments (Latin hypercube, no model) |
-| 2 — Initial Training | Fit deviation + energy prediction models; validate on held-out data |
-| 3 — Exploration | 6 rounds with w_explore=0.7 — model guides search toward uncertain regions |
-| 4 — Inference | 3 rounds optimising performance with design intent fixed (design=B, flexible) |
+| 0 — Setup | Schema, simulation, agent, calibration bounds (water_ratio, print_speed) |
+| 1 — Baseline | 20 space-filling experiments (Sobol sequence, no model) |
+| 2 — Initial Training | Fit deviation + energy + production rate prediction models; validate on held-out data |
+| 3 — Exploration | 10 rounds with w_explore=0.7 — model guides search toward uncertain regions |
+| 4 — Inference | 3 rounds optimising performance with design intent fixed (e.g. design=A, material=clay) |
 | 5 — Online Adaptation | Layer-by-layer print_speed tuning based on live deviation feedback |
 
 ## Simulated process
@@ -18,17 +18,21 @@ A self-contained showcase of the full [PFAB](../pred-fab) journey using a simula
 Each experiment = one print run: **5 layers × 4 segments = 20 evaluation steps**.
 
 **Parameters optimised:** `water_ratio` (0.30–0.50), `print_speed` (20–60 mm/s)
-**Fixed per design intent:** `design` (A / B / C), `material` (standard / reinforced / flexible)
+**Fixed per design intent:** `design` (A / B), `material` (clay / concrete)
 
-**Physics:** path deviation has a U-shaped response to print speed — too slow causes material sag, too fast causes inertia overshoot. The optimal speed varies by design complexity, material viscosity, and water ratio (via flowability). Energy increases monotonically with speed. These two objectives create a genuine trade-off.
+**Physics:** path deviation has a U-shaped response to print speed — too slow causes material sag, too fast causes inertia overshoot. The optimal speed varies by design complexity, material viscosity, and water ratio (via flowability). Energy is U-shaped with minimum near 35 mm/s. These objectives create a genuine three-way trade-off.
 
-**Sensors:**
-- `CameraSystem` → `path_deviation`, `filament_width` per (layer, segment)
+**Simulated sensors:**
+- `CameraSystem` → `path_deviation` per (layer, segment)
 - `EnergySensor` → `energy_per_segment` per (layer, segment)
+- `ProductionRateFeatureModel` → `production_rate` (deterministic, from speed and material)
 
-**Performance scores (both in [0, 1]):**
+**Performance scores (all in [0, 1]):**
 - `path_accuracy` — derived from mean path_deviation across the print
 - `energy_efficiency` — derived from total energy_per_segment
+- `production_rate` — derived from print speed relative to material capacity
+
+Combined score: (2 · path_accuracy + energy_efficiency + production_rate) / 4.
 
 ## Output plots
 
@@ -36,16 +40,14 @@ All plots are saved to `./plots/`. The console prints a one-line description aft
 
 | File | Phase | What it shows |
 |---|---|---|
-| `path_comparison.png` | 1 | 1×5 per-layer grid — measured vs designed path, deviation fill, layer drift visible |
-| `path_comparison_3d.png` | 1 | 3D tube stack — blue wireframe = designed, solid = as-printed, colour = deviation |
-| `filament_volume.png` | 1 | Close-up cylindrical filament — L0 vs L4, blue ghost = designed, arrows = deviation |
-| `physics_landscape.png` | 1 | U-shaped deviation vs speed — actual speed vs theoretical optimum |
-| `feature_heatmaps.png` | 1 | 5×4 heatmaps of path_deviation and energy_per_segment |
-| `prediction_accuracy.png` | 2 | Predicted vs actual scatter with R² for both models |
+| `physics_topology.png` | 1 | Ground truth performance landscape across the parameter space |
+| `baseline_scatter.png` | 1 | Sobol-sequence coverage visualisation |
+| `prediction_accuracy.png` | 2 | Predicted vs actual scatter with R² and R²_adj for each model |
+| `explore_*_topology.png` | 3 | Per-round acquisition landscape (performance + uncertainty + combined) |
 | `parameter_space.png` | 3 | water_ratio vs speed scatter — score, phase, and design encoded |
 | `performance_trajectory.png` | 4 | Score history across all experiments with phase bands |
-| `inference_convergence.png` | 4 | Physics score landscape with inference trajectory and optimum star |
-| `adaptation.png` | 5 | Adapted speed vs counterfactual, deviation saved shown as fill |
+| `inference_convergence.png` | 4 | Convergence trajectory toward the physics optimum |
+| `adaptation.png` | 5 | Adapted speed vs counterfactual, deviation reduction shown as fill |
 
 ## Quick start
 
@@ -103,17 +105,17 @@ pred-fab-mock/
 ├── schema.py             # build_schema()
 ├── agent_setup.py        # build_agent(schema, camera, energy)
 ├── utils.py              # Shared helpers (params_from_spec, get_performance)
-├── workflow.py           # JourneyState, run_and_evaluate, phase helpers
-├── reporting.py          # Phase reporters: console output + plot generation
+├── workflow.py           # JourneyState, run_and_evaluate, with_dimensions
+├── reporting.py          # Phase reporters: console output (via agent.console) + plot generation
 ├── sensors/
-│   ├── physics.py        # Pure deterministic physics (U-shaped deviation, energy)
-│   ├── camera.py         # CameraSystem — simulates path/width measurements
-│   ├── energy.py         # EnergySensor — simulates energy readings
-│   └── fabrication.py    # FabricationSystem — coordinates all sensors
+│   ├── physics.py        # Deterministic physics simulation (U-shaped deviation, energy, production rate)
+│   ├── camera.py         # CameraSystem — simulated path deviation measurements
+│   ├── energy.py         # EnergySensor — simulated energy readings
+│   └── fabrication.py    # FabricationSystem — coordinates physics + sensors per experiment
 ├── models/
-│   ├── feature_models.py    # PrintingFeatureModel, EnergyFeatureModel
-│   ├── evaluation_models.py # PathAccuracyModel, EnergyConsumptionModel
-│   └── prediction_model.py  # DeviationPredictionModel, EnergyPredictionModel (sklearn MLP)
+│   ├── feature_models.py    # PrintingFeatureModel, EnergyFeatureModel, ProductionRateFeatureModel
+│   ├── evaluation_models.py # PathAccuracyModel, EnergyConsumptionModel, ProductionRateModel
+│   └── prediction_model.py  # MLP and RF prediction models (sklearn)
 └── visualization/
-    └── plots.py          # Per-phase plot helpers (9 functions + tube helper)
+    └── plots.py          # Per-phase plot helpers
 ```

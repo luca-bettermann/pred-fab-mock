@@ -8,7 +8,7 @@ Primarily used to evaluate prediction model quality and compare workflows.
 
 | Module | Description |
 |---|---|
-| `eval_exploration.py` | Learning curve benchmark: compares 4 workflows (baseline n=4, explore L-BFGS-B, explore DE, random n=20) on a fixed held-out test set. Produces `dev_plots/learning_curves.png` and `dev_plots/forward_passes.png`. |
+| `eval_exploration.py` | Learning curve benchmark: compares 4 workflows (baseline n=4, explore L-BFGS-B, explore DE, random n=20) on a fixed held-out test set. Produces `dev/plots/learning_curves.png` and `dev/plots/forward_passes.png`. |
 
 ## Key Points
 - Uses the same schema, agent, sensors, and models as `main.py` — no new code.

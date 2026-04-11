@@ -23,7 +23,7 @@ def build_agent(
     verbose: bool = True,
 ) -> PfabAgent:
     """Register all models, initialize systems, and return a configured PfabAgent."""
-    agent = PfabAgent(root_folder="./pfab_data")
+    agent = PfabAgent(root_folder=".")
 
     # Register feature and evaluation models
     agent.register_feature_model(PrintingFeatureModel, camera=camera)

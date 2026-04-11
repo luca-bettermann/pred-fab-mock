@@ -8,9 +8,9 @@ __pycache__/
 **/logs/
 
 # Runtime data
-pfab_data/
+local/
 
 # Generated plots and data (main workflow + dev scripts)
 plots/
-dev_plots/
-dev_data/
+dev/data/
+dev/plots/

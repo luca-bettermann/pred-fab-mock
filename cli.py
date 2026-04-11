@@ -46,7 +46,6 @@ def _to_native(obj: Any) -> Any:
 
 
 SESSION_FILE = ".pfab_session.json"
-DATA_ROOT = "./pfab_data"
 
 
 def _next_code(state: 'JourneyState', prefix: str) -> str:
@@ -390,7 +389,7 @@ def cmd_summary(args: argparse.Namespace) -> None:
 def cmd_reset(args: argparse.Namespace) -> None:
     """Clear session state and data."""
     import shutil
-    for path in [SESSION_FILE, DATA_ROOT, "./plots", "./logs"]:
+    for path in [SESSION_FILE, "./local", "./plots", "./logs"]:
         if os.path.exists(path):
             if os.path.isdir(path):
                 shutil.rmtree(path)

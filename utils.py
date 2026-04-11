@@ -1,19 +1,6 @@
 """Shared helper utilities for the pred-fab-mock journey script."""
 
-from contextlib import contextmanager
-from typing import Any, Iterator
-
-from pred_fab.utils import PfabLogger
-
-
-@contextmanager
-def quiet_console(logger: PfabLogger) -> Iterator[None]:
-    """Temporarily suppress console output from the logger."""
-    logger.set_console_output(False)
-    try:
-        yield
-    finally:
-        logger.set_console_output(True)
+from typing import Any
 
 
 def params_from_spec(spec: Any) -> dict[str, Any]:
