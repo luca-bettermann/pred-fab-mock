@@ -21,7 +21,6 @@ from reporting import PLOT_DIRS, report_baseline, report_training, \
     report_exploration_round, report_exploration_summary, \
     report_inference_round, report_inference_summary, \
     report_adaptation, report_summary
-from visualization import print_phase_header
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CONFIGURATION — tweak these values to experiment with different settings
@@ -66,11 +65,11 @@ def main() -> None:
     fab   = FabricationSystem(CameraSystem(), EnergySensor())
 
     # ── Phase 0: Setup ───────────────────────────────────────────────────────
-    print_phase_header(0, "Setup", "Configure agent, sensors, schema, and calibration bounds")
-
     schema  = build_schema()
     agent   = build_agent(schema, fab.camera, fab.energy)
     dataset = Dataset(schema=schema)
+
+    agent.console.print_phase_header(0, "Setup", "Configure agent, sensors, schema, and calibration bounds")
 
     agent.configure(
         bounds=BOUNDS,
@@ -84,7 +83,7 @@ def main() -> None:
     )
 
     # ── Phase 1: Baseline ────────────────────────────────────────────────────
-    print_phase_header(1, "Baseline Sampling",
+    agent.console.print_phase_header(1, "Baseline Sampling",
                        f"{N_BASELINE} Sobol-sequence experiments — no model yet, space-filling only")
 
     specs = agent.baseline_step(n=N_BASELINE)
@@ -102,17 +101,17 @@ def main() -> None:
     report_baseline(agent, baseline_log)
 
     # ── Phase 2: Initial Training ────────────────────────────────────────────
-    print_phase_header(2, "Initial Training",
+    agent.console.print_phase_header(2, "Initial Training",
                        "Fit prediction models (deviation + energy) on baseline data")
 
     datamodule = agent.create_datamodule(dataset)
     datamodule.prepare(val_size=0.25)
-    agent.train(datamodule, validate=True)
+    results = agent.train(datamodule, validate=True)
 
-    report_training(agent, datamodule)
+    report_training(agent, datamodule, results)
 
     # ── Phase 3: Exploration ─────────────────────────────────────────────────
-    print_phase_header(3, "Exploration",
+    agent.console.print_phase_header(3, "Exploration",
                        f"{N_EXPLORE} rounds  (w_explore={W_EXPLORE}) — model guides search toward uncertain regions")
 
     explore_log = []
@@ -144,10 +143,10 @@ def main() -> None:
         datamodule.update()
         agent.train(datamodule, validate=False)
 
-    report_exploration_summary(explore_log, state, N_EXPLORE)
+    report_exploration_summary(agent, explore_log, state, N_EXPLORE)
 
     # ── Phase 4: Inference ───────────────────────────────────────────────────
-    print_phase_header(4, "Inference",
+    agent.console.print_phase_header(4, "Inference",
                        f"{N_INFER} rounds  ·  intent: {DESIGN_INTENT}  ·  w_explore=0")
 
     agent.configure(fixed_params=DESIGN_INTENT)
@@ -184,10 +183,10 @@ def main() -> None:
 
         report_inference_round(agent, state, exp_code, params, perf, DESIGN_INTENT)
 
-    report_inference_summary(infer_log, state, last_exp_data, fab.camera, DESIGN_INTENT, N_INFER)
+    report_inference_summary(agent, infer_log, state, last_exp_data, fab.camera, DESIGN_INTENT, N_INFER)
 
     # ── Phase 5: Online Adaptation ───────────────────────────────────────────
-    print_phase_header(5, "Online Adaptation",
+    agent.console.print_phase_header(5, "Online Adaptation",
                        "print_speed adjusted after each layer based on live deviation feedback")
 
     agent.configure(
@@ -239,7 +238,7 @@ def main() -> None:
     report_adaptation(agent, speeds, deviations, counterfactual)
 
     # ── Summary ──────────────────────────────────────────────────────────────
-    report_summary(state, DESIGN_INTENT)
+    report_summary(agent, state, DESIGN_INTENT)
 
 
 if __name__ == "__main__":

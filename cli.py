@@ -30,6 +30,21 @@ from sensors import CameraSystem, EnergySensor, FabricationSystem
 from utils import params_from_spec, get_performance
 from workflow import JourneyState, with_dimensions, run_and_evaluate
 
+def _to_native(obj: Any) -> Any:
+    """Recursively convert numpy types to native Python types for JSON serialization."""
+    if isinstance(obj, dict):
+        return {k: _to_native(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_native(v) for v in obj]
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+
 SESSION_FILE = ".pfab_session.json"
 DATA_ROOT = "./pfab_data"
 
@@ -55,7 +70,7 @@ def _save_session(config: dict[str, Any], journey: JourneyState) -> None:
         },
     }
     with open(SESSION_FILE, "w") as f:
-        json.dump(data, f, indent=2, default=str)
+        json.dump(_to_native(data), f, indent=2)
 
 
 def _load_session() -> tuple[dict[str, Any], JourneyState]:
@@ -187,7 +202,10 @@ def cmd_train(args: argparse.Namespace) -> None:
 
     datamodule = agent.create_datamodule(dataset)
     datamodule.prepare(val_size=args.val_size)
-    agent.train(datamodule, validate=args.val_size > 0)
+    results = agent.train(datamodule, validate=args.val_size > 0)
+
+    if results:
+        agent.console.print_training_summary(results)
 
     _save_session(config, state)
 

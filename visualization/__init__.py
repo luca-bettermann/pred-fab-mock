@@ -10,19 +10,6 @@ from .plots import (
     plot_physics_topology,
     plot_baseline_scatter,
 )
-from .console import (
-    print_phase_header,
-    print_section,
-    print_experiment_row,
-    print_phase_summary,
-    print_training_summary,
-    print_adaptation_row,
-    print_run_summary,
-    print_done,
-    print_explore_row,
-    print_infer_row,
-    print_optimizer_row,
-)
 
 __all__ = [
     "plot_path_comparison_3d",
@@ -35,15 +22,4 @@ __all__ = [
     "plot_acquisition_topology",
     "plot_physics_topology",
     "plot_baseline_scatter",
-    "print_phase_header",
-    "print_section",
-    "print_experiment_row",
-    "print_phase_summary",
-    "print_training_summary",
-    "print_adaptation_row",
-    "print_run_summary",
-    "print_done",
-    "print_explore_row",
-    "print_infer_row",
-    "print_optimizer_row",
 ]
