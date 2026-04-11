@@ -20,6 +20,7 @@ def build_agent(
     camera: CameraSystem,
     energy_sensor: EnergySensor,
     model_type: str = "mlp",
+    verbose: bool = True,
 ) -> PfabAgent:
     """Register all models, initialize systems, and return a configured PfabAgent."""
     agent = PfabAgent(root_folder="./pfab_data")
@@ -42,6 +43,6 @@ def build_agent(
     agent.register_prediction_model(ProductionRatePredictionModel)
 
     # Initialize all systems against the schema
-    agent.initialize_systems(schema, verbose_flag=True)
+    agent.initialize_systems(schema, verbose_flag=verbose)
 
     return agent
