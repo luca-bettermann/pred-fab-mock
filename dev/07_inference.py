@@ -1,6 +1,6 @@
 """07 — Inference Validation (Single-Shot).
 
-After exploration, test whether a single inference proposal (w_explore=0)
+After exploration, test whether a single inference proposal (kappa=0)
 lands near the physics optimum — first-time-right manufacturing.
 """
 
@@ -21,7 +21,7 @@ from utils import params_from_spec
 N_BASELINE = 15
 N_EXPLORE = 10
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
-W_EXPLORE = 0.7
+KAPPA = 0.7
 EXPLORATION_RADIUS = 0.5
 BOUNDARY_BUFFER = (0.10, 0.8, 2.0)
 
@@ -44,7 +44,7 @@ def main():
     # Exploration phase
     prev = baseline_params[-1]
     for i in range(N_EXPLORE):
-        spec = agent.exploration_step(dm, w_explore=W_EXPLORE)
+        spec = agent.exploration_step(dm, kappa=KAPPA)
         prev = with_dims({**prev, **params_from_spec(spec)})
         run_experiment(dataset, agent, fab, prev, f"explore_{i+1:02d}")
         dm.update()
@@ -54,10 +54,10 @@ def main():
     spd_opt = float(np.clip(np.sqrt(THETA * SAG / (DELTA * COMPLEXITY)), 20.0, 60.0))
     w_opt = W_OPTIMAL
 
-    print(f"\n  Inference (single-shot, w_explore=0):")
+    print(f"\n  Inference (single-shot, kappa=0):")
     print(f"  Physics optimum: speed={spd_opt:.1f}, water={w_opt:.2f}")
 
-    spec = agent.exploration_step(dm, w_explore=0.0)
+    spec = agent.exploration_step(dm, kappa=0.0)
     proposed = params_from_spec(spec)
     params = with_dims({**prev, **proposed})
     exp = run_experiment(dataset, agent, fab, params, "infer_01")

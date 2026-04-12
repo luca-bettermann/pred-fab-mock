@@ -21,12 +21,12 @@ N_BASELINE = 5
 N_EXPLORE = 10
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 RESOLUTION = 30
-W_EXPLORE = 0.7
+KAPPA = 0.7
 EXPLORATION_RADIUS = 0.5
 BOUNDARY_BUFFER = (0.10, 0.8, 2.0)
 
 
-def _compute_acquisition_grid(agent, dm, w_explore, res):
+def _compute_acquisition_grid(agent, dm, kappa, res):
     waters = np.linspace(0.30, 0.50, res)
     speeds = np.linspace(20.0, 60.0, res)
     perf_grid = np.zeros((res, res))
@@ -45,7 +45,7 @@ def _compute_acquisition_grid(agent, dm, w_explore, res):
     u_min, u_max = unc_grid.min(), unc_grid.max()
     p_norm = np.clip((perf_grid - p_min) / max(p_max - p_min, 1e-10), 0, 1)
     u_norm = np.clip((unc_grid - u_min) / max(u_max - u_min, 1e-10), 0, 1)
-    combined = (1 - w_explore) * p_norm + w_explore * u_norm
+    combined = (1 - kappa) * p_norm + kappa * u_norm
     return waters, speeds, perf_grid, unc_grid, combined
 
 
@@ -59,7 +59,7 @@ def _run_exploration(optimizer, tag):
     prev = bp[-1]
     rounds = []
     for i in range(N_EXPLORE):
-        spec = agent.exploration_step(dm, w_explore=W_EXPLORE)
+        spec = agent.exploration_step(dm, kappa=KAPPA)
         proposed = params_from_spec(spec)
         params = with_dims({**prev, **proposed})
         u = agent.predict_uncertainty(params, dm)
@@ -77,7 +77,7 @@ def main():
     warnings.filterwarnings("ignore", category=RuntimeWarning, module="sklearn")
     plot_dir = ensure_plot_dir()
 
-    print(f"\n  Exploration: {N_BASELINE} baseline + {N_EXPLORE} rounds, w_explore={W_EXPLORE}")
+    print(f"\n  Exploration: {N_BASELINE} baseline + {N_EXPLORE} rounds, kappa={KAPPA}")
 
     results = {}
     baseline_pts = {}
@@ -92,7 +92,7 @@ def main():
 
     out = os.path.join(plot_dir, "05_optimizer_comparison.png")
     plot_optimizer_comparison(out, results, baseline_pts,
-                              title=f"L-BFGS-B vs DE (w_explore={W_EXPLORE})")
+                              title=f"L-BFGS-B vs DE (kappa={KAPPA})")
     print(f"\n  Saved: {out}")
 
     # Acquisition topology at round 1 and round N
@@ -103,21 +103,21 @@ def main():
     bp = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
 
-    w1, s1, p1, u1, c1 = _compute_acquisition_grid(agent, dm, W_EXPLORE, RESOLUTION)
+    w1, s1, p1, u1, c1 = _compute_acquisition_grid(agent, dm, KAPPA, RESOLUTION)
     out = os.path.join(plot_dir, "05_acquisition_round1.png")
     plot_acquisition_topology(out, w1, s1, p1, u1, c1, title="Acquisition — Round 1")
     print(f"  Saved: {out}")
 
     prev = bp[-1]
     for i in range(N_EXPLORE):
-        spec = agent.exploration_step(dm, w_explore=W_EXPLORE)
+        spec = agent.exploration_step(dm, kappa=KAPPA)
         p = params_from_spec(spec)
         prev = with_dims({**prev, **p})
         run_experiment(dataset, agent, fab, prev, f"explore_{i+1:02d}")
         dm.update()
         agent.train(dm, validate=False)
 
-    wn, sn, pn, un, cn = _compute_acquisition_grid(agent, dm, W_EXPLORE, RESOLUTION)
+    wn, sn, pn, un, cn = _compute_acquisition_grid(agent, dm, KAPPA, RESOLUTION)
     out = os.path.join(plot_dir, f"05_acquisition_round{N_EXPLORE}.png")
     plot_acquisition_topology(out, wn, sn, pn, un, cn, title=f"Acquisition — Round {N_EXPLORE}")
     print(f"  Saved: {out}")

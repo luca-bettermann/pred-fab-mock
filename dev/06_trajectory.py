@@ -23,7 +23,7 @@ N_BASELINE = 15
 N_EXPLORE_FIXED = 5
 N_EXPLORE_TRAJ = 5
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
-W_EXPLORE = 0.5
+KAPPA = 0.5
 EXPLORATION_RADIUS = 0.5
 BOUNDARY_BUFFER = (0.10, 0.8, 2.0)
 ADAPTATION_DELTA = {"print_speed": 5.0}
@@ -73,7 +73,7 @@ def main():
     fixed_scores = []
     prev = baseline_params[-1]
     for i in range(N_EXPLORE_FIXED):
-        spec = agent.exploration_step(dm, w_explore=W_EXPLORE)
+        spec = agent.exploration_step(dm, kappa=KAPPA)
         proposed = params_from_spec(spec)
         params = with_dims({**prev, **proposed})
         exp = run_experiment(dataset, agent, fab, params, f"fixed_{i+1:02d}")
@@ -99,7 +99,7 @@ def main():
     traj_schedules = []
     for i in range(N_EXPLORE_TRAJ):
         # Pass current_params so _build_step_grid constructs the multi-step grid
-        spec = agent.exploration_step(dm, w_explore=W_EXPLORE, current_params=prev)
+        spec = agent.exploration_step(dm, kappa=KAPPA, current_params=prev)
         proposed = params_from_spec(spec)
         params = with_dims({**prev, **proposed})
 

@@ -25,7 +25,7 @@ def main():
 
     waters = [p["water_ratio"] for p in points]
     speeds = [p["print_speed"] for p in points]
-    print(f"  Baseline: {N_BASELINE} experiments (LHS)")
+    print(f"  Baseline: {N_BASELINE} experiments (\u03ba=1, pure evidence)")
     print(f"  Water ratio: [{min(waters):.3f}, {max(waters):.3f}]  (schema: [0.30, 0.50])")
     print(f"  Print speed: [{min(speeds):.1f}, {max(speeds):.1f}]  (schema: [20.0, 60.0])")
 

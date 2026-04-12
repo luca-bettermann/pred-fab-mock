@@ -108,7 +108,7 @@ def plot_baseline_scatter(
     ])
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle("Baseline Sampling Coverage (LHS)", fontsize=13, fontweight="bold")
+    fig.suptitle("Baseline Sampling Coverage (\u03ba=1)", fontsize=13, fontweight="bold")
 
     ax1.scatter(waters, speeds, s=60, c="#4878CF", edgecolors="white", linewidth=0.8, zorder=5)
     for i, (w, s) in enumerate(zip(waters, speeds)):

@@ -4,7 +4,7 @@ Usage:
     python cli.py configure --bounds '{"water_ratio":[0.30,0.50],"print_speed":[20.0,60.0]}'
     python cli.py baseline --n 20
     python cli.py train --val-size 0.25
-    python cli.py explore --n 10 --w-explore 0.7
+    python cli.py explore --n 10 --kappa 0.7
     python cli.py infer
     python cli.py summary
     python cli.py reset
@@ -196,13 +196,13 @@ def cmd_explore(args: argparse.Namespace) -> None:
     agent, dataset, fab = _rebuild(config)
 
     agent.console.print_phase_header(3, "Exploration",
-                                      f"{args.n} rounds (w_explore={args.w_explore})")
+                                      f"{args.n} rounds (kappa={args.kappa})")
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
 
     for i in range(args.n):
-        spec = agent.exploration_step(dm, w_explore=args.w_explore)
+        spec = agent.exploration_step(dm, kappa=args.kappa)
         proposed = params_from_spec(spec)
         params = with_dimensions({**state.prev_params, **proposed})
         exp_code = _next_code(state, "explore")
@@ -231,7 +231,7 @@ def cmd_infer(args: argparse.Namespace) -> None:
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
 
-    spec = agent.exploration_step(dm, w_explore=0.0)
+    spec = agent.exploration_step(dm, kappa=0.0)
     proposed = params_from_spec(spec)
     params = with_dimensions({**state.prev_params, **proposed})
     exp_code = _next_code(state, "infer")
@@ -299,7 +299,7 @@ def build_parser() -> argparse.ArgumentParser:
     # explore
     p = sub.add_parser("explore", help="Run exploration rounds")
     p.add_argument("--n", type=int, default=10)
-    p.add_argument("--w-explore", type=float, default=0.7)
+    p.add_argument("--kappa", type=float, default=0.7, help="Exploration weight (0=exploit, 1=explore)")
     p.set_defaults(func=cmd_explore)
 
     # infer

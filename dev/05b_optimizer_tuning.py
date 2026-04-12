@@ -29,7 +29,7 @@ from utils import params_from_spec
 # ── Configuration ─────────────────────────────────────────────────────────────
 N_BASELINE = 10
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
-W_EXPLORE = 0.7
+KAPPA = 0.7
 EXPLORATION_RADIUS = 0.5
 BOUNDARY_BUFFER = (0.10, 0.8, 2.0)
 
@@ -37,7 +37,7 @@ BOUNDARY_BUFFER = (0.10, 0.8, 2.0)
 def _run_single_exploration(agent, dm, prev_params, optimizer, **extra_config):
     """Run one exploration step and return the proposal + metadata."""
     agent.configure(optimizer=optimizer, **extra_config)
-    spec = agent.exploration_step(dm, w_explore=W_EXPLORE, n_optimization_rounds=10)
+    spec = agent.exploration_step(dm, kappa=KAPPA, n_optimization_rounds=10)
     proposed = params_from_spec(spec)
     params = with_dims({**prev_params, **proposed})
     return {
@@ -55,7 +55,7 @@ def _brute_force_acquisition(agent, dm, res=50):
     bounds = cal._get_global_bounds(dm)
     objective = cal._build_objective(
         mode=__import__("pred_fab.utils", fromlist=["Mode"]).Mode.EXPLORATION,
-        w_explore=W_EXPLORE,
+        kappa=KAPPA,
         bounds=bounds,
     )
 
@@ -108,7 +108,7 @@ def main():
         ("DE high mutation", {"maxiter": 100, "popsize": 10, "mutation": (0.8, 1.5), "recombination": 0.9}),
     ]
 
-    print(f"\n  DE configurations (w_explore={W_EXPLORE}):")
+    print(f"\n  DE configurations (kappa={KAPPA}):")
     print(f"  {'Config':25s}  {'water':>6s}  {'speed':>6s}  {'score':>7s}  {'nfev':>6s}  {'gap':>6s}")
     print(f"  {'─' * 65}")
 
@@ -157,7 +157,7 @@ def main():
         r = _run_single_exploration(agent, dm, prev, Optimizer.LBFGSB,
                                      **{})  # n_optimization_rounds is passed in exploration_step
         # Retry with specific n_rounds
-        spec = agent.exploration_step(dm, w_explore=W_EXPLORE, n_optimization_rounds=n_rounds)
+        spec = agent.exploration_step(dm, kappa=KAPPA, n_optimization_rounds=n_rounds)
         proposed = params_from_spec(spec)
         params = with_dims({**prev, **proposed})
         r = {

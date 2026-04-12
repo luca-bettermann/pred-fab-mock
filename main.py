@@ -37,7 +37,7 @@ EXPLORATION_RADIUS  = 0.5
 BOUNDARY_BUFFER     = (0.10, 0.8, 2.0)
 
 # Exploration
-W_EXPLORE = 0.7
+KAPPA = 0.7
 
 # DE optimizer
 DE_MAXITER = 100
@@ -126,11 +126,11 @@ def main() -> None:
 
     # ── Phase 3: Exploration ─────────────────────────────────────────────────
     agent.console.print_phase_header(3, "Exploration",
-                       f"{N_EXPLORE} rounds (w_explore={W_EXPLORE})")
+                       f"{N_EXPLORE} rounds (kappa={KAPPA})")
 
     prev_params = with_dimensions(params_from_spec(specs[-1]))
     for i in range(N_EXPLORE):
-        spec = agent.exploration_step(datamodule, w_explore=W_EXPLORE)
+        spec = agent.exploration_step(datamodule, kappa=KAPPA)
         proposed = params_from_spec(spec)
         params = with_dimensions({**prev_params, **proposed})
         exp_code = f"explore_{i+1:02d}"
@@ -152,7 +152,7 @@ def main() -> None:
                        "Single-shot first-time-right manufacturing")
 
     # Agent proposes the best parameters given current model
-    spec = agent.exploration_step(datamodule, w_explore=0.0)
+    spec = agent.exploration_step(datamodule, kappa=0.0)
     proposed = params_from_spec(spec)
     params = with_dimensions({**prev_params, **proposed})
     exp_code = "infer_01"
