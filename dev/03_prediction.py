@@ -27,6 +27,13 @@ VAL_SIZE = 0.25
 RESOLUTION = 40
 PERF_WEIGHTS = PERF_WEIGHTS_DEFAULT
 
+# Feature → performance weight mapping (features predict performance metrics)
+FEATURE_WEIGHTS = {
+    "path_deviation": PERF_WEIGHTS.get("path_accuracy", 1.0),
+    "energy_per_segment": PERF_WEIGHTS.get("energy_efficiency", 1.0),
+    "production_rate": PERF_WEIGHTS.get("production_rate", 1.0),
+}
+
 
 def _evaluate_model(agent, dm):
     """Compute per-feature R² and MAE on validation set."""
@@ -75,9 +82,9 @@ def main():
     true_grid = np.array([[physics_combined_at(w, spd) for w in waters] for spd in speeds])
 
     model_results = {}
+    val_metrics = {}
     pred_grids = {}
     mlp_dm = None
-    mlp_val_results = None
 
     for model_type in ["mlp", "rf"]:
         agent, fab, dataset = make_env(f"03_{model_type}", model_type=model_type, verbose=False)
@@ -85,19 +92,34 @@ def main():
         run_baseline(agent, fab, dataset, N_BASELINE)
         dm, val_results = train_models(agent, dataset, val_size=VAL_SIZE)
         model_results[model_type] = _evaluate_model(agent, dm)
+        val_metrics[model_type] = val_results or {}
         pred_grids[model_type] = _predict_combined_grid(agent, waters, speeds)
         if model_type == "mlp":
             mlp_dm = dm
-            mlp_val_results = val_results
 
-    # Console
+    # Console — use val_metrics (R² + R²_adj from framework validation)
     print(f"\n  Prediction quality ({N_BASELINE} baseline, {VAL_SIZE:.0%} held out):")
-    print(f"  {'Feature':25s}  {'MLP R²':>8s}  {'RF R²':>8s}")
-    print(f"  {'─' * 45}")
-    for feat in model_results["mlp"]:
-        mlp = model_results["mlp"][feat]
-        rf = model_results["rf"].get(feat, {"r2": 0})
-        print(f"  {feat:25s}  {mlp['r2']:8.3f}  {rf['r2']:8.3f}")
+    print(f"  {'Feature':25s}  {'MLP R²':>8s}  {'MLP R²_adj':>10s}  {'RF R²':>8s}  {'RF R²_adj':>10s}")
+    print(f"  {'─' * 67}")
+    for feat in val_metrics["mlp"]:
+        mlp = val_metrics["mlp"][feat]
+        rf = val_metrics["rf"].get(feat, {"r2": 0, "r2_adj": 0})
+        print(f"  {feat:25s}  {mlp['r2']:8.3f}  {mlp.get('r2_adj', 0):10.3f}"
+              f"  {rf['r2']:8.3f}  {rf.get('r2_adj', 0):10.3f}")
+
+    # Weighted combined R² (feature weights derived from performance weights)
+    total_w = sum(FEATURE_WEIGHTS.values())
+    for tag in ["mlp", "rf"]:
+        r2_comb = sum(FEATURE_WEIGHTS.get(f, 0) * val_metrics[tag][f]["r2"]
+                      for f in val_metrics[tag]) / total_w
+        r2a_comb = sum(FEATURE_WEIGHTS.get(f, 0) * val_metrics[tag][f].get("r2_adj", val_metrics[tag][f]["r2"])
+                       for f in val_metrics[tag]) / total_w
+        val_metrics[tag]["_combined"] = {"r2": r2_comb, "r2_adj": r2a_comb}
+    mlp_c = val_metrics["mlp"]["_combined"]
+    rf_c = val_metrics["rf"]["_combined"]
+    print(f"  {'─' * 67}")
+    print(f"  {'Combined (weighted)':25s}  {mlp_c['r2']:8.3f}  {mlp_c['r2_adj']:10.3f}"
+          f"  {rf_c['r2']:8.3f}  {rf_c['r2_adj']:10.3f}")
 
     # MLP scatter
     out = os.path.join(plot_dir, "03_prediction_accuracy.png")
@@ -112,7 +134,7 @@ def main():
     print(f"  Saved: {out}")
 
     # Importance weighting validation: show how weights map to performance
-    _plot_importance_weights(plot_dir, mlp_dm, mlp_val_results)
+    _plot_importance_weights(plot_dir, mlp_dm, val_metrics["mlp"])
 
 
 def _plot_importance_weights(plot_dir: str, dm: DataModule, val_results: dict):
