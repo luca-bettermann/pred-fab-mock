@@ -110,18 +110,21 @@ def plot_acquisition_topology(
             ew = [p["water_ratio"] for p in experiment_pts]
             es = [p["print_speed"] for p in experiment_pts]
             ax.scatter(ew, es, s=18, c="white", edgecolors="#3F3F46",
-                       linewidth=0.5, zorder=5)
+                       linewidth=0.5, zorder=5, label="Evaluated")
 
-        # Optimum cross (white, clean)
+        # Optimum cross (dark with white edge for readability on any background)
         if optimum is not None:
-            ax.plot(optimum[0], optimum[1], "x", color="white",
-                    ms=8, markeredgewidth=1.0, zorder=7)
+            ax.plot(optimum[0], optimum[1], "x", color="#18181B",
+                    ms=8, markeredgewidth=1.2, zorder=7, label="Optimum")
 
     # Proposed point only on combined panel
     if proposed is not None:
         axes[2].plot(proposed["water_ratio"], proposed["print_speed"],
                      "x", color="#EAB308", ms=9,
-                     markeredgewidth=1.0, zorder=8)
+                     markeredgewidth=1.2, zorder=8, label="Proposed")
+
+    # Legend on combined panel only (rightmost)
+    axes[2].legend(fontsize=7, loc="upper left", framealpha=0.8)
 
     save_fig(save_path)
 
