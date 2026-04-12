@@ -118,7 +118,7 @@ def main():
         cal = agent.calibration_system
         original_de = cal._optimize_de
 
-        def _patched_de(bounds, objective_func, _kw=de_kwargs):
+        def _patched_de(bounds, objective_func, _kw=de_kwargs, **kwargs):
             from scipy.optimize import differential_evolution
             seed = int(cal.rng.randint(0, 2**31 - 1))
             result = differential_evolution(
