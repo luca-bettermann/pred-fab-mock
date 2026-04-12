@@ -115,51 +115,51 @@ def main():
     phys_speeds = np.linspace(20.0, 60.0, 50)
     optimum = (phys_waters[opt_idx[1]], phys_speeds[opt_idx[0]])
 
-    # Per-round acquisition topology plots
-    clean_plots("05_rounds")
-    rounds_dir = os.path.join(plot_dir, "05_rounds")
+    # Per-round acquisition topology plots (one subfolder per optimizer)
+    for opt, tag in [(Optimizer.LBFGSB, "lbfgsb"), (Optimizer.DE, "de")]:
+        subfolder = f"05_rounds_{tag}"
+        clean_plots(subfolder)
+        rounds_dir = os.path.join(plot_dir, subfolder)
 
-    agent, fab, dataset = make_env("05_topo", verbose=False)
-    agent.configure_performance(weights=PERF_WEIGHTS)
-    agent.configure_exploration(radius=EXPLORATION_RADIUS)
-    agent.configure_optimizer(backend=Optimizer.DE)
-    bp = run_baseline(agent, fab, dataset, N_BASELINE)
-    dm, _ = train_models(agent, dataset, val_size=0.0)
-    all_pts = list(bp)
+        agent, fab, dataset = make_env(f"05_topo_{tag}", verbose=False)
+        agent.configure_performance(weights=PERF_WEIGHTS)
+        agent.configure_exploration(radius=EXPLORATION_RADIUS)
+        agent.configure_optimizer(backend=opt)
+        bp = run_baseline(agent, fab, dataset, N_BASELINE)
+        dm, _ = train_models(agent, dataset, val_size=0.0)
+        all_pts = list(bp)
 
-    # Round 1 (before first exploration)
-    w1, s1, p1, u1, c1 = _compute_acquisition_grid(agent, dm, KAPPA, RESOLUTION)
-    spec = agent.exploration_step(dm, kappa=KAPPA)
-    proposed = with_dims(params_from_spec(spec))
-    out = os.path.join(rounds_dir, "round_00_before.png")
-    plot_acquisition_topology(out, w1, s1, p1, u1, c1,
-                              experiment_pts=all_pts, proposed=proposed, optimum=optimum,
-                              title="Acquisition — Round 1")
-
-    # Execute exploration rounds with per-round plots
-    prev = bp[-1]
-    for i in range(N_EXPLORE):
-        p = params_from_spec(spec)
-        prev = with_dims({**prev, **p})
-        run_experiment(dataset, agent, fab, prev, f"explore_{i+1:02d}")
-        all_pts.append(prev)
-        dm.update()
-        agent.train(dm, validate=False)
-
-        # Compute grid and get next proposal
-        wi, si, pi, ui, ci = _compute_acquisition_grid(agent, dm, KAPPA, RESOLUTION)
-        if i < N_EXPLORE - 1:
-            spec = agent.exploration_step(dm, kappa=KAPPA)
-            proposed = with_dims(params_from_spec(spec))
-        else:
-            proposed = None  # last round, no next proposal
-
-        out = os.path.join(rounds_dir, f"round_{i+1:02d}.png")
-        plot_acquisition_topology(out, wi, si, pi, ui, ci,
+        # Round 0 (before first exploration)
+        w0, s0, p0, u0, c0 = _compute_acquisition_grid(agent, dm, KAPPA, RESOLUTION)
+        spec = agent.exploration_step(dm, kappa=KAPPA)
+        proposed = with_dims(params_from_spec(spec))
+        out = os.path.join(rounds_dir, "round_00.png")
+        plot_acquisition_topology(out, w0, s0, p0, u0, c0,
                                   experiment_pts=all_pts, proposed=proposed, optimum=optimum,
-                                  title=f"Acquisition — Round {i+1}")
+                                  title=f"{tag.upper()} — Round 0")
 
-    print(f"\n  Saved: {rounds_dir}/ ({N_EXPLORE + 1} round plots)")
+        prev = bp[-1]
+        for i in range(N_EXPLORE):
+            p = params_from_spec(spec)
+            prev = with_dims({**prev, **p})
+            run_experiment(dataset, agent, fab, prev, f"explore_{i+1:02d}")
+            all_pts.append(prev)
+            dm.update()
+            agent.train(dm, validate=False)
+
+            wi, si, pi, ui, ci = _compute_acquisition_grid(agent, dm, KAPPA, RESOLUTION)
+            if i < N_EXPLORE - 1:
+                spec = agent.exploration_step(dm, kappa=KAPPA)
+                proposed = with_dims(params_from_spec(spec))
+            else:
+                proposed = None
+
+            out = os.path.join(rounds_dir, f"round_{i+1:02d}.png")
+            plot_acquisition_topology(out, wi, si, pi, ui, ci,
+                                      experiment_pts=all_pts, proposed=proposed, optimum=optimum,
+                                      title=f"{tag.upper()} — Round {i+1}")
+
+        print(f"\n  Saved: {rounds_dir}/ ({N_EXPLORE + 1} plots)")
 
 
 if __name__ == "__main__":
