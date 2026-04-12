@@ -85,12 +85,12 @@ def main():
 
     # Console
     print(f"\n  Prediction quality ({N_BASELINE} baseline, {VAL_SIZE:.0%} held out):")
-    print(f"  {'Feature':25s}  {'MLP R²':>8s}  {'MLP MAE':>10s}  {'RF R²':>8s}  {'RF MAE':>10s}")
-    print(f"  {'─' * 65}")
+    print(f"  {'Feature':25s}  {'MLP R²':>8s}  {'RF R²':>8s}")
+    print(f"  {'─' * 45}")
     for feat in model_results["mlp"]:
         mlp = model_results["mlp"][feat]
-        rf = model_results["rf"].get(feat, {"r2": 0, "mae": 0})
-        print(f"  {feat:25s}  {mlp['r2']:8.3f}  {mlp['mae']:10.6f}  {rf['r2']:8.3f}  {rf['mae']:10.6f}")
+        rf = model_results["rf"].get(feat, {"r2": 0})
+        print(f"  {feat:25s}  {mlp['r2']:8.3f}  {rf['r2']:8.3f}")
 
     # MLP scatter
     out = os.path.join(plot_dir, "03_prediction_accuracy.png")
