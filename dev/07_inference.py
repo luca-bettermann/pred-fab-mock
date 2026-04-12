@@ -23,7 +23,7 @@ N_EXPLORE = 10
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 KAPPA = 0.7
 EXPLORATION_RADIUS = 0.5
-BOUNDARY_BUFFER = (0.10, 0.8, 2.0)
+BOUNDARY_BUFFER = (0.45, 0.8, 2.0)
 
 
 def _combined(perf):

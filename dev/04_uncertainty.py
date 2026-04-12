@@ -19,7 +19,7 @@ N_BASELINE = 20
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 RESOLUTION = 40
 EXPLORATION_RADIUS = 0.5
-BOUNDARY_BUFFER = (0.10, 0.8, 2.0)
+BOUNDARY_BUFFER = (0.45, 0.8, 2.0)  # base extent at N=1; scales as extent/√N
 
 
 def _compute_grids(agent, dm, res):
