@@ -82,7 +82,6 @@ def main():
         dm.update()
         agent.train(dm, validate=False)
         prev = params
-        print(f"    fixed_{i+1:02d}  w={params['water_ratio']:.3f}  spd={params['print_speed']:.1f}  score={score:.3f}")
 
     # Phase 2: Trajectory exploration (OFAT on print_speed per layer)
     print(f"\n  Trajectory exploration ({N_EXPLORE_TRAJ} rounds, step_param=print_speed@n_layers):")
@@ -91,7 +90,7 @@ def main():
         adaptation_delta=ADAPTATION_DELTA,
         mpc_lookahead=MPC_LOOKAHEAD,
         mpc_discount=MPC_DISCOUNT,
-        trajectory_smoothing=TRAJECTORY_SMOOTHING,
+        smoothing=TRAJECTORY_SMOOTHING,
     )
 
     traj_scores = []
