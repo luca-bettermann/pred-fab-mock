@@ -36,15 +36,15 @@ N_INFER      = 1  if QUICK_TEST else 3       # inference rounds
 # Agent-level configuration (persists across all phases)
 BOUNDS              = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 PERFORMANCE_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
-EXPLORATION_RADIUS  = 0.5                    # KDE bubble size c → h = c·√d/√N, γ = max(1, c·√N)
+EXPLORATION_RADIUS  = 0.4                    # KDE bubble size c → h = c·√d/√N, γ = max(1, c·√N)
 MPC_LOOKAHEAD       = 0                      # 0 = greedy, N = N-step discounted lookahead
 MPC_DISCOUNT        = 0.9                    # discount factor γ for MPC
-OPTIMIZER           = Optimizer.DE           # LBFGSB (gradient, fast) or DE (global, slower)
-BOUNDARY_BUFFER     = (0.10, 0.8, 2.0)      # (extent, strength, exponent) — penalise edge proposals
+OPTIMIZER           = Optimizer.LBFGSB       # LBFGSB (gradient, fast) or DE (global, slower)
+BOUNDARY_BUFFER     = (0.10, 0.5, 1.5)      # (extent, strength, exponent) — penalise edge proposals
 
 # Step-level parameters (per-call, overridable)
 W_EXPLORE             = 0.7                  # exploration weight κ ∈ (0, 1]
-N_OPTIMIZATION_ROUNDS = 5                    # L-BFGS-B random restarts (ignored by DE)
+N_OPTIMIZATION_ROUNDS = 10                    # L-BFGS-B random restarts (ignored by DE)
 
 # Design intent for inference phase
 MATERIAL      = "clay"                                     # fixed material for mock
