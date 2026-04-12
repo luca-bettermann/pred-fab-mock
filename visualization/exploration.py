@@ -28,7 +28,7 @@ def plot_uncertainty(
         (axes[1], bf_grid, "Boundary Factor"),
         (axes[2], unc_buffered, "Uncertainty x Boundary"),
     ]:
-        im = ax.contourf(waters, speeds, data, levels=20, cmap="viridis")
+        im = ax.contourf(waters, speeds, data, levels=20, cmap="Blues")
         if baseline_params:
             bw = [p["water_ratio"] for p in baseline_params]
             bs = [p["print_speed"] for p in baseline_params]
@@ -92,9 +92,9 @@ def plot_acquisition_topology(
     fig.suptitle(title, fontsize=13, fontweight="bold")
 
     for ax, data, subtitle, cmap in [
-        (axes[0], perf_grid, "Performance", "RdYlGn"),
-        (axes[1], unc_grid, "Uncertainty", "viridis"),
-        (axes[2], combined_grid, "Combined", "YlOrRd"),
+        (axes[0], perf_grid, "Performance", "YlGn"),
+        (axes[1], unc_grid, "Uncertainty", "Blues"),
+        (axes[2], combined_grid, "Combined", "RdYlGn"),
     ]:
         im = ax.contourf(waters, speeds, data, levels=20, cmap=cmap)
         ax.set_xlabel("Water Ratio")

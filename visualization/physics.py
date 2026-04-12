@@ -29,7 +29,9 @@ def plot_physics_topology(
     fig.suptitle("Physics Performance Topology", fontsize=14, fontweight="bold", y=1.02)
 
     for ax, (title, data) in zip(axes, metrics.items()):
-        im = ax.contourf(waters, speeds, data, levels=20, cmap="RdYlGn")
+        # Individual metrics use YlGn (performance); combined uses RdYlGn (objective)
+        cmap = "RdYlGn" if "Combined" in title else "YlGn"
+        im = ax.contourf(waters, speeds, data, levels=20, cmap=cmap)
         ax.contour(waters, speeds, data, levels=10, colors="white", linewidths=0.3, alpha=0.5)
 
         if "Combined" in title:
