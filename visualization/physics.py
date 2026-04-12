@@ -12,12 +12,13 @@ from .helpers import save_fig, evaluate_physics_grid
 def plot_physics_topology(
     save_path: str,
     resolution: int = 50,
-    opt_speed: float | None = None,
-    opt_water: float | None = None,
     perf_weights: dict[str, float] | None = None,
 ) -> None:
-    """1x4 heatmap: path_accuracy | energy_efficiency | production_rate | combined."""
+    """1x4 heatmap with per-metric optima (dots) and combined optimum (star)."""
     waters, speeds, metrics = evaluate_physics_grid(resolution, perf_weights)
+
+    # Per-metric markers: dot at each metric's own optimum
+    _METRIC_MARKERS = {"Path Accuracy": "o", "Energy Efficiency": "s", "Production Rate": "D"}
 
     fig, axes = plt.subplots(1, 4, figsize=(18, 4.5))
     fig.suptitle("Physics Performance Topology", fontsize=14, fontweight="bold", y=1.02)
@@ -25,8 +26,19 @@ def plot_physics_topology(
     for ax, (title, data) in zip(axes, metrics.items()):
         im = ax.contourf(waters, speeds, data, levels=20, cmap="RdYlGn")
         ax.contour(waters, speeds, data, levels=10, colors="white", linewidths=0.3, alpha=0.5)
-        if opt_water is not None and opt_speed is not None:
-            ax.plot(opt_water, opt_speed, "w*", ms=14, markeredgecolor="black", markeredgewidth=0.8)
+
+        # Mark this metric's own optimum
+        best_idx = np.unravel_index(np.argmax(data), data.shape)
+        best_w, best_s = waters[best_idx[1]], speeds[best_idx[0]]
+        marker = _METRIC_MARKERS.get(title, "o")
+        ax.plot(best_w, best_s, marker, color="white", ms=10,
+                markeredgecolor="black", markeredgewidth=0.8)
+
+        # Combined panel gets a star at the combined optimum
+        if "Combined" in title:
+            ax.plot(best_w, best_s, "w*", ms=14,
+                    markeredgecolor="black", markeredgewidth=0.8)
+
         ax.set_title(title, fontsize=10)
         ax.set_xlabel("Water Ratio")
         ax.set_ylabel("Print Speed [mm/s]")
@@ -87,7 +99,7 @@ def plot_baseline_scatter(
     ])
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle("Baseline Sampling Coverage (Sobol)", fontsize=13, fontweight="bold")
+    fig.suptitle("Baseline Sampling Coverage (LHS)", fontsize=13, fontweight="bold")
 
     ax1.scatter(waters, speeds, s=60, c="#4878CF", edgecolors="white", linewidth=0.8, zorder=5)
     for i, (w, s) in enumerate(zip(waters, speeds)):

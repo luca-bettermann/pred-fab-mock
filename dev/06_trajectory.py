@@ -16,12 +16,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from pred_fab.orchestration import Optimizer
 from visualization import plot_trajectory_comparison
 from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
+from pred_fab import combined_score
 from utils import params_from_spec
 
 N_BASELINE = 15
 N_EXPLORE_FIXED = 5
 N_EXPLORE_TRAJ = 5
-BOUNDS = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 W_EXPLORE = 0.5
 EXPLORATION_RADIUS = 0.5
@@ -33,8 +33,7 @@ TRAJECTORY_SMOOTHING = 0.15  # penalize speed changes between layers (0=off, 0.3
 
 
 def _combined(perf):
-    total_w = sum(PERF_WEIGHTS.values())
-    return sum(PERF_WEIGHTS.get(k, 0) * float(v) for k, v in perf.items() if v is not None) / total_w
+    return combined_score(perf, PERF_WEIGHTS)
 
 
 def _extract_schedules(spec):
@@ -63,7 +62,7 @@ def main():
     plot_dir = ensure_plot_dir()
 
     agent, fab, dataset = make_env("06_trajectory", verbose=False)
-    agent.configure(bounds=BOUNDS, performance_weights=PERF_WEIGHTS,
+    agent.configure(performance_weights=PERF_WEIGHTS,
                     exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
                     optimizer=Optimizer.DE)
     baseline_params = run_baseline(agent, fab, dataset, N_BASELINE)

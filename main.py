@@ -9,6 +9,7 @@ Configure the parameters below, then run: python main.py
 import numpy as np
 
 from pred_fab.core import Dataset
+from pred_fab import combined_score
 
 from schema import build_schema
 from agent_setup import build_agent
@@ -30,8 +31,7 @@ N_BASELINE   = 2  if QUICK_TEST else 20
 N_EXPLORE    = 1  if QUICK_TEST else 10
 N_INFER      = 1  if QUICK_TEST else 1       # single-shot inference
 
-# Agent configuration
-BOUNDS              = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
+# Agent configuration (bounds default to schema min/max)
 PERFORMANCE_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 EXPLORATION_RADIUS  = 0.5
 BOUNDARY_BUFFER     = (0.10, 0.8, 2.0)
@@ -64,9 +64,7 @@ def _perf_str(perf: dict, keys: list[str]) -> str:
     return "  ".join(parts)
 
 def _combined(perf: dict) -> float:
-    total_w = sum(PERFORMANCE_WEIGHTS.values())
-    return sum(PERFORMANCE_WEIGHTS.get(k, 0) * float(v)
-               for k, v in perf.items() if v is not None) / total_w
+    return combined_score(perf, PERFORMANCE_WEIGHTS)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -90,7 +88,6 @@ def main() -> None:
     dataset = Dataset(schema=schema)
 
     agent.configure(
-        bounds=BOUNDS,
         performance_weights=PERFORMANCE_WEIGHTS,
         exploration_radius=EXPLORATION_RADIUS,
         boundary_buffer=BOUNDARY_BUFFER,

@@ -11,6 +11,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from pred_fab.orchestration import Optimizer
+from pred_fab import combined_score
 from sensors.physics import N_LAYERS, N_SEGMENTS
 from visualization import plot_optimizer_comparison, plot_acquisition_topology
 from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
@@ -18,7 +19,6 @@ from utils import params_from_spec
 
 N_BASELINE = 5
 N_EXPLORE = 10
-BOUNDS = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 RESOLUTION = 30
 W_EXPLORE = 0.7
@@ -36,9 +36,7 @@ def _compute_acquisition_grid(agent, dm, w_explore, res):
             p = {"water_ratio": w, "print_speed": spd, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
             try:
                 perf = agent.predict_performance(p)
-                total_w = sum(PERF_WEIGHTS.values())
-                perf_grid[j, i] = sum(PERF_WEIGHTS.get(k, 0) * float(v)
-                                       for k, v in perf.items() if v is not None) / total_w
+                perf_grid[j, i] = combined_score(perf, PERF_WEIGHTS)
             except Exception:
                 perf_grid[j, i] = 0.0
             unc_grid[j, i] = agent.predict_uncertainty(p, dm)
@@ -53,7 +51,7 @@ def _compute_acquisition_grid(agent, dm, w_explore, res):
 
 def _run_exploration(optimizer, tag):
     agent, fab, dataset = make_env(f"05_{tag}", verbose=False)
-    agent.configure(bounds=BOUNDS, performance_weights=PERF_WEIGHTS,
+    agent.configure(performance_weights=PERF_WEIGHTS,
                     exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
                     optimizer=optimizer)
     bp = run_baseline(agent, fab, dataset, N_BASELINE)
@@ -99,7 +97,7 @@ def main():
 
     # Acquisition topology at round 1 and round N
     agent, fab, dataset = make_env("05_topo", verbose=False)
-    agent.configure(bounds=BOUNDS, performance_weights=PERF_WEIGHTS,
+    agent.configure(performance_weights=PERF_WEIGHTS,
                     exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
                     optimizer=Optimizer.DE)
     bp = run_baseline(agent, fab, dataset, N_BASELINE)

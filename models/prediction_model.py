@@ -45,7 +45,10 @@ class DeviationPredictionModel(IPredictionModel):
 
     @property
     def input_features(self) -> list[str]:
-        return ["prev_layer_deviation", "prev_segment_deviation"]
+        return [
+            "prev_layer_deviation_1", "prev_layer_deviation_2",
+            "prev_segment_deviation_1", "prev_segment_deviation_2",
+        ]
 
     @property
     def outputs(self) -> list[str]:
@@ -65,7 +68,7 @@ class DeviationPredictionModel(IPredictionModel):
             ("scaler", StandardScaler()),
             ("mlp", MLPRegressor(
                 hidden_layer_sizes=(48, 24, 12), max_iter=2000,
-                random_state=42, alpha=0.01,
+                alpha=0.01,
             )),
         ])
         self._model.fit(X, y)
@@ -116,7 +119,7 @@ class EnergyPredictionModel(IPredictionModel):
             ("scaler", StandardScaler()),
             ("mlp", MLPRegressor(
                 hidden_layer_sizes=(24, 12), max_iter=2000,
-                random_state=42, alpha=0.01,
+                alpha=0.01,
             )),
         ])
         self._model.fit(X, y)
@@ -172,7 +175,10 @@ class DeviationRFModel(IPredictionModel):
 
     @property
     def input_features(self) -> list[str]:
-        return ["prev_layer_deviation", "prev_segment_deviation"]
+        return [
+            "prev_layer_deviation_1", "prev_layer_deviation_2",
+            "prev_segment_deviation_1", "prev_segment_deviation_2",
+        ]
 
     @property
     def outputs(self) -> list[str]:

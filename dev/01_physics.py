@@ -38,7 +38,7 @@ def main():
         print(f"  {name:25s} at optimum: {data[s_idx, w_idx]:.3f}")
 
     topo_path = os.path.join(plot_dir, "01_topology.png")
-    plot_physics_topology(topo_path, opt_speed=spd_opt, opt_water=w_opt, perf_weights=PERF_WEIGHTS)
+    plot_physics_topology(topo_path, perf_weights=PERF_WEIGHTS)
     print(f"\n  Saved: {topo_path}")
 
     cross_path = os.path.join(plot_dir, "01_cross_sections.png")
