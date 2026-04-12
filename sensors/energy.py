@@ -21,12 +21,12 @@ class EnergySensor:
 
     def _cache_key(self, params: dict[str, Any], layer_idx: int, segment_idx: int) -> tuple:
         return (
-            params["print_speed"], params["design"], params["material"],
-            params["water_ratio"], layer_idx, segment_idx,
+            params["print_speed"], params["water_ratio"],
+            layer_idx, segment_idx,
         )
 
     def run_experiment(self, params: dict[str, Any]) -> None:
-        """Simulate and cache all (layer, segment) positions for the given experiment params."""
+        """Simulate and cache all (layer, segment) positions."""
         n_layers = int(params["n_layers"])
         for layer_idx in range(n_layers):
             self.run_layer(params, layer_idx)
@@ -43,8 +43,8 @@ class EnergySensor:
         self, params: dict[str, Any], layer_idx: int, segment_idx: int
     ) -> dict:
         e = physics_energy(
-            params["print_speed"], params["material"], params["design"],
-            params["water_ratio"], segment_idx=segment_idx, layer_idx=layer_idx,
+            params["print_speed"], params["water_ratio"],
+            segment_idx=segment_idx, layer_idx=layer_idx,
         )
         energy_noisy = e + self._rng.normal(0, self.NOISE_ENERGY)
         return {"energy_per_segment": float(max(0.0, energy_noisy))}

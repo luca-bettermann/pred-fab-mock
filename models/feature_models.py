@@ -20,7 +20,7 @@ class PrintingFeatureModel(IFeatureModel):
 
     @property
     def input_parameters(self) -> list[str]:
-        return ["water_ratio", "print_speed", "design", "material"]
+        return ["water_ratio", "print_speed"]
 
     @property
     def outputs(self) -> list[str]:
@@ -55,7 +55,7 @@ class EnergyFeatureModel(IFeatureModel):
 
     @property
     def input_parameters(self) -> list[str]:
-        return ["water_ratio", "print_speed", "design", "material"]
+        return ["water_ratio", "print_speed"]
 
     @property
     def outputs(self) -> list[str]:
@@ -75,18 +75,14 @@ class EnergyFeatureModel(IFeatureModel):
 
 
 class ProductionRateFeatureModel(IFeatureModel):
-    """Effective production rate per position, accounting for nozzle-slip at high water ratios.
-
-    At low-to-moderate water ratios, rate tracks print_speed. Above the slip threshold
-    (W_SLIP in physics.py) extrusion rate falls below commanded speed.
-    """
+    """Effective production rate, accounting for nozzle-slip at high water ratios."""
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
 
     @property
     def input_parameters(self) -> list[str]:
-        return ["print_speed", "water_ratio", "material"]
+        return ["print_speed", "water_ratio"]
 
     @property
     def outputs(self) -> list[str]:
@@ -101,6 +97,5 @@ class ProductionRateFeatureModel(IFeatureModel):
         rate = _physics_production_rate(
             print_speed=float(params["print_speed"]),
             water_ratio=float(params["water_ratio"]),
-            material=str(params["material"]),
         )
         return {"production_rate": rate}

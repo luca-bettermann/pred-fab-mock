@@ -1,58 +1,72 @@
-"""Full PFAB journey: Baseline → Training → Exploration → Inference → Adaptation.
+"""Full PFAB journey: Baseline → Training → Exploration → Inference.
+
+Demonstrates the functionality and capabilities of pred-fab in a minimal
+but realistic extrusion printing scenario (single design, single material).
 
 Configure the parameters below, then run: python main.py
 """
 
 import numpy as np
 
-from pred_fab.orchestration import Optimizer
 from pred_fab.core import Dataset
 
 from schema import build_schema
 from agent_setup import build_agent
 from sensors import CameraSystem, EnergySensor, FabricationSystem
-from sensors.physics import path_deviation as physics_deviation
-from utils import params_from_spec
 from workflow import (
     JourneyState, clean_artifacts, with_dimensions,
-    run_and_evaluate,
+    run_and_evaluate, get_physics_optimum,
 )
-from reporting import PLOT_DIRS, report_baseline, report_training, \
-    report_exploration_round, report_exploration_summary, \
-    report_inference_round, report_inference_summary, \
-    report_adaptation, report_summary
+from utils import params_from_spec
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CONFIGURATION — tweak these values to experiment with different settings
+#  CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-QUICK_TEST = False                           # True: minimal runs for fast iteration
+QUICK_TEST = False
 
 # Experiment counts
-N_BASELINE   = 2  if QUICK_TEST else 20      # LHS space-filling experiments
-N_EXPLORE    = 2  if QUICK_TEST else 10      # exploration rounds
-N_INFER      = 1  if QUICK_TEST else 3       # inference rounds
+N_BASELINE   = 2  if QUICK_TEST else 20
+N_EXPLORE    = 1  if QUICK_TEST else 10
+N_INFER      = 1  if QUICK_TEST else 1       # single-shot inference
 
-# Agent-level configuration (persists across all phases)
+# Agent configuration
 BOUNDS              = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 PERFORMANCE_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
-EXPLORATION_RADIUS  = 0.4                    # KDE bubble size c → h = c·√d/√N, γ = max(1, c·√N)
-MPC_LOOKAHEAD       = 0                      # 0 = greedy, N = N-step discounted lookahead
-MPC_DISCOUNT        = 0.9                    # discount factor γ for MPC
-OPTIMIZER           = Optimizer.LBFGSB       # LBFGSB (gradient, fast) or DE (global, slower)
-BOUNDARY_BUFFER     = (0.10, 0.5, 1.5)      # (extent, strength, exponent) — penalise edge proposals
+EXPLORATION_RADIUS  = 0.5
+BOUNDARY_BUFFER     = (0.10, 0.8, 2.0)
 
-# Step-level parameters (per-call, overridable)
-W_EXPLORE             = 0.7                  # exploration weight κ ∈ (0, 1]
-N_OPTIMIZATION_ROUNDS = 10                    # L-BFGS-B random restarts (ignored by DE)
+# Exploration
+W_EXPLORE = 0.7
 
-# Design intent for inference phase
-MATERIAL      = "clay"                                     # fixed material for mock
-DESIGN_INTENT = {"design": "A", "material": MATERIAL}
+# DE optimizer
+DE_MAXITER = 100
+DE_POPSIZE = 10
 
-# Adaptation
-ADAPTATION_START_SPEED = 40.0
-ADAPTATION_DELTA       = {"print_speed": 5.0}
+PLOT_DIR = "./plots"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  HELPERS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _score_color(v: float) -> str:
+    if v >= 0.70: return "\033[32m"
+    if v >= 0.45: return "\033[33m"
+    return "\033[31m"
+
+def _perf_str(perf: dict, keys: list[str]) -> str:
+    parts = []
+    for k in keys:
+        v = perf.get(k, 0.0)
+        short = k[:3]
+        parts.append(f"{short}={_score_color(v)}{v:.3f}\033[0m")
+    return "  ".join(parts)
+
+def _combined(perf: dict) -> float:
+    total_w = sum(PERFORMANCE_WEIGHTS.values())
+    return sum(PERFORMANCE_WEIGHTS.get(k, 0) * float(v)
+               for k, v in perf.items() if v is not None) / total_w
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -60,185 +74,107 @@ ADAPTATION_DELTA       = {"print_speed": 5.0}
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def main() -> None:
-    clean_artifacts(list(PLOT_DIRS.values()))
+    import os, shutil
+    for d in ["./local", PLOT_DIR]:
+        if os.path.exists(d):
+            shutil.rmtree(d)
+    os.makedirs(PLOT_DIR, exist_ok=True)
+
     state = JourneyState()
     fab   = FabricationSystem(CameraSystem(), EnergySensor())
+    perf_keys = ["path_accuracy", "energy_efficiency", "production_rate"]
 
     # ── Phase 0: Setup ───────────────────────────────────────────────────────
     schema  = build_schema()
     agent   = build_agent(schema, fab.camera, fab.energy)
     dataset = Dataset(schema=schema)
 
-    agent.console.print_phase_header(0, "Setup", "Configure agent, sensors, schema, and calibration bounds")
-
     agent.configure(
         bounds=BOUNDS,
         performance_weights=PERFORMANCE_WEIGHTS,
         exploration_radius=EXPLORATION_RADIUS,
-        mpc_lookahead=MPC_LOOKAHEAD,
-        mpc_discount=MPC_DISCOUNT,
-        optimizer=OPTIMIZER,
         boundary_buffer=BOUNDARY_BUFFER,
-        fixed_params={"material": MATERIAL},
+        de_maxiter=DE_MAXITER,
+        de_popsize=DE_POPSIZE,
     )
 
+    print()
+
     # ── Phase 1: Baseline ────────────────────────────────────────────────────
-    agent.console.print_phase_header(1, "Baseline Sampling",
-                       f"{N_BASELINE} Sobol-sequence experiments — no model yet, space-filling only")
+    agent.console.print_phase_header(1, "Baseline",
+                       f"{N_BASELINE} Sobol experiments — space-filling, no model")
 
     specs = agent.baseline_step(n=N_BASELINE)
-
-    baseline_log = []
     for i, spec in enumerate(specs):
-        params = with_dimensions(params_from_spec(spec), fab)
+        params = with_dimensions(params_from_spec(spec))
         exp_code = f"baseline_{i+1:02d}"
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
-        perf = exp_data.performance.get_values_dict()
-        baseline_log.append((exp_code, params, {k: float(v) for k, v in perf.items() if v is not None}))
-        state.record("baseline", exp_code, params_from_spec(spec), baseline_log[-1][2])
+        perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
+        state.record("baseline", exp_code, params, perf)
 
-    state.prev_params = with_dimensions(params_from_spec(specs[-1]), fab)
-    report_baseline(agent, baseline_log)
+    best_idx = max(range(len(state.perf_history)),
+                   key=lambda i: _combined(state.perf_history[i][1]))
+    best_code = state.all_codes[best_idx]
+    best_perf = state.perf_history[best_idx][1]
+    print(f"  Best: \033[1m{best_code}\033[0m  {_perf_str(best_perf, perf_keys)}  "
+          f"combined={_combined(best_perf):.3f}")
 
-    # ── Phase 2: Initial Training ────────────────────────────────────────────
-    agent.console.print_phase_header(2, "Initial Training",
-                       "Fit prediction models (deviation + energy) on baseline data")
+    # ── Phase 2: Training ────────────────────────────────────────────────────
+    agent.console.print_phase_header(2, "Training",
+                       "Fit prediction models on baseline data")
 
     datamodule = agent.create_datamodule(dataset)
     datamodule.prepare(val_size=0.25)
     results = agent.train(datamodule, validate=True)
 
-    report_training(agent, datamodule, results)
-
     # ── Phase 3: Exploration ─────────────────────────────────────────────────
     agent.console.print_phase_header(3, "Exploration",
-                       f"{N_EXPLORE} rounds  (w_explore={W_EXPLORE}) — model guides search toward uncertain regions")
+                       f"{N_EXPLORE} rounds (w_explore={W_EXPLORE})")
 
-    explore_log = []
+    prev_params = with_dimensions(params_from_spec(specs[-1]))
     for i in range(N_EXPLORE):
-        # Agent proposes next experiment
-        spec = agent.exploration_step(
-            datamodule, w_explore=W_EXPLORE, n_optimization_rounds=N_OPTIMIZATION_ROUNDS,
-        )
-
-        # Execute experiment
+        spec = agent.exploration_step(datamodule, w_explore=W_EXPLORE)
         proposed = params_from_spec(spec)
-        params = with_dimensions({**state.prev_params, **proposed}, fab)
+        params = with_dimensions({**prev_params, **proposed})
         exp_code = f"explore_{i+1:02d}"
 
-        # Plot BEFORE retraining so the topology reflects the landscape the optimizer saw
-        proposed_full = {**state.prev_params, **proposed, "n_layers": 5, "n_segments": 4}
-        u = agent.predict_uncertainty(proposed_full, datamodule)
-
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
-
-        # Record results
         perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
-        explore_log.append((exp_code, params, perf))
         state.record("exploration", exp_code, params, perf)
+        prev_params = params
 
-        report_exploration_round(agent, state, exp_code, params, perf, u, proposed, W_EXPLORE)
+        u = agent.predict_uncertainty(params, datamodule)
+        print(f"  {exp_code}  w={params['water_ratio']:.3f}  spd={params['print_speed']:.1f}  "
+              f"{_perf_str(perf, perf_keys)}  u={u:.3f}")
 
-        # Retrain on expanded dataset (after plotting)
         datamodule.update()
         agent.train(datamodule, validate=False)
 
-    report_exploration_summary(agent, explore_log, state, N_EXPLORE)
-
-    # ── Phase 4: Inference ───────────────────────────────────────────────────
+    # ── Phase 4: Inference (single-shot) ─────────────────────────────────────
     agent.console.print_phase_header(4, "Inference",
-                       f"{N_INFER} rounds  ·  intent: {DESIGN_INTENT}  ·  w_explore=0")
+                       "Single-shot first-time-right manufacturing")
 
-    agent.configure(fixed_params=DESIGN_INTENT)
-    state.prev_params = with_dimensions({**state.prev_params, **DESIGN_INTENT}, fab)
+    # Agent proposes the best parameters given current model
+    spec = agent.exploration_step(datamodule, w_explore=0.0)
+    proposed = params_from_spec(spec)
+    params = with_dimensions({**prev_params, **proposed})
+    exp_code = "infer_01"
 
-    infer_log = []
-    last_exp_data = None
-    for i in range(N_INFER):
-        params = state.prev_params
-        exp_code = f"infer_{i+1:02d}"
+    exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
+    perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
+    state.record("inference", exp_code, params, perf)
 
-        # Execute current parameters
-        exp_data = dataset.create_experiment(exp_code, parameters=params)
-        fab.run_experiment(params)
-
-        # Agent evaluates and proposes improved parameters
-        agent.evaluate(exp_data)
-        spec = agent.inference_step(
-            exp_data, datamodule, w_explore=0.0,
-            n_optimization_rounds=N_OPTIMIZATION_ROUNDS, current_params=params,
-        )
-        next_params = with_dimensions({**params, **params_from_spec(spec)}, fab)
-
-        # Persist and retrain
-        dataset.save_experiment(exp_code)
-        datamodule.update()
-        agent.train(datamodule, validate=False)
-
-        perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
-        infer_log.append((exp_code, params, perf))
-        last_exp_data = exp_data
-        state.record("inference", exp_code, params, perf)
-        state.prev_params = next_params
-
-        report_inference_round(agent, state, exp_code, params, perf, DESIGN_INTENT)
-
-    report_inference_summary(agent, infer_log, state, last_exp_data, fab.camera, DESIGN_INTENT, N_INFER)
-
-    # ── Phase 5: Online Adaptation ───────────────────────────────────────────
-    agent.console.print_phase_header(5, "Online Adaptation",
-                       "print_speed adjusted after each layer based on live deviation feedback")
-
-    agent.configure(
-        step_parameters={"print_speed": "n_layers"},
-        adaptation_delta=ADAPTATION_DELTA,
-    )
-
-    # Set up adaptation experiment
-    adapt_params = with_dimensions({**state.prev_params, "print_speed": ADAPTATION_START_SPEED}, fab)
-    adapt_exp = dataset.create_experiment("adapt_01", parameters=adapt_params)
-    agent.set_active_experiment(adapt_exp)
-
-    speeds = []
-    deviations = []
-    for layer_idx in range(int(adapt_params["n_layers"])):
-        # Fabricate one layer
-        fab.run_layer(adapt_params, layer_idx)
-        start, end = adapt_exp.parameters.get_start_and_end_indices("n_layers", layer_idx)
-        agent.feature_system.run_feature_extraction(  # type: ignore[union-attr]
-            adapt_exp, evaluate_from=start, evaluate_to=end,
-        )
-
-        speed = float(adapt_params["print_speed"])
-        speeds.append(speed)
-        feat = adapt_exp.features.get_value("path_deviation")
-        deviations.append(float(np.mean(feat[layer_idx, :])))
-
-        # Agent adapts speed for next layer
-        if layer_idx < int(adapt_params["n_layers"]) - 1:
-            spec = agent.adaptation_step(
-                dimension="n_layers", step_index=layer_idx,
-                exp_data=adapt_exp, record=True,
-            )
-            adapt_params["print_speed"] = float(spec.initial_params.get("print_speed", speed))
-
-    dataset.save_experiment("adapt_01")
-
-    # Counterfactual: what would happen without adaptation
-    n_segs = int(adapt_params["n_segments"])
-    counterfactual = [
-        float(sum(
-            physics_deviation(ADAPTATION_START_SPEED, str(adapt_params["design"]), s,
-                              float(adapt_params["water_ratio"]), str(adapt_params["material"]), li)
-            for s in range(n_segs)
-        ) / n_segs)
-        for li in range(len(speeds))
-    ]
-
-    report_adaptation(agent, speeds, deviations, counterfactual)
+    print(f"  {exp_code}  w={params['water_ratio']:.3f}  spd={params['print_speed']:.1f}  "
+          f"{_perf_str(perf, perf_keys)}  combined={_combined(perf):.3f}")
 
     # ── Summary ──────────────────────────────────────────────────────────────
-    report_summary(agent, state, DESIGN_INTENT)
+    spd_opt, w_opt = get_physics_optimum()
+    print(f"\n  \033[2m{'─' * 58}\033[0m")
+    print(f"  Physics optimum:   speed={spd_opt:.1f} mm/s, water={w_opt:.2f}")
+    print(f"  Inference result:  speed={params['print_speed']:.1f} mm/s, "
+          f"water={params['water_ratio']:.2f}  "
+          f"combined={_combined(perf):.3f}")
+    print(f"  \033[2m{'─' * 58}\033[0m")
 
 
 if __name__ == "__main__":

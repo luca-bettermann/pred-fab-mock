@@ -25,7 +25,6 @@ def build_agent(
     """Register all models, initialize systems, and return a configured PfabAgent."""
     agent = PfabAgent(root_folder=".")
 
-    # Register feature and evaluation models
     agent.register_feature_model(PrintingFeatureModel, camera=camera)
     agent.register_feature_model(EnergyFeatureModel, energy_sensor=energy_sensor)
     agent.register_feature_model(ProductionRateFeatureModel)
@@ -33,7 +32,6 @@ def build_agent(
     agent.register_evaluation_model(EnergyConsumptionModel)
     agent.register_evaluation_model(ProductionRateModel)
 
-    # Register prediction models based on model_type
     if model_type == "rf":
         agent.register_prediction_model(DeviationRFModel)
         agent.register_prediction_model(EnergyRFModel)
@@ -42,7 +40,6 @@ def build_agent(
         agent.register_prediction_model(EnergyPredictionModel)
     agent.register_prediction_model(ProductionRatePredictionModel)
 
-    # Initialize all systems against the schema
     agent.initialize_systems(schema, verbose_flag=verbose)
 
     return agent
