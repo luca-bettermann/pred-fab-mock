@@ -14,7 +14,8 @@ from pred_fab.orchestration import Optimizer
 from pred_fab import combined_score
 from sensors.physics import N_LAYERS, N_SEGMENTS
 from visualization import plot_optimizer_comparison, plot_acquisition_topology
-from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
+from visualization.helpers import evaluate_physics_grid
+from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir, clean_plots
 from utils import params_from_spec
 
 N_BASELINE = 5
@@ -27,6 +28,11 @@ EXPLORATION_RADIUS = 0.5
 
 
 def _compute_acquisition_grid(agent, dm, kappa, res):
+    """Compute performance, uncertainty (with buffer), and combined grids.
+
+    Uses the calibration system's perf range for normalization — matching
+    what the optimizer actually sees.
+    """
     waters = np.linspace(0.30, 0.50, res)
     speeds = np.linspace(20.0, 60.0, res)
     perf_grid = np.zeros((res, res))
@@ -39,13 +45,19 @@ def _compute_acquisition_grid(agent, dm, kappa, res):
                 perf_grid[j, i] = combined_score(perf, PERF_WEIGHTS)
             except Exception:
                 perf_grid[j, i] = 0.0
-            unc_grid[j, i] = agent.predict_uncertainty(p, dm)
+            unc_grid[j, i] = agent.predict_uncertainty(p, dm)  # includes buffer
 
-    p_min, p_max = perf_grid.min(), perf_grid.max()
-    u_min, u_max = unc_grid.min(), unc_grid.max()
-    p_norm = np.clip((perf_grid - p_min) / max(p_max - p_min, 1e-10), 0, 1)
-    u_norm = np.clip((unc_grid - u_min) / max(u_max - u_min, 1e-10), 0, 1)
-    combined = (1 - kappa) * p_norm + kappa * u_norm
+    # Normalize performance using training-data range (same as optimizer)
+    cal = agent.calibration_system
+    if cal._perf_range_min is not None and cal._perf_range_max is not None:
+        p_min, p_max = cal._perf_range_min, cal._perf_range_max
+    else:
+        p_min, p_max = perf_grid.min(), perf_grid.max()
+    span = max(p_max - p_min, 1e-10)
+    p_norm = np.clip((perf_grid - p_min) / span, 0, 1)
+
+    # Uncertainty is already [0,1] with buffer — no renormalization
+    combined = (1 - kappa) * p_norm + kappa * unc_grid
     return waters, speeds, perf_grid, unc_grid, combined
 
 
@@ -95,32 +107,59 @@ def main():
                               title=f"L-BFGS-B vs DE (kappa={KAPPA})")
     print(f"\n  Saved: {out}")
 
-    # Acquisition topology at round 1 and round N
+    # Physics optimum for reference
+    _, _, phys_metrics = evaluate_physics_grid(50, PERF_WEIGHTS)
+    combined_phys = list(phys_metrics.values())[-1]
+    opt_idx = np.unravel_index(np.argmax(combined_phys), combined_phys.shape)
+    phys_waters = np.linspace(0.30, 0.50, 50)
+    phys_speeds = np.linspace(20.0, 60.0, 50)
+    optimum = (phys_waters[opt_idx[1]], phys_speeds[opt_idx[0]])
+
+    # Per-round acquisition topology plots
+    clean_plots("05_rounds")
+    rounds_dir = os.path.join(plot_dir, "05_rounds")
+
     agent, fab, dataset = make_env("05_topo", verbose=False)
     agent.configure_performance(weights=PERF_WEIGHTS)
     agent.configure_exploration(radius=EXPLORATION_RADIUS)
     agent.configure_optimizer(backend=Optimizer.DE)
     bp = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
+    all_pts = list(bp)
 
+    # Round 1 (before first exploration)
     w1, s1, p1, u1, c1 = _compute_acquisition_grid(agent, dm, KAPPA, RESOLUTION)
-    out = os.path.join(plot_dir, "05_acquisition_round1.png")
-    plot_acquisition_topology(out, w1, s1, p1, u1, c1, title="Acquisition — Round 1")
-    print(f"  Saved: {out}")
+    spec = agent.exploration_step(dm, kappa=KAPPA)
+    proposed = with_dims(params_from_spec(spec))
+    out = os.path.join(rounds_dir, "round_00_before.png")
+    plot_acquisition_topology(out, w1, s1, p1, u1, c1,
+                              experiment_pts=all_pts, proposed=proposed, optimum=optimum,
+                              title="Acquisition — Round 1")
 
+    # Execute exploration rounds with per-round plots
     prev = bp[-1]
     for i in range(N_EXPLORE):
-        spec = agent.exploration_step(dm, kappa=KAPPA)
         p = params_from_spec(spec)
         prev = with_dims({**prev, **p})
         run_experiment(dataset, agent, fab, prev, f"explore_{i+1:02d}")
+        all_pts.append(prev)
         dm.update()
         agent.train(dm, validate=False)
 
-    wn, sn, pn, un, cn = _compute_acquisition_grid(agent, dm, KAPPA, RESOLUTION)
-    out = os.path.join(plot_dir, f"05_acquisition_round{N_EXPLORE}.png")
-    plot_acquisition_topology(out, wn, sn, pn, un, cn, title=f"Acquisition — Round {N_EXPLORE}")
-    print(f"  Saved: {out}")
+        # Compute grid and get next proposal
+        wi, si, pi, ui, ci = _compute_acquisition_grid(agent, dm, KAPPA, RESOLUTION)
+        if i < N_EXPLORE - 1:
+            spec = agent.exploration_step(dm, kappa=KAPPA)
+            proposed = with_dims(params_from_spec(spec))
+        else:
+            proposed = None  # last round, no next proposal
+
+        out = os.path.join(rounds_dir, f"round_{i+1:02d}.png")
+        plot_acquisition_topology(out, wi, si, pi, ui, ci,
+                                  experiment_pts=all_pts, proposed=proposed, optimum=optimum,
+                                  title=f"Acquisition — Round {i+1}")
+
+    print(f"\n  Saved: {rounds_dir}/ ({N_EXPLORE + 1} round plots)")
 
 
 if __name__ == "__main__":
