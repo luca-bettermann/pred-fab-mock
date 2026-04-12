@@ -109,38 +109,47 @@ def main():
 
 
 def _plot_importance_weights(plot_dir: str, model_results: dict):
-    """Visualize the R²_adj importance weighting scheme."""
+    """Visualize the R²_adj sigmoid importance weighting scheme."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from visualization.helpers import save_fig
 
-    # Simulate importance weights across the performance range
-    perf_range = np.linspace(0.0, 1.0, 100)
     floor = 0.1
-    weights = floor + (1.0 - floor) * perf_range  # linear mapping [floor, 1.0]
+    steepness = 0.8
+    perf_range = np.linspace(0.0, 1.0, 200)
+
+    # Show for a representative mean and std
+    mean, std = 0.5, 0.15
+    k = steepness / std
+    sigmoid = 1.0 / (1.0 + np.exp(-k * (perf_range - mean)))
+    weights = floor + (1.0 - floor) * sigmoid
+    midpoint = (1.0 + floor) / 2.0
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
-    fig.suptitle("R²_adj Importance Weighting", fontsize=13, fontweight="bold")
+    fig.suptitle("R\u00b2_adj Importance Weighting", fontsize=13, fontweight="bold")
 
-    # Left: weight function
+    # Left: sigmoid weight function
     ax1.plot(perf_range, weights, "b-", lw=2)
-    ax1.axhline(1.0, color="gray", ls="--", lw=0.8, alpha=0.5)
-    ax1.axhline(floor, color="gray", ls="--", lw=0.8, alpha=0.5)
-    ax1.fill_between(perf_range, floor, weights, alpha=0.1, color="blue")
+    ax1.axhline(midpoint, color="gray", ls="--", lw=0.8, alpha=0.5, label=f"midpoint = {midpoint:.2f}")
+    ax1.axhline(floor, color="gray", ls=":", lw=0.8, alpha=0.5)
+    ax1.axhline(1.0, color="gray", ls=":", lw=0.8, alpha=0.5)
+    ax1.axvline(mean, color="red", ls="--", lw=1, alpha=0.7, label=f"mean = {mean}")
+    ax1.axvspan(mean - std, mean + std, alpha=0.06, color="red")
+    ax1.fill_between(perf_range, floor, weights, alpha=0.08, color="blue")
     ax1.set_xlabel("Combined Performance Score")
     ax1.set_ylabel("Importance Weight")
-    ax1.set_title(f"Weight = {floor} + {1-floor:.1f} * normalized_perf")
+    ax1.set_title(f"sigmoid(k\u00b7(perf \u2212 mean)), k = {steepness}/std")
     ax1.set_xlim(0, 1)
-    ax1.set_ylim(0, 1.1)
+    ax1.set_ylim(0, 1.08)
+    ax1.legend(fontsize=8)
     ax1.grid(True, alpha=0.2)
-    ax1.annotate(f"floor = {floor}", xy=(0.02, floor + 0.02), fontsize=9, color="gray")
 
-    # Right: R² vs R²_adj interpretation
+    # Right: interpretation
     scenarios = {
-        "Uniform quality\n(R²_adj ≈ R²)": (0.0, "#888888"),
-        "Better at optimum\n(R²_adj > R²)": (0.05, "#2ca02c"),
-        "Worse at optimum\n(R²_adj < R²)": (-0.05, "#d62728"),
+        "Uniform quality\n(R\u00b2_adj \u2248 R\u00b2)": (0.0, "#888888"),
+        "Better above avg\n(R\u00b2_adj > R\u00b2)": (0.05, "#2ca02c"),
+        "Worse above avg\n(R\u00b2_adj < R\u00b2)": (-0.05, "#d62728"),
     }
     y_pos = 0
     for label, (gap, color) in scenarios.items():
