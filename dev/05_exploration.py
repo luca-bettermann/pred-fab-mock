@@ -23,7 +23,7 @@ PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate
 RESOLUTION = 30
 KAPPA = 0.7
 EXPLORATION_RADIUS = 0.5
-BOUNDARY_BUFFER = (0.45, 0.8, 2.0)
+
 
 
 def _compute_acquisition_grid(agent, dm, kappa, res):
@@ -51,9 +51,9 @@ def _compute_acquisition_grid(agent, dm, kappa, res):
 
 def _run_exploration(optimizer, tag):
     agent, fab, dataset = make_env(f"05_{tag}", verbose=False)
-    agent.configure(performance_weights=PERF_WEIGHTS,
-                    exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
-                    optimizer=optimizer)
+    agent.configure_performance(weights=PERF_WEIGHTS)
+    agent.configure_exploration(radius=EXPLORATION_RADIUS)
+    agent.configure_optimizer(backend=optimizer)
     bp = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
     prev = bp[-1]
@@ -97,9 +97,9 @@ def main():
 
     # Acquisition topology at round 1 and round N
     agent, fab, dataset = make_env("05_topo", verbose=False)
-    agent.configure(performance_weights=PERF_WEIGHTS,
-                    exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
-                    optimizer=Optimizer.DE)
+    agent.configure_performance(weights=PERF_WEIGHTS)
+    agent.configure_exploration(radius=EXPLORATION_RADIUS)
+    agent.configure_optimizer(backend=Optimizer.DE)
     bp = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
 

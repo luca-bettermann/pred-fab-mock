@@ -25,7 +25,6 @@ N_EXPLORE_TRAJ = 5
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 KAPPA = 0.5
 EXPLORATION_RADIUS = 0.5
-BOUNDARY_BUFFER = (0.45, 0.8, 2.0)
 ADAPTATION_DELTA = {"print_speed": 5.0}
 MPC_LOOKAHEAD = 2    # look 2 layers ahead for trajectory optimization
 MPC_DISCOUNT = 0.9   # discount factor for future layers
@@ -62,9 +61,9 @@ def main():
     plot_dir = ensure_plot_dir()
 
     agent, fab, dataset = make_env("06_trajectory", verbose=False)
-    agent.configure(performance_weights=PERF_WEIGHTS,
-                    exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
-                    optimizer=Optimizer.DE)
+    agent.configure_performance(weights=PERF_WEIGHTS)
+    agent.configure_exploration(radius=EXPLORATION_RADIUS)
+    agent.configure_optimizer(backend=Optimizer.DE)
     baseline_params = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
 
@@ -87,7 +86,7 @@ def main():
 
     # Phase 2: Trajectory exploration (OFAT on print_speed per layer)
     print(f"\n  Trajectory exploration ({N_EXPLORE_TRAJ} rounds, step_param=print_speed@n_layers):")
-    agent.configure(
+    agent.configure_trajectory(
         step_parameters={"print_speed": "n_layers"},
         adaptation_delta=ADAPTATION_DELTA,
         mpc_lookahead=MPC_LOOKAHEAD,

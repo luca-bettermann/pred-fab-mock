@@ -19,7 +19,6 @@ N_BASELINE = 20
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 RESOLUTION = 40
 EXPLORATION_RADIUS = 0.5
-BOUNDARY_BUFFER = (0.45, 0.8, 2.0)  # base extent at N=1; scales as extent/√N
 
 
 def _compute_grids(agent, dm, res):
@@ -43,8 +42,8 @@ def main():
     plot_dir = ensure_plot_dir()
 
     agent, fab, dataset = make_env("04_uncertainty", verbose=False)
-    agent.configure(performance_weights=PERF_WEIGHTS,
-                    exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER)
+    agent.configure_performance(weights=PERF_WEIGHTS)
+    agent.configure_exploration(radius=EXPLORATION_RADIUS)
     baseline_params = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
 
@@ -71,7 +70,7 @@ def main():
 
     out = os.path.join(plot_dir, "04_uncertainty.png")
     plot_uncertainty(out, waters, speeds, unc_grid, bf_grid, baseline_params,
-                     title=f"KDE Uncertainty (radius={EXPLORATION_RADIUS}, buffer={BOUNDARY_BUFFER})")
+                     title=f"KDE Uncertainty (radius={EXPLORATION_RADIUS})")
     print(f"\n  Saved: {out}")
 
     out = os.path.join(plot_dir, "04_uncertainty_cross.png")

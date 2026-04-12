@@ -88,7 +88,7 @@ def main():
 
     for model_type in ["mlp", "rf"]:
         agent, fab, dataset = make_env(f"03_{model_type}", model_type=model_type, verbose=False)
-        agent.configure(performance_weights=PERF_WEIGHTS)
+        agent.configure_performance(weights=PERF_WEIGHTS)
         run_baseline(agent, fab, dataset, N_BASELINE)
         dm, val_results = train_models(agent, dataset, val_size=VAL_SIZE)
         model_results[model_type] = _evaluate_model(agent, dm)

@@ -23,7 +23,6 @@ N_EXPLORE = 10
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 KAPPA = 0.7
 EXPLORATION_RADIUS = 0.5
-BOUNDARY_BUFFER = (0.45, 0.8, 2.0)
 
 
 def _combined(perf):
@@ -35,9 +34,9 @@ def main():
     plot_dir = ensure_plot_dir()
 
     agent, fab, dataset = make_env("07_inference", verbose=False)
-    agent.configure(performance_weights=PERF_WEIGHTS,
-                    exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
-                    optimizer=Optimizer.DE)
+    agent.configure_performance(weights=PERF_WEIGHTS)
+    agent.configure_exploration(radius=EXPLORATION_RADIUS)
+    agent.configure_optimizer(backend=Optimizer.DE)
     baseline_params = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
 

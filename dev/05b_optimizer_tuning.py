@@ -31,12 +31,13 @@ N_BASELINE = 10
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 KAPPA = 0.7
 EXPLORATION_RADIUS = 0.5
-BOUNDARY_BUFFER = (0.45, 0.8, 2.0)
 
 
 def _run_single_exploration(agent, dm, prev_params, optimizer, **extra_config):
     """Run one exploration step and return the proposal + metadata."""
-    agent.configure(optimizer=optimizer, **extra_config)
+    agent.configure_optimizer(backend=optimizer)
+    if extra_config:
+        agent.configure_exploration(**extra_config)
     spec = agent.exploration_step(dm, kappa=KAPPA, n_optimization_rounds=10)
     proposed = params_from_spec(spec)
     params = with_dims({**prev_params, **proposed})
@@ -86,10 +87,8 @@ def main():
 
     # ── Setup: shared baseline ────────────────────────────────────────────────
     agent, fab, dataset = make_env("05b_tuning", verbose=False)
-    agent.configure(
-        performance_weights=PERF_WEIGHTS,
-        exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
-    )
+    agent.configure_performance(weights=PERF_WEIGHTS)
+    agent.configure_exploration(radius=EXPLORATION_RADIUS)
     baseline_params = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
     prev = baseline_params[-1]
