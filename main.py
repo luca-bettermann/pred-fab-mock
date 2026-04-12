@@ -9,6 +9,7 @@ Configure the parameters below, then run: python main.py
 import numpy as np
 
 from pred_fab.core import Dataset
+from pred_fab import combined_score
 
 from schema import build_schema
 from agent_setup import build_agent
@@ -63,9 +64,7 @@ def _perf_str(perf: dict, keys: list[str]) -> str:
     return "  ".join(parts)
 
 def _combined(perf: dict) -> float:
-    total_w = sum(PERFORMANCE_WEIGHTS.values())
-    return sum(PERFORMANCE_WEIGHTS.get(k, 0) * float(v)
-               for k, v in perf.items() if v is not None) / total_w
+    return combined_score(perf, PERFORMANCE_WEIGHTS)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

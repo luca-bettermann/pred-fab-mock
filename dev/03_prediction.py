@@ -14,6 +14,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from pred_fab.utils import SplitType
+from pred_fab import combined_score
 from sensors.physics import N_LAYERS, N_SEGMENTS
 from visualization import plot_prediction_scatter, plot_topology_comparison
 from visualization.helpers import physics_combined_at, PERF_WEIGHTS_DEFAULT
@@ -55,9 +56,7 @@ def _predict_combined_grid(agent, waters, speeds):
             try:
                 perf = agent.predict_performance({"water_ratio": w, "print_speed": spd,
                                                    "n_layers": N_LAYERS, "n_segments": N_SEGMENTS})
-                total_w = sum(PERF_WEIGHTS.values())
-                grid[j, i] = sum(PERF_WEIGHTS.get(k, 0) * float(v)
-                                  for k, v in perf.items() if v is not None) / total_w
+                grid[j, i] = combined_score(perf, PERF_WEIGHTS)
             except Exception:
                 grid[j, i] = 0.0
     return grid

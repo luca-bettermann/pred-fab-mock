@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from pred_fab.orchestration import Optimizer
 from visualization import plot_trajectory_comparison
 from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
+from pred_fab import combined_score
 from utils import params_from_spec
 
 N_BASELINE = 15
@@ -32,8 +33,7 @@ TRAJECTORY_SMOOTHING = 0.15  # penalize speed changes between layers (0=off, 0.3
 
 
 def _combined(perf):
-    total_w = sum(PERF_WEIGHTS.values())
-    return sum(PERF_WEIGHTS.get(k, 0) * float(v) for k, v in perf.items() if v is not None) / total_w
+    return combined_score(perf, PERF_WEIGHTS)
 
 
 def _extract_schedules(spec):

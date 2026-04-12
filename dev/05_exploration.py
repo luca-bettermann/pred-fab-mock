@@ -11,6 +11,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from pred_fab.orchestration import Optimizer
+from pred_fab import combined_score
 from sensors.physics import N_LAYERS, N_SEGMENTS
 from visualization import plot_optimizer_comparison, plot_acquisition_topology
 from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
@@ -35,9 +36,7 @@ def _compute_acquisition_grid(agent, dm, w_explore, res):
             p = {"water_ratio": w, "print_speed": spd, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
             try:
                 perf = agent.predict_performance(p)
-                total_w = sum(PERF_WEIGHTS.values())
-                perf_grid[j, i] = sum(PERF_WEIGHTS.get(k, 0) * float(v)
-                                       for k, v in perf.items() if v is not None) / total_w
+                perf_grid[j, i] = combined_score(perf, PERF_WEIGHTS)
             except Exception:
                 perf_grid[j, i] = 0.0
             unc_grid[j, i] = agent.predict_uncertainty(p, dm)

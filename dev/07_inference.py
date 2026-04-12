@@ -15,6 +15,7 @@ from pred_fab.orchestration import Optimizer
 from sensors.physics import DELTA, THETA, SAG, COMPLEXITY, W_OPTIMAL, N_LAYERS, N_SEGMENTS
 from visualization import plot_inference_convergence
 from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
+from pred_fab import combined_score
 from utils import params_from_spec
 
 N_BASELINE = 15
@@ -26,8 +27,7 @@ BOUNDARY_BUFFER = (0.10, 0.8, 2.0)
 
 
 def _combined(perf):
-    total_w = sum(PERF_WEIGHTS.values())
-    return sum(PERF_WEIGHTS.get(k, 0) * float(v) for k, v in perf.items() if v is not None) / total_w
+    return combined_score(perf, PERF_WEIGHTS)
 
 
 def main():
