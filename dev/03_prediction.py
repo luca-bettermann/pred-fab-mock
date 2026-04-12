@@ -104,6 +104,61 @@ def main():
                               title="Topology: Ground Truth vs MLP vs RF")
     print(f"  Saved: {out}")
 
+    # Importance weighting validation: show how weights map to performance
+    _plot_importance_weights(plot_dir, model_results["mlp"])
+
+
+def _plot_importance_weights(plot_dir: str, model_results: dict):
+    """Visualize the R²_adj importance weighting scheme."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from visualization.helpers import save_fig
+
+    # Simulate importance weights across the performance range
+    perf_range = np.linspace(0.0, 1.0, 100)
+    floor = 0.1
+    weights = floor + (1.0 - floor) * perf_range  # linear mapping [floor, 1.0]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
+    fig.suptitle("R²_adj Importance Weighting", fontsize=13, fontweight="bold")
+
+    # Left: weight function
+    ax1.plot(perf_range, weights, "b-", lw=2)
+    ax1.axhline(1.0, color="gray", ls="--", lw=0.8, alpha=0.5)
+    ax1.axhline(floor, color="gray", ls="--", lw=0.8, alpha=0.5)
+    ax1.fill_between(perf_range, floor, weights, alpha=0.1, color="blue")
+    ax1.set_xlabel("Combined Performance Score")
+    ax1.set_ylabel("Importance Weight")
+    ax1.set_title(f"Weight = {floor} + {1-floor:.1f} * normalized_perf")
+    ax1.set_xlim(0, 1)
+    ax1.set_ylim(0, 1.1)
+    ax1.grid(True, alpha=0.2)
+    ax1.annotate(f"floor = {floor}", xy=(0.02, floor + 0.02), fontsize=9, color="gray")
+
+    # Right: R² vs R²_adj interpretation
+    scenarios = {
+        "Uniform quality\n(R²_adj ≈ R²)": (0.0, "#888888"),
+        "Better at optimum\n(R²_adj > R²)": (0.05, "#2ca02c"),
+        "Worse at optimum\n(R²_adj < R²)": (-0.05, "#d62728"),
+    }
+    y_pos = 0
+    for label, (gap, color) in scenarios.items():
+        ax2.barh(y_pos, gap, height=0.6, color=color, alpha=0.7)
+        ax2.text(gap + 0.002 * np.sign(gap), y_pos, label, va="center",
+                 ha="left" if gap >= 0 else "right", fontsize=9)
+        y_pos += 1
+    ax2.axvline(0, color="black", lw=1)
+    ax2.set_xlabel("Gap (R²_adj - R²)")
+    ax2.set_title("Interpretation")
+    ax2.set_xlim(-0.08, 0.08)
+    ax2.set_yticks([])
+    ax2.grid(True, alpha=0.2, axis="x")
+
+    out = os.path.join(plot_dir, "03_importance_weights.png")
+    save_fig(out)
+    print(f"  Saved: {out}")
+
 
 if __name__ == "__main__":
     main()
