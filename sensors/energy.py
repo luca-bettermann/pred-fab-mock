@@ -15,7 +15,7 @@ class EnergySensor:
 
     NOISE_ENERGY = 0.3  # J (~3% of typical 10 J per segment)
 
-    def __init__(self, random_seed: int = 99) -> None:
+    def __init__(self, random_seed: int | None = None) -> None:
         self._rng = np.random.RandomState(random_seed)
         self._cache: dict[tuple, dict] = {}
 

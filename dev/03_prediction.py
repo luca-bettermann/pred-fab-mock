@@ -22,7 +22,6 @@ from shared import make_env, run_baseline, train_models, ensure_plot_dir
 N_BASELINE = 20
 VAL_SIZE = 0.25
 RESOLUTION = 40
-BOUNDS = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 PERF_WEIGHTS = PERF_WEIGHTS_DEFAULT
 
 
@@ -79,7 +78,7 @@ def main():
 
     for model_type in ["mlp", "rf"]:
         agent, fab, dataset = make_env(f"03_{model_type}", model_type=model_type, verbose=False)
-        agent.configure(bounds=BOUNDS, performance_weights=PERF_WEIGHTS)
+        agent.configure(performance_weights=PERF_WEIGHTS)
         run_baseline(agent, fab, dataset, N_BASELINE)
         dm, _ = train_models(agent, dataset, val_size=VAL_SIZE)
         model_results[model_type] = _evaluate_model(agent, dm)

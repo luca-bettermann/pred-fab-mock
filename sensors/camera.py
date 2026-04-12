@@ -16,7 +16,7 @@ class CameraSystem:
 
     NOISE_DEVIATION = 0.00010  # m (~7% of typical deviation)
 
-    def __init__(self, random_seed: int = 42) -> None:
+    def __init__(self, random_seed: int | None = None) -> None:
         self._rng = np.random.RandomState(random_seed)
         self._cache: dict[tuple, dict] = {}
 

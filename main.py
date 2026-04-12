@@ -30,8 +30,7 @@ N_BASELINE   = 2  if QUICK_TEST else 20
 N_EXPLORE    = 1  if QUICK_TEST else 10
 N_INFER      = 1  if QUICK_TEST else 1       # single-shot inference
 
-# Agent configuration
-BOUNDS              = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
+# Agent configuration (bounds default to schema min/max)
 PERFORMANCE_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 EXPLORATION_RADIUS  = 0.5
 BOUNDARY_BUFFER     = (0.10, 0.8, 2.0)
@@ -90,7 +89,6 @@ def main() -> None:
     dataset = Dataset(schema=schema)
 
     agent.configure(
-        bounds=BOUNDS,
         performance_weights=PERFORMANCE_WEIGHTS,
         exploration_radius=EXPLORATION_RADIUS,
         boundary_buffer=BOUNDARY_BUFFER,

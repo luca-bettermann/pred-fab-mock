@@ -18,7 +18,6 @@ from utils import params_from_spec
 
 N_BASELINE = 5
 N_EXPLORE = 10
-BOUNDS = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 RESOLUTION = 30
 W_EXPLORE = 0.7
@@ -53,7 +52,7 @@ def _compute_acquisition_grid(agent, dm, w_explore, res):
 
 def _run_exploration(optimizer, tag):
     agent, fab, dataset = make_env(f"05_{tag}", verbose=False)
-    agent.configure(bounds=BOUNDS, performance_weights=PERF_WEIGHTS,
+    agent.configure(performance_weights=PERF_WEIGHTS,
                     exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
                     optimizer=optimizer)
     bp = run_baseline(agent, fab, dataset, N_BASELINE)
@@ -99,7 +98,7 @@ def main():
 
     # Acquisition topology at round 1 and round N
     agent, fab, dataset = make_env("05_topo", verbose=False)
-    agent.configure(bounds=BOUNDS, performance_weights=PERF_WEIGHTS,
+    agent.configure(performance_weights=PERF_WEIGHTS,
                     exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
                     optimizer=Optimizer.DE)
     bp = run_baseline(agent, fab, dataset, N_BASELINE)

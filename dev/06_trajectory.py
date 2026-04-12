@@ -21,7 +21,6 @@ from utils import params_from_spec
 N_BASELINE = 15
 N_EXPLORE_FIXED = 5
 N_EXPLORE_TRAJ = 5
-BOUNDS = {"water_ratio": (0.30, 0.50), "print_speed": (20.0, 60.0)}
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 W_EXPLORE = 0.5
 EXPLORATION_RADIUS = 0.5
@@ -63,7 +62,7 @@ def main():
     plot_dir = ensure_plot_dir()
 
     agent, fab, dataset = make_env("06_trajectory", verbose=False)
-    agent.configure(bounds=BOUNDS, performance_weights=PERF_WEIGHTS,
+    agent.configure(performance_weights=PERF_WEIGHTS,
                     exploration_radius=EXPLORATION_RADIUS, boundary_buffer=BOUNDARY_BUFFER,
                     optimizer=Optimizer.DE)
     baseline_params = run_baseline(agent, fab, dataset, N_BASELINE)

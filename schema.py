@@ -14,21 +14,21 @@ from pred_fab.core import (
 )
 
 ROOT_FOLDER = "."
-SCHEMA_NAME = "extrusion_printing_v7"
+SCHEMA_NAME = "extrusion_printing_v8"
 
 
 def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
     """Construct and return the DatasetSchema for the extrusion printing simulation.
 
     Two continuous parameters (water_ratio, print_speed) over a fixed
-    spatial domain (5 layers × 4 segments).
+    spatial domain (5 layers x 4 segments). Recursive features at lag 1 and 2.
     """
     params = Parameters([
         Parameter.real("water_ratio", min_val=0.30, max_val=0.50),
         Parameter.real("print_speed", min_val=20.0, max_val=60.0, runtime=True),
     ])
 
-    # Spatial domain: (layer, segment) — 5 layers × 4 segments = 20 steps
+    # Spatial domain: (layer, segment) — 5 layers x 4 segments = 20 steps
     spatial = Domain("spatial_segment", [
         Dimension("n_layers",   "layer_idx",   min_val=5, max_val=5),
         Dimension("n_segments", "segment_idx", min_val=4, max_val=4),
@@ -43,8 +43,9 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
         path_dev,
         Feature.array("energy_per_segment", domain=spatial),
         Feature.array("production_rate"),
-        Feature.recursive("prev_layer_deviation",   source=path_dev, dimensions=(layer_dim,)),
-        Feature.recursive("prev_segment_deviation", source=path_dev, dimensions=(segment_dim,)),
+        # Recursive: lag 1 and 2 along each dimension
+        *Feature.recursive("prev_layer_deviation",   source=path_dev, dimensions=(layer_dim,),   max_depth=2),
+        *Feature.recursive("prev_segment_deviation", source=path_dev, dimensions=(segment_dim,), max_depth=2),
     ])
 
     performance = PerformanceAttributes([
