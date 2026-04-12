@@ -20,6 +20,8 @@ from visualization import plot_prediction_scatter, plot_topology_comparison
 from visualization.helpers import physics_combined_at, PERF_WEIGHTS_DEFAULT
 from shared import make_env, run_baseline, train_models, ensure_plot_dir
 
+from pred_fab.core import DataModule
+
 N_BASELINE = 20
 VAL_SIZE = 0.25
 RESOLUTION = 40
@@ -74,14 +76,19 @@ def main():
 
     model_results = {}
     pred_grids = {}
+    mlp_dm = None
+    mlp_val_results = None
 
     for model_type in ["mlp", "rf"]:
         agent, fab, dataset = make_env(f"03_{model_type}", model_type=model_type, verbose=False)
         agent.configure(performance_weights=PERF_WEIGHTS)
         run_baseline(agent, fab, dataset, N_BASELINE)
-        dm, _ = train_models(agent, dataset, val_size=VAL_SIZE)
+        dm, val_results = train_models(agent, dataset, val_size=VAL_SIZE)
         model_results[model_type] = _evaluate_model(agent, dm)
         pred_grids[model_type] = _predict_combined_grid(agent, waters, speeds)
+        if model_type == "mlp":
+            mlp_dm = dm
+            mlp_val_results = val_results
 
     # Console
     print(f"\n  Prediction quality ({N_BASELINE} baseline, {VAL_SIZE:.0%} held out):")
@@ -105,11 +112,15 @@ def main():
     print(f"  Saved: {out}")
 
     # Importance weighting validation: show how weights map to performance
-    _plot_importance_weights(plot_dir, model_results["mlp"])
+    _plot_importance_weights(plot_dir, mlp_dm, mlp_val_results)
 
 
-def _plot_importance_weights(plot_dir: str, model_results: dict):
-    """Visualize the R²_adj sigmoid importance weighting scheme."""
+def _plot_importance_weights(plot_dir: str, dm: DataModule, val_results: dict):
+    """Visualize the R²_adj sigmoid importance weighting with real training data.
+
+    Left panel:  sigmoid weight curve with actual experiment scores plotted.
+    Right panel: actual per-feature R²_adj − R² gap from validation.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -117,53 +128,80 @@ def _plot_importance_weights(plot_dir: str, model_results: dict):
 
     floor = 0.1
     steepness = 0.8
-    perf_range = np.linspace(0.0, 1.0, 200)
 
-    # Show for a representative mean and std
-    mean, std = 0.5, 0.15
-    k = steepness / std
-    sigmoid = 1.0 / (1.0 + np.exp(-k * (perf_range - mean)))
-    weights = floor + (1.0 - floor) * sigmoid
+    # --- Collect real per-experiment combined scores from training split ---
+    train_codes = dm.get_split_codes(SplitType.TRAIN)
+    exp_scores = []
+    for code in train_codes:
+        exp = dm.dataset.get_experiment(code)
+        perf = exp.performance.get_values_dict()
+        exp_scores.append(combined_score(perf, PERF_WEIGHTS))
+    exp_scores = np.array(exp_scores)
+
+    s_mean = float(exp_scores.mean())
+    s_std = float(exp_scores.std())
+    k = steepness / s_std if s_std > 1e-10 else 0.0
+
+    # Sigmoid curve from real mean/std
+    perf_range = np.linspace(0.0, 1.0, 200)
+    sigmoid_curve = 1.0 / (1.0 + np.exp(-k * (perf_range - s_mean)))
+    weights_curve = floor + (1.0 - floor) * sigmoid_curve
     midpoint = (1.0 + floor) / 2.0
 
+    # Per-experiment weights (dots on the curve)
+    exp_sigmoid = 1.0 / (1.0 + np.exp(-k * (exp_scores - s_mean)))
+    exp_weights = floor + (1.0 - floor) * exp_sigmoid
+
+    # ---- Left panel: sigmoid + real data points ----
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
     fig.suptitle("R\u00b2_adj Importance Weighting", fontsize=13, fontweight="bold")
 
-    # Left: sigmoid weight function
-    ax1.plot(perf_range, weights, "b-", lw=2)
+    ax1.plot(perf_range, weights_curve, "b-", lw=2, zorder=1)
+    ax1.scatter(exp_scores, exp_weights, c="red", s=40, zorder=3,
+                edgecolors="darkred", linewidths=0.5, label=f"experiments (n={len(exp_scores)})")
     ax1.axhline(midpoint, color="gray", ls="--", lw=0.8, alpha=0.5, label=f"midpoint = {midpoint:.2f}")
     ax1.axhline(floor, color="gray", ls=":", lw=0.8, alpha=0.5)
     ax1.axhline(1.0, color="gray", ls=":", lw=0.8, alpha=0.5)
-    ax1.axvline(mean, color="red", ls="--", lw=1, alpha=0.7, label=f"mean = {mean}")
-    ax1.axvspan(mean - std, mean + std, alpha=0.06, color="red")
-    ax1.fill_between(perf_range, floor, weights, alpha=0.08, color="blue")
+    ax1.axvline(s_mean, color="red", ls="--", lw=1, alpha=0.7, label=f"mean = {s_mean:.3f}")
+    ax1.axvspan(s_mean - s_std, s_mean + s_std, alpha=0.06, color="red")
+    ax1.fill_between(perf_range, floor, weights_curve, alpha=0.08, color="blue")
     ax1.set_xlabel("Combined Performance Score")
     ax1.set_ylabel("Importance Weight")
-    ax1.set_title(f"sigmoid(k\u00b7(perf \u2212 mean)), k = {steepness}/std")
+    ax1.set_title(f"sigmoid(k\u00b7(perf \u2212 mean)),  k = {steepness}/\u03c3 = {k:.1f}")
     ax1.set_xlim(0, 1)
     ax1.set_ylim(0, 1.08)
     ax1.legend(fontsize=8)
     ax1.grid(True, alpha=0.2)
 
-    # Right: interpretation
-    scenarios = {
-        "Uniform quality\n(R\u00b2_adj \u2248 R\u00b2)": (0.0, "#888888"),
-        "Better above avg\n(R\u00b2_adj > R\u00b2)": (0.05, "#2ca02c"),
-        "Worse above avg\n(R\u00b2_adj < R\u00b2)": (-0.05, "#d62728"),
-    }
-    y_pos = 0
-    for label, (gap, color) in scenarios.items():
-        ax2.barh(y_pos, gap, height=0.6, color=color, alpha=0.7)
-        ax2.text(gap + 0.002 * np.sign(gap), y_pos, label, va="center",
-                 ha="left" if gap >= 0 else "right", fontsize=9)
-        y_pos += 1
+    # ---- Right panel: actual per-feature R²_adj gaps ----
+    if val_results:
+        features = []
+        gaps = []
+        for feat, m in val_results.items():
+            if "r2_adj" in m and "r2" in m:
+                features.append(feat)
+                gaps.append(m["r2_adj"] - m["r2"])
+
+        if features:
+            y_pos = np.arange(len(features))
+            colors = ["#2ca02c" if g >= 0 else "#d62728" for g in gaps]
+            ax2.barh(y_pos, gaps, height=0.6, color=colors, alpha=0.7)
+            for i, (feat, g) in enumerate(zip(features, gaps)):
+                sign = 1 if g >= 0 else -1
+                ax2.text(g + 0.002 * sign, i, f"{g:+.4f}", va="center",
+                         ha="left" if g >= 0 else "right", fontsize=8)
+            ax2.set_yticks(y_pos)
+            ax2.set_yticklabels(features, fontsize=8)
+            ax2.invert_yaxis()
     ax2.axvline(0, color="black", lw=1)
-    ax2.set_xlabel("Gap (R²_adj - R²)")
-    ax2.set_title("Interpretation")
-    ax2.set_xlim(-0.08, 0.08)
-    ax2.set_yticks([])
+    ax2.set_xlabel("Gap (R\u00b2_adj \u2212 R\u00b2)")
+    ax2.set_title("Actual Validation Gaps")
+    max_gap = max(abs(g) for g in gaps) if gaps else 0.05
+    margin = max(max_gap * 1.5, 0.02)
+    ax2.set_xlim(-margin, margin)
     ax2.grid(True, alpha=0.2, axis="x")
 
+    fig.tight_layout()
     out = os.path.join(plot_dir, "03_importance_weights.png")
     save_fig(out)
     print(f"  Saved: {out}")
