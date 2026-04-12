@@ -22,8 +22,8 @@ N_BASELINE = 5
 N_EXPLORE = 10
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 RESOLUTION = 30
-KAPPA = 0.7
-EXPLORATION_RADIUS = 0.5
+KAPPA = 0.5
+EXPLORATION_RADIUS = 0.25
 
 
 

@@ -27,10 +27,10 @@ from shared import make_env, run_baseline, train_models, with_dims, ensure_plot_
 from utils import params_from_spec
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-N_BASELINE = 10
+N_BASELINE = 5
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
-KAPPA = 0.7
-EXPLORATION_RADIUS = 0.5
+KAPPA = 0.5
+EXPLORATION_RADIUS = 0.25
 
 
 def _run_single_exploration(agent, dm, prev_params, optimizer, **extra_config):
