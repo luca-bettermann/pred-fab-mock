@@ -190,7 +190,7 @@ class DeviationRFModel(IPredictionModel):
         y = np.vstack([b[1] for b in train_batches]).ravel()
         self._model = Pipeline([
             ("scaler", StandardScaler()),
-            ("rf", RandomForestRegressor(n_estimators=100, min_samples_leaf=2)),
+            ("rf", RandomForestRegressor(n_estimators=100, min_samples_leaf=5, max_features="sqrt")),
         ])
         self._model.fit(X, y)
         self._is_trained = True
@@ -238,7 +238,7 @@ class EnergyRFModel(IPredictionModel):
         y = np.vstack([b[1] for b in train_batches]).ravel()
         self._model = Pipeline([
             ("scaler", StandardScaler()),
-            ("rf", RandomForestRegressor(n_estimators=100, min_samples_leaf=2)),
+            ("rf", RandomForestRegressor(n_estimators=100, min_samples_leaf=5, max_features="sqrt")),
         ])
         self._model.fit(X, y)
         self._is_trained = True
