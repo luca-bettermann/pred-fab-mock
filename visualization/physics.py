@@ -14,11 +14,16 @@ def plot_physics_topology(
     resolution: int = 50,
     perf_weights: dict[str, float] | None = None,
 ) -> None:
-    """1x4 heatmap with per-metric optima (dots) and combined optimum (star)."""
+    """1x4 heatmap: individual panels show star at own optimum, combined panel
+    shows small dots for each metric's optimum plus a star at the combined optimum."""
     waters, speeds, metrics = evaluate_physics_grid(resolution, perf_weights)
+    metric_names = list(metrics.keys())
 
-    # Per-metric markers: dot at each metric's own optimum
-    _METRIC_MARKERS = {"Path Accuracy": "o", "Energy Efficiency": "s", "Production Rate": "D"}
+    # Pre-compute each metric's optimum location
+    optima = {}
+    for title, data in metrics.items():
+        best_idx = np.unravel_index(np.argmax(data), data.shape)
+        optima[title] = (waters[best_idx[1]], speeds[best_idx[0]])
 
     fig, axes = plt.subplots(1, 4, figsize=(18, 4.5))
     fig.suptitle("Physics Performance Topology", fontsize=14, fontweight="bold", y=1.02)
@@ -27,17 +32,21 @@ def plot_physics_topology(
         im = ax.contourf(waters, speeds, data, levels=20, cmap="RdYlGn")
         ax.contour(waters, speeds, data, levels=10, colors="white", linewidths=0.3, alpha=0.5)
 
-        # Mark this metric's own optimum
-        best_idx = np.unravel_index(np.argmax(data), data.shape)
-        best_w, best_s = waters[best_idx[1]], speeds[best_idx[0]]
-        marker = _METRIC_MARKERS.get(title, "o")
-        ax.plot(best_w, best_s, marker, color="white", ms=10,
-                markeredgecolor="black", markeredgewidth=0.8)
-
-        # Combined panel gets a star at the combined optimum
         if "Combined" in title:
-            ax.plot(best_w, best_s, "w*", ms=14,
-                    markeredgecolor="black", markeredgewidth=0.8)
+            # Combined panel: small dots for each individual metric's optimum
+            for m_name in metric_names[:-1]:  # skip combined itself
+                ow, os_ = optima[m_name]
+                ax.plot(ow, os_, "o", color="white", ms=6,
+                        markeredgecolor="black", markeredgewidth=0.6, zorder=8)
+            # Star at the combined optimum
+            cw, cs = optima[title]
+            ax.plot(cw, cs, "*", color="white", ms=16,
+                    markeredgecolor="black", markeredgewidth=0.8, zorder=9)
+        else:
+            # Individual panels: star at this metric's own optimum
+            ow, os_ = optima[title]
+            ax.plot(ow, os_, "*", color="white", ms=14,
+                    markeredgecolor="black", markeredgewidth=0.8, zorder=8)
 
         ax.set_title(title, fontsize=10)
         ax.set_xlabel("Water Ratio")
