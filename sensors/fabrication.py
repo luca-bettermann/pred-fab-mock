@@ -40,5 +40,6 @@ class FabricationSystem:
 
     def run_experiment(self, params: dict[str, Any]) -> None:
         """Populate sensor caches for all layers of a full experiment."""
-        for layer_idx in range(N_LAYERS):
+        n_layers = int(params.get("n_layers", N_LAYERS))
+        for layer_idx in range(n_layers):
             self.run_layer(params, layer_idx)

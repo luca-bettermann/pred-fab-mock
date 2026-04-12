@@ -58,7 +58,7 @@ def _compute_acquisition_grid(agent, dm, kappa, res):
 
     # Uncertainty is already [0,1] with buffer — no renormalization
     combined = (1 - kappa) * p_norm + kappa * unc_grid
-    return waters, speeds, perf_grid, unc_grid, combined
+    return waters, speeds, p_norm, unc_grid, combined
 
 
 def _run_exploration(optimizer, tag):

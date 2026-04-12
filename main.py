@@ -33,8 +33,7 @@ N_INFER      = 1  if QUICK_TEST else 1       # single-shot inference
 
 # Agent configuration (bounds default to schema min/max)
 PERFORMANCE_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
-EXPLORATION_RADIUS  = 0.5
-BOUNDARY_BUFFER     = (0.10, 0.8, 2.0)
+EXPLORATION_RADIUS  = 0.15
 
 # Exploration
 KAPPA = 0.7
@@ -87,13 +86,9 @@ def main() -> None:
     agent   = build_agent(schema, fab.camera, fab.energy)
     dataset = Dataset(schema=schema)
 
-    agent.configure(
-        performance_weights=PERFORMANCE_WEIGHTS,
-        exploration_radius=EXPLORATION_RADIUS,
-        boundary_buffer=BOUNDARY_BUFFER,
-        de_maxiter=DE_MAXITER,
-        de_popsize=DE_POPSIZE,
-    )
+    agent.configure_performance(weights=PERFORMANCE_WEIGHTS)
+    agent.configure_exploration(radius=EXPLORATION_RADIUS)
+    agent.configure_optimizer(de_maxiter=DE_MAXITER, de_popsize=DE_POPSIZE)
 
     print()
 

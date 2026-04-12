@@ -48,8 +48,13 @@ def clean_artifacts(plot_dirs: list[str]) -> None:
 
 
 def with_dimensions(params: dict[str, Any]) -> dict[str, Any]:
-    """Return params with n_layers and n_segments added."""
-    return {**params, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
+    """Return params with n_layers and n_segments, preserving existing values."""
+    result = {**params}
+    if "n_layers" not in result:
+        result["n_layers"] = N_LAYERS
+    if "n_segments" not in result:
+        result["n_segments"] = N_SEGMENTS
+    return result
 
 
 def run_and_evaluate(

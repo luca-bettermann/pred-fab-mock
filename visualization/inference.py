@@ -15,9 +15,12 @@ def plot_inference_convergence(
     opt_water: float,
     resolution: int = 40,
     perf_weights: dict[str, float] | None = None,
+    n_layers: int | None = None,
 ) -> None:
     """Convergence trajectory on the performance topology + score per round."""
-    waters, speeds, metrics = evaluate_physics_grid(resolution, perf_weights)
+    from sensors.physics import N_LAYERS as _DEFAULT_LAYERS
+    nl = n_layers or _DEFAULT_LAYERS
+    waters, speeds, metrics = evaluate_physics_grid(resolution, perf_weights, n_layers=nl)
     combined = list(metrics.values())[-1]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5.5))

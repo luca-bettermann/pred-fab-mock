@@ -15,10 +15,10 @@ from sensors.physics import N_LAYERS, N_SEGMENTS
 from shared import make_env, run_baseline, train_models, ensure_plot_dir
 from visualization.helpers import save_fig
 
-N_BASELINE = 20
+N_BASELINE = 15
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 RESOLUTION = 40
-EXPLORATION_RADIUS = 0.5
+EXPLORATION_RADIUS = 0.2
 
 
 def _compute_uncertainty_grid(agent, dm, res):

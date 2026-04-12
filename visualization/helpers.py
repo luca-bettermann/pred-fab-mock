@@ -27,6 +27,7 @@ def save_fig(path: str) -> None:
 def physics_combined_at(
     w: float, spd: float,
     perf_weights: dict[str, float] | None = None,
+    n_layers: int = N_LAYERS,
 ) -> float:
     """Compute combined physics performance score at a single (water, speed) point."""
     pw = perf_weights or PERF_WEIGHTS_DEFAULT
@@ -35,10 +36,10 @@ def physics_combined_at(
     max_e = EnergyConsumptionModel.MAX_ENERGY
     max_rate = ProductionRateModel.MAX_RATE
 
-    devs = [path_deviation(spd, s, w, li) for li in range(N_LAYERS) for s in range(N_SEGMENTS)]
+    devs = [path_deviation(spd, s, w, li) for li in range(n_layers) for s in range(N_SEGMENTS)]
     pa = max(0.0, 1.0 - np.mean(devs) / max_dev)
 
-    energies = [energy_per_segment(spd, w, s, li) for li in range(N_LAYERS) for s in range(N_SEGMENTS)]
+    energies = [energy_per_segment(spd, w, s, li) for li in range(n_layers) for s in range(N_SEGMENTS)]
     ee = max(0.0, 1.0 - abs(np.mean(energies) - target_e) / max_e)
 
     pr = production_rate(spd, w) / max_rate
@@ -51,6 +52,7 @@ def physics_combined_at(
 def evaluate_physics_grid(
     resolution: int = 50,
     perf_weights: dict[str, float] | None = None,
+    n_layers: int = N_LAYERS,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
     """Evaluate all performance metrics on a 2D grid.
 
@@ -71,9 +73,9 @@ def evaluate_physics_grid(
 
     for i, w in enumerate(waters):
         for j, spd in enumerate(speeds):
-            devs = [path_deviation(spd, s, w, li) for li in range(N_LAYERS) for s in range(N_SEGMENTS)]
+            devs = [path_deviation(spd, s, w, li) for li in range(n_layers) for s in range(N_SEGMENTS)]
             path_acc[j, i] = max(0.0, 1.0 - np.mean(devs) / max_dev)
-            energies = [energy_per_segment(spd, w, s, li) for li in range(N_LAYERS) for s in range(N_SEGMENTS)]
+            energies = [energy_per_segment(spd, w, s, li) for li in range(n_layers) for s in range(N_SEGMENTS)]
             energy_eff[j, i] = max(0.0, 1.0 - abs(np.mean(energies) - target_e) / max_e)
             prod_rate[j, i] = production_rate(spd, w) / max_rate
 

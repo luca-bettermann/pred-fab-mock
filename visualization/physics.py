@@ -13,10 +13,13 @@ def plot_physics_topology(
     save_path: str,
     resolution: int = 50,
     perf_weights: dict[str, float] | None = None,
+    n_layers: int | None = None,
 ) -> None:
     """1x4 heatmap: individual panels show star at own optimum, combined panel
     shows small dots for each metric's optimum plus a star at the combined optimum."""
-    waters, speeds, metrics = evaluate_physics_grid(resolution, perf_weights)
+    from sensors.physics import N_LAYERS as _DEFAULT_LAYERS
+    nl = n_layers or _DEFAULT_LAYERS
+    waters, speeds, metrics = evaluate_physics_grid(resolution, perf_weights, n_layers=nl)
     metric_names = list(metrics.keys())
 
     # Pre-compute each metric's optimum location

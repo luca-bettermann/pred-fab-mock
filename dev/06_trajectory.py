@@ -19,16 +19,16 @@ from shared import make_env, run_baseline, train_models, with_dims, run_experime
 from pred_fab import combined_score
 from utils import params_from_spec
 
-N_BASELINE = 15
-N_EXPLORE_FIXED = 5
-N_EXPLORE_TRAJ = 5
+N_BASELINE = 10
+N_EXPLORE_FIXED = 3
+N_EXPLORE_TRAJ = 3
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 KAPPA = 0.5
-EXPLORATION_RADIUS = 0.5
+EXPLORATION_RADIUS = 0.15
 ADAPTATION_DELTA = {"print_speed": 5.0}
 MPC_LOOKAHEAD = 2    # look 2 layers ahead for trajectory optimization
 MPC_DISCOUNT = 0.9   # discount factor for future layers
-TRAJECTORY_SMOOTHING = 0.15  # penalize speed changes between layers (0=off, 0.3=strong)
+TRAJECTORY_SMOOTHING = 0.25  # penalize speed changes between layers (0=off, 0.3=strong)
 
 
 def _combined(perf):
@@ -112,12 +112,7 @@ def main():
         agent.train(dm, validate=False)
         prev = params
 
-        if "print_speed" in schedules:
-            layers = schedules["print_speed"]
-            speed_str = "spd=[" + ", ".join(f"{s:.1f}" for s in layers) + "]"
-        else:
-            speed_str = f"spd={params['print_speed']:.1f}"
-        print(f"    traj_{i+1:02d}   w={params['water_ratio']:.3f}  {speed_str}  score={score:.3f}")
+        # Schedule is printed by pred-fab's exploration_step console output
 
     out = os.path.join(plot_dir, "06_trajectory.png")
     plot_trajectory_comparison(out, fixed_scores, traj_scores, traj_schedules)
