@@ -6,7 +6,7 @@ from pred_fab import IEvaluationModel
 from pred_fab.utils import PfabLogger
 
 
-class PathAccuracyModel(IEvaluationModel):
+class PathAccuracy(IEvaluationModel):
     """Scores path_deviation against a zero-deviation target."""
 
     MAX_DEVIATION = 0.003  # m — deviation at which score = 0
@@ -33,7 +33,7 @@ class PathAccuracyModel(IEvaluationModel):
         return self.MAX_DEVIATION
 
 
-class EnergyConsumptionModel(IEvaluationModel):
+class EnergyEfficiency(IEvaluationModel):
     """Scores energy_per_segment against a target energy consumption.
 
     TARGET_ENERGY is the minimum achievable (~speed=20, clay, A).
@@ -66,7 +66,7 @@ class EnergyConsumptionModel(IEvaluationModel):
         return self.MAX_ENERGY
 
 
-class ProductionRateModel(IEvaluationModel):
+class ProductionRate(IEvaluationModel):
     """Scores effective production_rate [mm/s] against maximum achievable rate.
 
     production_rate = print_speed × slip_factor, so MAX_RATE = 60 mm/s (no slip, full speed).

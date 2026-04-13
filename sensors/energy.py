@@ -9,7 +9,7 @@ from .physics import energy_per_segment as physics_energy
 class EnergySensor:
     """Simulates energy meter readings per print segment.
 
-    run_experiment() caches energy data for all positions. EnergyFeatureModel
+    run_experiment() caches energy data for all positions. EnergyFeature
     reads per-segment energy via get_segment_energy().
     """
 

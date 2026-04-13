@@ -11,7 +11,7 @@ from sensors.energy import EnergySensor
 from sensors.physics import production_rate as _physics_production_rate
 
 
-class PrintingFeatureModel(IFeatureModel):
+class DevFeature(IFeatureModel):
     """Extracts path deviation from CameraSystem per (layer, segment)."""
 
     def __init__(self, logger: PfabLogger, camera: CameraSystem) -> None:
@@ -46,7 +46,7 @@ class PrintingFeatureModel(IFeatureModel):
         ]))
 
 
-class EnergyFeatureModel(IFeatureModel):
+class EnergyFeature(IFeatureModel):
     """Extracts energy_per_segment from EnergySensor per (layer, segment)."""
 
     def __init__(self, logger: PfabLogger, energy_sensor: EnergySensor) -> None:
@@ -74,7 +74,7 @@ class EnergyFeatureModel(IFeatureModel):
         return {"energy_per_segment": float(data["energy_per_segment"])}
 
 
-class ProductionRateFeatureModel(IFeatureModel):
+class RateFeature(IFeatureModel):
     """Effective production rate, accounting for nozzle-slip at high water ratios."""
 
     def __init__(self, logger: PfabLogger) -> None:

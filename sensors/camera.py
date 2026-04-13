@@ -10,7 +10,7 @@ class CameraSystem:
     """Simulates camera-based geometry sensing for each print segment.
 
     run_experiment() iterates all (layer, segment) positions, calls physics + noise,
-    caches raw visual data keyed by parameter hash. PrintingFeatureModel reads from
+    caches raw visual data keyed by parameter hash. DevFeature reads from
     cache position-by-position via get_segment_data().
     """
 

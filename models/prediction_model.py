@@ -28,7 +28,7 @@ def _penultimate_activations(pipeline: Pipeline, X: np.ndarray) -> np.ndarray:
     return activation
 
 
-class DeviationPredictionModel(IPredictionModel):
+class DevMLP(IPredictionModel):
     """Predicts path_deviation from process parameters.
 
     U-shaped response to print_speed with shear-thinning coupling in water_ratio.
@@ -85,7 +85,7 @@ class DeviationPredictionModel(IPredictionModel):
         return _penultimate_activations(self._model, X)
 
 
-class EnergyPredictionModel(IPredictionModel):
+class EnergyMLP(IPredictionModel):
     """Predicts energy_per_segment from process parameters."""
 
     def __init__(self, logger: PfabLogger) -> None:
@@ -136,7 +136,7 @@ class EnergyPredictionModel(IPredictionModel):
         return _penultimate_activations(self._model, X)
 
 
-class ProductionRatePredictionModel(IDeterministicModel):
+class RateMLP(IDeterministicModel):
     """Deterministic production_rate [mm/s] from physics formula."""
 
     @property
@@ -161,7 +161,7 @@ class ProductionRatePredictionModel(IDeterministicModel):
         return results.reshape(-1, 1)
 
 
-class DeviationRFModel(IPredictionModel):
+class DevRF(IPredictionModel):
     """Random Forest model for path_deviation."""
 
     def __init__(self, logger: PfabLogger) -> None:
@@ -212,7 +212,7 @@ class DeviationRFModel(IPredictionModel):
         return self._model.named_steps["scaler"].transform(X)
 
 
-class EnergyRFModel(IPredictionModel):
+class EnergyRF(IPredictionModel):
     """Random Forest model for energy_per_segment."""
 
     def __init__(self, logger: PfabLogger) -> None:

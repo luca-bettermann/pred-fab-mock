@@ -1,12 +1,16 @@
-"""CLI for the PFAB mock — run each phase as a separate command.
+"""CLI for the PFAB mock — step-by-step predictive fabrication workflow.
 
-Usage:
-    python cli.py reset
-    python cli.py configure --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
-    python cli.py baseline --n 10
-    python cli.py explore --n 10 --kappa 0.5
-    python cli.py infer --n-layers 5
-    python cli.py summary
+Quick start:
+    uv run cli.py reset
+    uv run cli.py init-schema
+    uv run cli.py init-physics --plot
+    uv run cli.py configure --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
+    uv run cli.py baseline --n 10 --plot
+    uv run cli.py explore --n 5 --kappa 0.5 --plot
+    uv run cli.py test-set --n 20
+    uv run cli.py analyse --plot
+    uv run cli.py inference --design-intent '{"n_layers":5}' --plot
+    uv run cli.py summary
 """
 
 import argparse
@@ -27,10 +31,14 @@ from sensors import CameraSystem, EnergySensor, FabricationSystem
 from sensors.physics import N_LAYERS, N_SEGMENTS
 from utils import params_from_spec, get_performance
 from workflow import JourneyState, with_dimensions, run_and_evaluate
+from cli_helpers import (
+    show_plot, randomize_physics, apply_physics_config, load_physics_from_session,
+    PHYSICS_CONFIG_KEY, generate_test_params, compute_local_sensitivity, plot_sensitivity,
+)
 
 
 def _to_native(obj: Any) -> Any:
-    """Recursively convert numpy types to native Python types for JSON."""
+    """Recursively convert numpy types to native Python for JSON."""
     if isinstance(obj, dict):
         return {k: _to_native(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
@@ -72,7 +80,7 @@ def _save_session(config: dict[str, Any], journey: JourneyState) -> None:
 
 def _load_session() -> tuple[dict[str, Any], JourneyState]:
     if not os.path.exists(SESSION_FILE):
-        print("No session found. Run 'python cli.py configure' first.")
+        print("No session found. Run 'uv run cli.py init-schema' first.")
         sys.exit(1)
     with open(SESSION_FILE) as f:
         data = json.load(f)
@@ -89,6 +97,9 @@ def _load_session() -> tuple[dict[str, Any], JourneyState]:
 
 def _rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset, FabricationSystem]:
     """Reconstruct agent + dataset + fab from session config."""
+    # Apply physics config before building anything
+    load_physics_from_session(config)
+
     if not verbose:
         _real_stdout = sys.stdout
         sys.stdout = open(os.devnull, "w")
@@ -98,7 +109,6 @@ def _rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Datase
         fab = FabricationSystem(CameraSystem(), EnergySensor())
         agent = build_agent(schema, fab.camera, fab.energy, verbose=verbose)
 
-        # Apply configuration using explicit configure_* methods
         if config.get("performance_weights"):
             agent.configure_performance(weights=config["performance_weights"])
         if config.get("exploration_radius") is not None:
@@ -118,14 +128,6 @@ def _rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Datase
             bounds = {k: tuple(v) for k, v in config["bounds"].items()}
             agent.calibration_system.configure_param_bounds(bounds)
 
-        traj_kwargs: dict[str, Any] = {}
-        if config.get("mpc_lookahead") is not None:
-            traj_kwargs["mpc_lookahead"] = config["mpc_lookahead"]
-        if config.get("mpc_discount") is not None:
-            traj_kwargs["mpc_discount"] = config["mpc_discount"]
-        if traj_kwargs:
-            agent.configure_trajectory(**traj_kwargs)
-
         dataset = Dataset(schema=schema)
         dataset.populate()
     finally:
@@ -136,11 +138,20 @@ def _rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Datase
     return agent, dataset, fab
 
 
-# ── Plot helpers ──────────────────────────────────────────────────────────────
-
 def _ensure_plot_dir() -> str:
     os.makedirs(PLOT_DIR, exist_ok=True)
     return PLOT_DIR
+
+
+def _get_physics_optimum(perf_weights=None, n_layers=N_LAYERS):
+    """Find the physics optimum location."""
+    from visualization.helpers import evaluate_physics_grid
+    _, _, phys_metrics = evaluate_physics_grid(50, perf_weights, n_layers=n_layers)
+    combined = list(phys_metrics.values())[-1]
+    opt_idx = np.unravel_index(np.argmax(combined), combined.shape)
+    phys_waters = np.linspace(0.30, 0.50, 50)
+    phys_speeds = np.linspace(20.0, 60.0, 50)
+    return (phys_waters[opt_idx[1]], phys_speeds[opt_idx[0]])
 
 
 def _compute_acquisition_grid(agent, dm, kappa, res=30):
@@ -160,7 +171,6 @@ def _compute_acquisition_grid(agent, dm, kappa, res=30):
                 perf_grid[j, i] = 0.0
             unc_grid[j, i] = agent.predict_uncertainty(p, dm)
 
-    # Normalize perf using calibration range
     cal = agent.calibration_system
     if cal._perf_range_min is not None and cal._perf_range_max is not None:
         p_min, p_max = cal._perf_range_min, cal._perf_range_max
@@ -173,22 +183,81 @@ def _compute_acquisition_grid(agent, dm, kappa, res=30):
     return waters, speeds, p_norm, unc_grid, combined
 
 
-def _get_physics_optimum(perf_weights=None, n_layers=N_LAYERS):
-    """Find the physics optimum location."""
-    from visualization.helpers import evaluate_physics_grid
-    _, _, phys_metrics = evaluate_physics_grid(50, perf_weights, n_layers=n_layers)
-    combined = list(phys_metrics.values())[-1]
-    opt_idx = np.unravel_index(np.argmax(combined), combined.shape)
-    phys_waters = np.linspace(0.30, 0.50, 50)
-    phys_speeds = np.linspace(20.0, 60.0, 50)
-    return (phys_waters[opt_idx[1]], phys_speeds[opt_idx[0]])
-
-
 # ── Commands ─────────────────────────────────────────────────────────────────
 
-def cmd_configure(args: argparse.Namespace) -> None:
-    """Set up agent configuration and save session."""
+def cmd_reset(args: argparse.Namespace) -> None:
+    """Clear all session state, data, and plots."""
+    import shutil
+    for path in [SESSION_FILE, "./local", "./plots", "./logs"]:
+        if os.path.exists(path):
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
+            print(f"  Removed {path}")
+    print("  Session reset.")
+
+
+def cmd_init_schema(args: argparse.Namespace) -> None:
+    """Show the problem schema: parameters, features, performance attributes."""
     config: dict[str, Any] = {}
+    state = JourneyState()
+
+    schema = build_schema()
+    print(f"\n  Schema: {schema.name}")
+
+    print(f"\n  Parameters:")
+    for code, obj in schema.parameters.items():
+        c = obj.constraints
+        lo, hi = c.get("min", ""), c.get("max", "")
+        bounds = f"[{lo}, {hi}]" if lo != "" else ""
+        runtime = " (runtime)" if obj.runtime_adjustable else ""
+        fixed = " (fixed)" if lo == hi and lo != "" else ""
+        print(f"    {code:<20s} {bounds:<15s}{runtime}{fixed}")
+
+    print(f"\n  Features:")
+    for code in schema.features.keys():
+        print(f"    {code}")
+
+    print(f"\n  Performance attributes:")
+    for code in schema.performance_attrs.keys():
+        print(f"    {code}")
+
+    print()
+    _save_session(config, state)
+
+
+def cmd_init_physics(args: argparse.Namespace) -> None:
+    """Randomize physics constants and show the ground truth topology."""
+    config, state = _load_session()
+    plot_dir = _ensure_plot_dir()
+
+    # Randomize
+    seed = args.seed
+    physics = randomize_physics(seed)
+    config[PHYSICS_CONFIG_KEY] = physics
+    apply_physics_config(physics)
+
+    print(f"\n  Physics initialized (seed={seed}):")
+    for key, val in physics.items():
+        if isinstance(val, list):
+            print(f"    {key:<25s} = [{', '.join(f'{v:.3f}' for v in val)}]")
+        else:
+            print(f"    {key:<25s} = {val:.6f}")
+
+    # Show topology
+    from visualization import plot_physics_topology
+    perf_weights = config.get("performance_weights")
+    path = os.path.join(plot_dir, "00_physics_topology.png")
+    plot_physics_topology(path, perf_weights=perf_weights)
+    show_plot(path, inline=args.plot)
+
+    _save_session(config, state)
+
+
+def cmd_configure(args: argparse.Namespace) -> None:
+    """Set agent configuration."""
+    config, state = _load_session()
 
     if args.bounds:
         config["bounds"] = json.loads(args.bounds)
@@ -203,12 +272,22 @@ def cmd_configure(args: argparse.Namespace) -> None:
     if args.de_popsize is not None:
         config["de_popsize"] = args.de_popsize
 
-    agent, dataset, fab = _rebuild(config, verbose=True)
-    state = JourneyState()
+    print("\n  Configuration:")
+    if config.get("performance_weights"):
+        pw = config["performance_weights"]
+        parts = [f"{k}={v}" for k, v in pw.items()]
+        print(f"    Weights: {', '.join(parts)}")
+    if config.get("exploration_radius") is not None:
+        print(f"    Exploration radius: {config['exploration_radius']}")
+    if config.get("optimizer"):
+        print(f"    Optimizer: {config['optimizer']}")
+    print()
+
     _save_session(config, state)
 
 
 def cmd_baseline(args: argparse.Namespace) -> None:
+    """Run baseline experiments (space-filling, no model)."""
     config, state = _load_session()
     agent, dataset, fab = _rebuild(config)
     perf_weights = config.get("performance_weights")
@@ -227,21 +306,15 @@ def cmd_baseline(args: argparse.Namespace) -> None:
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
 
-    # ── Plots ──
-    from visualization import plot_physics_topology, plot_baseline_scatter, plot_topology_comparison
+    # Plots
+    from visualization import plot_baseline_scatter, plot_topology_comparison
     from visualization.helpers import physics_combined_at
 
-    # 1. Physics topology (ground truth)
-    path = os.path.join(plot_dir, "01_physics_topology.png")
-    plot_physics_topology(path, perf_weights=perf_weights)
-    print(f"\n  Plot: {path}")
-
-    # 2. Baseline scatter
-    path = os.path.join(plot_dir, "02_baseline_scatter.png")
+    path = os.path.join(plot_dir, "01_baseline_scatter.png")
     plot_baseline_scatter(path, state.all_params)
-    print(f"  Plot: {path}")
+    show_plot(path, inline=args.plot)
 
-    # 3. Initial model quality — train and compare topology
+    # Train initial model and compare topology
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
@@ -260,41 +333,36 @@ def cmd_baseline(args: argparse.Namespace) -> None:
             except Exception:
                 pred_grid[j, i] = 0.0
 
-    path = os.path.join(plot_dir, "03_initial_topology.png")
+    path = os.path.join(plot_dir, "02_initial_topology.png")
     plot_topology_comparison(path, waters, speeds,
                               {"Ground Truth": true_grid, f"Model ({args.n} baseline)": pred_grid},
                               title="Initial Model vs Ground Truth")
-    print(f"  Plot: {path}")
-
-    _save_session(config, state)
-
-
-def cmd_train(args: argparse.Namespace) -> None:
-    config, state = _load_session()
-    agent, dataset, fab = _rebuild(config)
-
-    dm = agent.create_datamodule(dataset)
-    dm.prepare(val_size=args.val_size)
-    results = agent.train(dm, validate=args.val_size > 0)
+    show_plot(path, inline=args.plot)
 
     _save_session(config, state)
 
 
 def cmd_explore(args: argparse.Namespace) -> None:
+    """Run exploration rounds (incremental — can be called multiple times)."""
     config, state = _load_session()
     agent, dataset, fab = _rebuild(config)
     perf_weights = config.get("performance_weights")
     plot_dir = _ensure_plot_dir()
 
+    n_existing = len([p for p in state.all_phases if p == "exploration"])
+    total_after = n_existing + args.n
+
     agent.console.print_phase_header(2, "Exploration",
-                                      f"{args.n} rounds (\u03ba={args.kappa})")
+                                      f"rounds {n_existing+1}..{total_after} (\u03ba={args.kappa})")
+
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
-    agent.train(dm, validate=False)
+    agent.train(dm, validate=args.validate)
 
     optimum = _get_physics_optimum(perf_weights)
 
     for i in range(args.n):
+        round_num = n_existing + i + 1
         spec = agent.exploration_step(dm, kappa=args.kappa)
         proposed = params_from_spec(spec)
         params = with_dimensions({**state.prev_params, **proposed})
@@ -307,15 +375,16 @@ def cmd_explore(args: argparse.Namespace) -> None:
         dm.update()
         agent.train(dm, validate=False)
 
-        # Per-round acquisition plot
-        if i < 5 or i == args.n - 1 or (i + 1) % 5 == 0:
+        # Plot per round if --plot
+        if args.plot:
             from visualization import plot_acquisition_topology
             w, s, p, u, c = _compute_acquisition_grid(agent, dm, args.kappa, res=30)
-            path = os.path.join(plot_dir, f"04_explore_round_{i+1:02d}.png")
+            path = os.path.join(plot_dir, f"03_explore_round_{round_num:02d}.png")
             plot_acquisition_topology(path, w, s, p, u, c,
                                       experiment_pts=state.all_params,
                                       optimum=optimum,
-                                      title=f"Exploration — Round {i+1}")
+                                      title=f"Exploration \u2014 Round {round_num}")
+            show_plot(path, inline=True)
 
     # Final topology comparison
     from visualization import plot_topology_comparison
@@ -335,29 +404,130 @@ def cmd_explore(args: argparse.Namespace) -> None:
                 pred_grid[j_s, i_w] = 0.0
 
     n_total = len(state.all_params)
-    path = os.path.join(plot_dir, "05_final_topology.png")
+    path = os.path.join(plot_dir, "04_topology_after_exploration.png")
     plot_topology_comparison(path, waters, speeds,
                               {"Ground Truth": true_grid, f"Model ({n_total} experiments)": pred_grid},
                               title="Model After Exploration vs Ground Truth")
-    print(f"\n  Plot: {path}")
-    print(f"  Round plots: {plot_dir}/04_explore_round_*.png")
+    show_plot(path, inline=args.plot)
 
     _save_session(config, state)
 
 
-def cmd_infer(args: argparse.Namespace) -> None:
-    """Single-shot inference — first-time-right manufacturing."""
+def cmd_test_set(args: argparse.Namespace) -> None:
+    """Create a held-out test set for model evaluation."""
     config, state = _load_session()
     agent, dataset, fab = _rebuild(config)
-    perf_weights = config.get("performance_weights")
+    load_physics_from_session(config)
+
+    test_params = generate_test_params(args.n)
+    print(f"\n  Creating {len(test_params)} test experiments...")
+
+    for i, params in enumerate(test_params):
+        exp_code = f"test_{i+1:02d}"
+        if dataset.has_experiment(exp_code):
+            continue
+        params = with_dimensions(params)
+        run_and_evaluate(dataset, agent, fab, params, exp_code)
+
+    print(f"  Test set: {len(test_params)} experiments (test_01..test_{len(test_params):02d})")
+    config["test_set_n"] = len(test_params)
+    _save_session(config, state)
+
+
+def cmd_analyse(args: argparse.Namespace) -> None:
+    """Evaluate the prediction model on the test set and show sensitivity analysis."""
+    config, state = _load_session()
+    agent, dataset, fab = _rebuild(config)
+    perf_weights = config.get("performance_weights", {})
     plot_dir = _ensure_plot_dir()
-    n_layers = args.n_layers or N_LAYERS
 
-    agent.console.print_phase_header(3, "Inference",
-                                      f"First-time-right (n_layers={n_layers})")
+    # Train on all non-test data
+    dm = agent.create_datamodule(dataset)
+    dm.prepare(val_size=0.0)
+    agent.train(dm, validate=False)
 
-    # Fix n_layers to the design intent
-    agent.calibration_system.configure_fixed_params({"n_layers": n_layers}, force=True)
+    # Evaluate on test set
+    test_codes = [c for c in dataset.get_populated_experiment_codes() if c.startswith("test_")]
+    if not test_codes:
+        print("  No test set found. Run 'uv run cli.py test-set --n 20' first.")
+        return
+
+    print(f"\n  Evaluating model on {len(test_codes)} test experiments:")
+    errors = []
+    for code in sorted(test_codes):
+        exp = dataset.get_experiment(code)
+        params = exp.parameters.get_values_dict()
+        true_perf = {k: float(v) for k, v in exp.performance.get_values_dict().items() if v is not None}
+        true_score = combined_score(true_perf, perf_weights)
+
+        try:
+            pred_perf = agent.predict_performance(params)
+            pred_score = combined_score(pred_perf, perf_weights)
+        except Exception:
+            pred_score = 0.0
+
+        errors.append(abs(true_score - pred_score))
+
+    mae = np.mean(errors)
+    print(f"    MAE (combined score): {mae:.4f}")
+    print(f"    Max error:            {max(errors):.4f}")
+
+    # Topology comparison plot
+    from visualization import plot_topology_comparison
+    from visualization.helpers import physics_combined_at, evaluate_physics_grid
+    waters = np.linspace(0.30, 0.50, 40)
+    speeds = np.linspace(20.0, 60.0, 40)
+    true_grid = np.array([[physics_combined_at(w, spd, perf_weights) for w in waters] for spd in speeds])
+    pred_grid = np.zeros_like(true_grid)
+    for i, w in enumerate(waters):
+        for j, spd in enumerate(speeds):
+            try:
+                perf = agent.predict_performance({"water_ratio": w, "print_speed": spd,
+                                                   "n_layers": N_LAYERS, "n_segments": N_SEGMENTS})
+                pred_grid[j, i] = combined_score(perf, perf_weights)
+            except Exception:
+                pred_grid[j, i] = 0.0
+
+    path = os.path.join(plot_dir, "05_analysis_topology.png")
+    plot_topology_comparison(path, waters, speeds,
+                              {"Ground Truth": true_grid, "Model Prediction": pred_grid},
+                              title="Model Analysis on Test Set")
+    show_plot(path, inline=args.plot)
+
+    # Sensitivity analysis at predicted optimum
+    opt_w, opt_s = _get_physics_optimum(perf_weights)
+    opt_params = {"water_ratio": opt_w, "print_speed": opt_s,
+                  "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
+
+    tunable = agent.calibration_system.get_tunable_params(dm)
+    sensitivities = compute_local_sensitivity(agent, opt_params, tunable, perf_weights)
+
+    print(f"\n  Local sensitivity at optimum:")
+    for code, val in sorted(sensitivities.items(), key=lambda x: x[1], reverse=True):
+        print(f"    {code:<20s}  {val:.4f}")
+
+    path = os.path.join(plot_dir, "06_sensitivity.png")
+    plot_sensitivity(path, sensitivities)
+    show_plot(path, inline=args.plot)
+
+
+def cmd_inference(args: argparse.Namespace) -> None:
+    """Single-shot inference with design intent."""
+    config, state = _load_session()
+    agent, dataset, fab = _rebuild(config)
+    perf_weights = config.get("performance_weights", {})
+    plot_dir = _ensure_plot_dir()
+
+    # Parse design intent
+    design_intent = json.loads(args.design_intent) if args.design_intent else {}
+    n_layers = design_intent.get("n_layers", N_LAYERS)
+
+    agent.console.print_phase_header(3, "Inference", "First-time-right")
+
+    if design_intent:
+        parts = [f"{k}={v}" for k, v in design_intent.items()]
+        print(f"  Design intent: {', '.join(parts)}")
+        agent.calibration_system.configure_fixed_params(design_intent, force=True)
 
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
@@ -366,42 +536,40 @@ def cmd_infer(args: argparse.Namespace) -> None:
     spec = agent.exploration_step(dm, kappa=0.0)
     proposed = params_from_spec(spec)
     params = with_dimensions({**state.prev_params, **proposed})
-    params["n_layers"] = n_layers  # ensure design intent
+    params.update(design_intent)
     exp_code = _next_code(state, "infer")
 
     exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
     perf = get_performance(exp_data)
     state.record("inference", exp_code, params, perf)
 
-    # Show result
-    pw = perf_weights or {}
-    score = combined_score(perf, pw)
-    print(f"\n  Inference result (n_layers={n_layers}):")
+    score = combined_score(perf, perf_weights)
+    print(f"\n  Proposed parameters:")
     print(f"    water_ratio  = {params['water_ratio']:.3f}")
     print(f"    print_speed  = {params['print_speed']:.1f} mm/s")
+    for k, v in design_intent.items():
+        print(f"    {k:<13s} = {v}  (design intent)")
+    print(f"\n  Performance:")
     for k, v in perf.items():
-        print(f"    {k:<15s} = {v:.3f}")
-    print(f"    combined     = {score:.3f}")
+        print(f"    {k:<20s} = {v:.3f}")
+    print(f"    {'combined':<20s} = {score:.3f}")
 
-    # Physics optimum for comparison
-    opt_w, opt_s = _get_physics_optimum(perf_weights, n_layers=n_layers)
+    # Compare to physics optimum
     from visualization.helpers import physics_combined_at
+    opt_w, opt_s = _get_physics_optimum(perf_weights, n_layers=n_layers)
     opt_score = physics_combined_at(opt_w, opt_s, perf_weights, n_layers=n_layers)
-    print(f"\n  Physics optimum (n_layers={n_layers}):")
-    print(f"    water_ratio  = {opt_w:.3f}")
-    print(f"    print_speed  = {opt_s:.1f} mm/s")
-    print(f"    combined     = {opt_score:.3f}")
-    print(f"    gap          = {opt_score - score:.3f}")
+    gap = opt_score - score
+    print(f"\n  Physics optimum: combined={opt_score:.3f} (gap={gap:+.3f})")
 
     _save_session(config, state)
 
 
 def cmd_summary(args: argparse.Namespace) -> None:
+    """Show run summary across all phases."""
     config, state = _load_session()
-    agent, dataset, fab = _rebuild(config)
     perf_weights = config.get("performance_weights", {})
 
-    print("\n  Run Summary:")
+    print(f"\n  Run Summary:")
     print(f"  {'─' * 60}")
     print(f"  {'Phase':<15s}  {'Experiments':>11s}  {'Best Combined':>14s}")
     print(f"  {'─' * 60}")
@@ -416,19 +584,10 @@ def cmd_summary(args: argparse.Namespace) -> None:
         print(f"  {phase:<15s}  {len(indices):>11d}  {best:>14.3f}")
 
     print(f"  {'─' * 60}")
-    agent.console.print_done(PLOT_DIR)
-
-
-def cmd_reset(args: argparse.Namespace) -> None:
-    import shutil
-    for path in [SESSION_FILE, "./local", "./plots", "./logs"]:
-        if os.path.exists(path):
-            if os.path.isdir(path):
-                shutil.rmtree(path)
-            else:
-                os.remove(path)
-            print(f"  Removed {path}")
-    print("Session reset.")
+    total = len(state.all_params)
+    test_n = config.get("test_set_n", 0)
+    print(f"  Total: {total} training experiments + {test_n} test experiments")
+    print()
 
 
 # ── Argument parser ──────────────────────────────────────────────────────────
@@ -436,49 +595,100 @@ def cmd_reset(args: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pfab-mock",
-        description="PFAB mock CLI — run fabrication phases step by step",
+        description="PFAB mock CLI — predictive fabrication workflow step by step",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Quick start:
+  uv run cli.py reset
+  uv run cli.py init-schema
+  uv run cli.py init-physics --plot
+  uv run cli.py configure --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
+  uv run cli.py baseline --n 10 --plot
+  uv run cli.py explore --n 5 --kappa 0.5 --plot
+  uv run cli.py inference --design-intent '{"n_layers":5}' --plot
+  uv run cli.py summary
+""",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # reset
+    p = sub.add_parser("reset", help="Clear all session state and data")
+    p.set_defaults(func=cmd_reset)
+
+    # init-schema
+    p = sub.add_parser("init-schema", help="Show the problem schema")
+    p.set_defaults(func=cmd_init_schema)
+
+    # init-physics
+    p = sub.add_parser("init-physics", help="Randomize physics constants and show topology")
+    p.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    p.add_argument("--plot", action="store_true", help="Show plots inline in terminal")
+    p.set_defaults(func=cmd_init_physics)
+
     # configure
-    p = sub.add_parser("configure", help="Set up agent configuration")
-    p.add_argument("--bounds", type=str, help='JSON: {"param": [lo, hi], ...}')
-    p.add_argument("--weights", type=str, help='JSON: {"perf_attr": weight, ...}')
+    p = sub.add_parser("configure", help="Set agent configuration",
+                        formatter_class=argparse.RawDescriptionHelpFormatter,
+                        epilog="""
+Configuration groups:
+
+  Performance:
+    --weights JSON        Performance attribute weights
+                          Example: '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
+
+  Exploration:
+    --radius FLOAT        KDE exploration radius (default: 0.15)
+
+  Optimizer:
+    --optimizer {de,lbfgsb}  Backend (default: de)
+    --de-maxiter INT         DE max generations (default: 100)
+    --de-popsize INT         DE population size (default: 10)
+
+  Bounds:
+    --bounds JSON         Parameter search bounds override
+                          Example: '{"water_ratio":[0.35,0.45]}'
+""")
+    p.add_argument("--bounds", type=str, help="JSON: parameter bounds override")
+    p.add_argument("--weights", type=str, help="JSON: performance attribute weights")
     p.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None)
     p.add_argument("--radius", type=float, default=None, help="Exploration radius")
-    p.add_argument("--de-maxiter", type=int, default=None, help="DE max generations")
-    p.add_argument("--de-popsize", type=int, default=None, help="DE population size")
+    p.add_argument("--de-maxiter", type=int, default=None)
+    p.add_argument("--de-popsize", type=int, default=None)
     p.set_defaults(func=cmd_configure)
 
     # baseline
-    p = sub.add_parser("baseline", help="Run baseline experiments")
-    p.add_argument("--n", type=int, default=10)
+    p = sub.add_parser("baseline", help="Run baseline experiments (space-filling)")
+    p.add_argument("--n", type=int, default=10, help="Number of experiments")
+    p.add_argument("--plot", action="store_true", help="Show plots inline")
     p.set_defaults(func=cmd_baseline)
 
-    # train
-    p = sub.add_parser("train", help="Train prediction models")
-    p.add_argument("--val-size", type=float, default=0.25)
-    p.set_defaults(func=cmd_train)
-
     # explore
-    p = sub.add_parser("explore", help="Run exploration rounds")
-    p.add_argument("--n", type=int, default=10)
+    p = sub.add_parser("explore", help="Run exploration rounds (incremental)")
+    p.add_argument("--n", type=int, default=5, help="Number of rounds to add")
     p.add_argument("--kappa", type=float, default=0.5, help="Exploration weight (0=exploit, 1=explore)")
+    p.add_argument("--plot", action="store_true", help="Show per-round plots inline")
+    p.add_argument("--validate", action="store_true", help="Validate model during training")
     p.set_defaults(func=cmd_explore)
 
-    # infer
-    p = sub.add_parser("infer", help="Single-shot inference")
-    p.add_argument("--n-layers", type=int, default=None,
-                   help="Design intent: fix n_layers for inference (default: schema default)")
-    p.set_defaults(func=cmd_infer)
+    # test-set
+    p = sub.add_parser("test-set", help="Create held-out test experiments")
+    p.add_argument("--n", type=int, default=20, help="Number of test experiments")
+    p.set_defaults(func=cmd_test_set)
+
+    # analyse
+    p = sub.add_parser("analyse", help="Evaluate model on test set + sensitivity analysis")
+    p.add_argument("--plot", action="store_true", help="Show plots inline")
+    p.set_defaults(func=cmd_analyse)
+
+    # inference
+    p = sub.add_parser("inference", help="Single-shot first-time-right manufacturing")
+    p.add_argument("--design-intent", type=str, default=None,
+                   help="JSON: fix parameters for inference. Example: '{\"n_layers\":5}'")
+    p.add_argument("--plot", action="store_true", help="Show plots inline")
+    p.set_defaults(func=cmd_inference)
 
     # summary
-    p = sub.add_parser("summary", help="Print run summary")
+    p = sub.add_parser("summary", help="Show run summary across all phases")
     p.set_defaults(func=cmd_summary)
-
-    # reset
-    p = sub.add_parser("reset", help="Clear session state and data")
-    p.set_defaults(func=cmd_reset)
 
     return parser
 

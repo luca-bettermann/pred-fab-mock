@@ -11,7 +11,7 @@ from sensors.physics import (
     path_deviation, energy_per_segment, production_rate,
     N_LAYERS, N_SEGMENTS,
 )
-from models.evaluation_models import PathAccuracyModel, EnergyConsumptionModel, ProductionRateModel
+from models.evaluation_models import PathAccuracy, EnergyEfficiency, ProductionRate
 
 PERF_WEIGHTS_DEFAULT = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
 
@@ -31,10 +31,10 @@ def physics_combined_at(
 ) -> float:
     """Compute combined physics performance score at a single (water, speed) point."""
     pw = perf_weights or PERF_WEIGHTS_DEFAULT
-    max_dev = PathAccuracyModel.MAX_DEVIATION
-    target_e = EnergyConsumptionModel.TARGET_ENERGY
-    max_e = EnergyConsumptionModel.MAX_ENERGY
-    max_rate = ProductionRateModel.MAX_RATE
+    max_dev = PathAccuracy.MAX_DEVIATION
+    target_e = EnergyEfficiency.TARGET_ENERGY
+    max_e = EnergyEfficiency.MAX_ENERGY
+    max_rate = ProductionRate.MAX_RATE
 
     devs = [path_deviation(spd, s, w, li) for li in range(n_layers) for s in range(N_SEGMENTS)]
     pa = max(0.0, 1.0 - np.mean(devs) / max_dev)
@@ -59,10 +59,10 @@ def evaluate_physics_grid(
     Returns (waters, speeds, metrics_dict).
     """
     pw = perf_weights or PERF_WEIGHTS_DEFAULT
-    max_dev = PathAccuracyModel.MAX_DEVIATION
-    target_e = EnergyConsumptionModel.TARGET_ENERGY
-    max_e = EnergyConsumptionModel.MAX_ENERGY
-    max_rate = ProductionRateModel.MAX_RATE
+    max_dev = PathAccuracy.MAX_DEVIATION
+    target_e = EnergyEfficiency.TARGET_ENERGY
+    max_e = EnergyEfficiency.MAX_ENERGY
+    max_rate = ProductionRate.MAX_RATE
 
     waters = np.linspace(0.30, 0.50, resolution)
     speeds = np.linspace(20.0, 60.0, resolution)
