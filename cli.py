@@ -34,7 +34,7 @@ from utils import params_from_spec, get_performance
 from workflow import JourneyState, with_dimensions, run_and_evaluate
 from cli_helpers import (
     show_plot, randomize_physics, apply_physics_config, load_physics_from_session,
-    PHYSICS_CONFIG_KEY, generate_test_params, compute_local_sensitivity, plot_sensitivity,
+    PHYSICS_CONFIG_KEY, generate_test_params, compute_local_sensitivity,
 )
 
 
@@ -535,10 +535,6 @@ def cmd_analyse(args: argparse.Namespace) -> None:
     print(f"\n  Local sensitivity at optimum:")
     for code, val in sorted(sensitivities.items(), key=lambda x: x[1], reverse=True):
         print(f"    {code:<20s}  {val:.4f}")
-
-    path = os.path.join(plot_dir, "06_sensitivity.png")
-    plot_sensitivity(path, sensitivities)
-    show_plot(path, inline=args.plot)
 
 
 def cmd_inference(args: argparse.Namespace) -> None:
