@@ -44,8 +44,8 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
         Feature.array("energy_per_segment", domain=spatial),
         Feature.array("production_rate"),
         # Recursive: lag 1 and 2 along each dimension
-        *Feature.recursive("prev_layer_deviation",   source=path_dev, dimensions=(layer_dim,),   max_depth=2),
-        *Feature.recursive("prev_segment_deviation", source=path_dev, dimensions=(segment_dim,), max_depth=2),
+        *Feature.recursive("prev_layer_dev",   source=path_dev, dimensions=(layer_dim,),   max_depth=2),
+        *Feature.recursive("prev_seg_dev", source=path_dev, dimensions=(segment_dim,), max_depth=2),
     ])
 
     performance = PerformanceAttributes([

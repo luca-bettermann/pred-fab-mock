@@ -204,7 +204,16 @@ def cmd_init_schema(args: argparse.Namespace) -> None:
     state = JourneyState()
 
     schema = build_schema()
-    print(f"\n  Schema: {schema.name}")
+
+    _B = "\033[1m"
+    _C = "\033[36m"
+    _R = "\033[0m"
+    _D = "\033[2m"
+    bar = "━" * 58
+    print(f"\n{_B}{_C}{bar}{_R}")
+    print(f"{_B}{_C}  PHASE 0.1{_R}{_B} ▸ Schema{_R}")
+    print(f"  {_D}{schema.name}{_R}")
+    print(f"{_B}{_C}{bar}{_R}")
 
     print(f"\n  Parameters:")
     for code, obj in schema.parameters.items():
@@ -232,13 +241,23 @@ def cmd_init_physics(args: argparse.Namespace) -> None:
     config, state = _load_session()
     plot_dir = _ensure_plot_dir()
 
-    # Randomize
+    _B = "\033[1m"
+    _C = "\033[36m"
+    _R = "\033[0m"
+    _D = "\033[2m"
+    bar = "━" * 58
+    print(f"\n{_B}{_C}{bar}{_R}")
+    print(f"{_B}{_C}  PHASE 0.2{_R}{_B} ▸ Physics{_R}")
+    seed_str = f"seed={args.seed}" if args.seed is not None else "random"
+    print(f"  {_D}Randomize ground truth ({seed_str}){_R}")
+    print(f"{_B}{_C}{bar}{_R}")
+
     seed = args.seed
     physics = randomize_physics(seed)
     config[PHYSICS_CONFIG_KEY] = physics
     apply_physics_config(physics)
 
-    print(f"\n  Physics initialized (seed={seed}):")
+    print(f"\n  Physics constants:")
     for key, val in physics.items():
         if isinstance(val, list):
             print(f"    {key:<25s} = [{', '.join(f'{v:.3f}' for v in val)}]")
@@ -564,6 +583,165 @@ def cmd_inference(args: argparse.Namespace) -> None:
     _save_session(config, state)
 
 
+# ── Advanced commands ────────────────────────────────────────────────────────
+
+def cmd_explore_trajectory(args: argparse.Namespace) -> None:
+    """Trajectory exploration: per-layer speed optimization with MPC lookahead."""
+    config, state = _load_session()
+    agent, dataset, fab = _rebuild(config)
+    perf_weights = config.get("performance_weights", {})
+
+    # Configure trajectory
+    agent.configure_trajectory(
+        step_parameters={"print_speed": "n_layers"},
+        adaptation_delta={"print_speed": args.delta},
+        smoothing=args.smoothing,
+        mpc_lookahead=args.lookahead,
+        mpc_discount=args.discount,
+    )
+
+    design_intent = json.loads(args.design_intent) if args.design_intent else {}
+    n_layers = design_intent.get("n_layers", N_LAYERS)
+    if design_intent:
+        agent.calibration_system.configure_fixed_params(design_intent, force=True)
+
+    agent.console.print_phase_header(4, "Trajectory Exploration",
+                                      f"{args.n} rounds, \u0394speed=\u00b1{args.delta} mm/s")
+    if design_intent:
+        parts = [f"{k}={v}" for k, v in design_intent.items()]
+        print(f"  Design intent: {', '.join(parts)}")
+
+    dm = agent.create_datamodule(dataset)
+    dm.prepare(val_size=0.0)
+    agent.train(dm, validate=False)
+
+    prev = state.prev_params if state.prev_params else {}
+
+    for i in range(args.n):
+        spec = agent.exploration_step(dm, kappa=args.kappa, current_params=prev)
+        proposed = params_from_spec(spec)
+        params = with_dimensions({**prev, **proposed})
+        params.update(design_intent)
+
+        # Apply schedules to the experiment
+        exp_code = _next_code(state, "traj")
+        exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
+        if spec.schedules:
+            spec.apply_schedules(exp_data)
+
+        perf = get_performance(exp_data)
+        state.record("trajectory", exp_code, params, perf)
+
+        dm.update()
+        agent.train(dm, validate=False)
+        prev = params
+
+    _save_session(config, state)
+
+
+def cmd_adapt(args: argparse.Namespace) -> None:
+    """Online inference with layer-by-layer adaptation.
+
+    1. Run inference to get optimal starting parameters
+    2. Start fabrication
+    3. After each layer: evaluate, tune model, adapt speed for next layer
+    """
+    config, state = _load_session()
+    agent, dataset, fab = _rebuild(config)
+    perf_weights = config.get("performance_weights", {})
+
+    # Configure for adaptation
+    agent.configure_trajectory(
+        step_parameters={"print_speed": "n_layers"},
+        adaptation_delta={"print_speed": args.delta},
+    )
+
+    design_intent = json.loads(args.design_intent) if args.design_intent else {}
+    n_layers = design_intent.get("n_layers", N_LAYERS)
+    if design_intent:
+        agent.calibration_system.configure_fixed_params(design_intent, force=True)
+
+    agent.console.print_phase_header(5, "Online Inference",
+                                      f"Inference + layer-by-layer adaptation")
+
+    dm = agent.create_datamodule(dataset)
+    dm.prepare(val_size=0.0)
+    agent.train(dm, validate=False)
+
+    # Step 1: Get initial parameters via inference (kappa=0)
+    print(f"\n  Step 1: Initial inference...")
+    spec = agent.exploration_step(dm, kappa=0.0)
+    proposed = params_from_spec(spec)
+    params = with_dimensions({**state.prev_params, **proposed})
+    params.update(design_intent)
+
+    print(f"    Starting params: w={params['water_ratio']:.3f}, spd={params['print_speed']:.1f}")
+
+    # Step 2: Create experiment, fabricate layer by layer with adaptation
+    exp_code = _next_code(state, "adapt")
+    exp_data = dataset.create_experiment(exp_code, parameters=params)
+
+    print(f"\n  Step 2: Fabrication with online adaptation ({n_layers} layers):")
+    print(f"    {'Layer':<8s}  {'Speed':>8s}  {'Adapted':>8s}  {'Deviation':>10s}")
+    print(f"    {'─' * 38}")
+
+    for layer_idx in range(n_layers):
+        # Fabricate this layer
+        fab.run_layer(params, layer_idx)
+
+        # Evaluate what we have so far
+        agent.evaluate(exp_data)
+
+        speed_before = params["print_speed"]
+
+        # Adapt for next layer (except the last)
+        if layer_idx < n_layers - 1:
+            agent.set_active_experiment(exp_data)
+            adapt_spec = agent.adaptation_step(
+                dimension="n_layers",
+                step_index=layer_idx + 1,
+                exp_data=exp_data,
+                mode=__import__("pred_fab.utils", fromlist=["Mode"]).Mode.INFERENCE,
+                kappa=0.0,
+                record=True,
+            )
+            new_speed = adapt_spec.initial_params.get("print_speed", speed_before)
+            params = {**params, "print_speed": float(new_speed)}
+        else:
+            new_speed = speed_before
+
+        # Get deviation for this layer
+        dev_vals = exp_data.features.get_value("path_deviation")
+        if dev_vals is not None and hasattr(dev_vals, '__len__'):
+            import numpy as _np
+            flat = _np.array(dev_vals).flatten()
+            n_segs = int(params.get("n_segments", N_SEGMENTS))
+            start_idx = layer_idx * n_segs
+            end_idx = min(start_idx + n_segs, len(flat))
+            if end_idx > start_idx:
+                layer_dev = float(_np.mean(flat[start_idx:end_idx]))
+            else:
+                layer_dev = 0.0
+        else:
+            layer_dev = 0.0
+
+        adapted_str = f"{new_speed:.1f}" if new_speed != speed_before else "—"
+        print(f"    {layer_idx+1:<8d}  {speed_before:8.1f}  {adapted_str:>8s}  {layer_dev:10.6f}")
+
+    # Save experiment
+    dataset.save_experiment(exp_code)
+    perf = get_performance(exp_data)
+    state.record("adaptation", exp_code, params, perf)
+
+    score = combined_score(perf, perf_weights)
+    print(f"\n  Result:")
+    for k, v in perf.items():
+        print(f"    {k:<20s} = {v:.3f}")
+    print(f"    {'combined':<20s} = {score:.3f}")
+
+    _save_session(config, state)
+
+
 def cmd_summary(args: argparse.Namespace) -> None:
     """Show run summary across all phases."""
     config, state = _load_session()
@@ -574,7 +752,7 @@ def cmd_summary(args: argparse.Namespace) -> None:
     print(f"  {'Phase':<15s}  {'Experiments':>11s}  {'Best Combined':>14s}")
     print(f"  {'─' * 60}")
 
-    for phase in ["baseline", "exploration", "inference"]:
+    for phase in ["baseline", "exploration", "trajectory", "inference", "adaptation"]:
         indices = [i for i, p in enumerate(state.all_phases) if p == phase]
         if not indices:
             continue
@@ -685,6 +863,26 @@ Configuration groups:
                    help="JSON: fix parameters for inference. Example: '{\"n_layers\":5}'")
     p.add_argument("--plot", action="store_true", help="Show plots inline")
     p.set_defaults(func=cmd_inference)
+
+    # ── Advanced commands ──
+
+    # explore-trajectory
+    p = sub.add_parser("explore-trajectory", help="Trajectory exploration: per-layer speed optimization")
+    p.add_argument("--n", type=int, default=3, help="Number of trajectory rounds")
+    p.add_argument("--kappa", type=float, default=0.5, help="Exploration weight")
+    p.add_argument("--delta", type=float, default=5.0, help="Trust region half-width for speed (mm/s)")
+    p.add_argument("--smoothing", type=float, default=0.25, help="Smoothing penalty (0=off, 0.3=strong)")
+    p.add_argument("--lookahead", type=int, default=2, help="MPC lookahead steps")
+    p.add_argument("--discount", type=float, default=0.9, help="MPC discount factor")
+    p.add_argument("--design-intent", type=str, default=None, help="JSON: fix parameters")
+    p.add_argument("--plot", action="store_true", help="Show plots inline")
+    p.set_defaults(func=cmd_explore_trajectory)
+
+    # adapt
+    p = sub.add_parser("adapt", help="Online inference with layer-by-layer adaptation")
+    p.add_argument("--delta", type=float, default=5.0, help="Trust region half-width for speed (mm/s)")
+    p.add_argument("--design-intent", type=str, default=None, help="JSON: fix parameters")
+    p.set_defaults(func=cmd_adapt)
 
     # summary
     p = sub.add_parser("summary", help="Show run summary across all phases")

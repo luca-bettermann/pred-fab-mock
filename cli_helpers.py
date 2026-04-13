@@ -15,26 +15,33 @@ def show_plot(path: str, inline: bool = True) -> None:
     """Display a plot: save path always printed, inline display if requested.
 
     Tries iTerm2 imgcat protocol (works in iTerm2, WezTerm, VSCode terminal).
-    Falls back to macOS `open` command. Always prints the file path.
+    Falls back to macOS `open` command (non-blocking).
+    Always prints the file path regardless.
     """
     print(f"  Plot: {path}")
     if not inline:
         return
 
+    displayed = False
+
+    # Try iTerm2 inline image protocol
     try:
         with open(path, "rb") as f:
             img_data = f.read()
         b64 = base64.b64encode(img_data).decode("ascii")
-        # iTerm2 inline image protocol
         sys.stdout.write(f"\033]1337;File=inline=1;size={len(img_data)}:{b64}\a\n")
         sys.stdout.flush()
+        displayed = True
     except Exception:
-        # Fallback: try opening with system viewer
+        pass
+
+    # Fallback: open with system viewer (macOS)
+    if not displayed:
         try:
             import subprocess
             subprocess.Popen(["open", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
-            pass  # path already printed above
+            pass
 
 
 # ── Physics randomization ─────────────────────────────────────────────────────

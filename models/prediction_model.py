@@ -46,8 +46,8 @@ class DevMLP(IPredictionModel):
     @property
     def input_features(self) -> list[str]:
         return [
-            "prev_layer_deviation_1", "prev_layer_deviation_2",
-            "prev_segment_deviation_1", "prev_segment_deviation_2",
+            "prev_layer_dev_1", "prev_layer_dev_2",
+            "prev_seg_dev_1", "prev_seg_dev_2",
         ]
 
     @property
@@ -176,8 +176,8 @@ class DevRF(IPredictionModel):
     @property
     def input_features(self) -> list[str]:
         return [
-            "prev_layer_deviation_1", "prev_layer_deviation_2",
-            "prev_segment_deviation_1", "prev_segment_deviation_2",
+            "prev_layer_dev_1", "prev_layer_dev_2",
+            "prev_seg_dev_1", "prev_seg_dev_2",
         ]
 
     @property

@@ -47,7 +47,22 @@ uv run cli.py summary
 | `inference [--design-intent JSON] [--plot]` | Single-shot first-time-right proposal |
 | `summary` | Print run summary across all phases |
 
-All commands support `--plot` for inline terminal display (iTerm2/WezTerm/VSCode). Plots are always saved to `./plots/`.
+All commands support `--plot` for inline terminal display (iTerm2/WezTerm/VSCode) or opens in system viewer. Plots are always saved to `./plots/`.
+
+### Advanced commands
+
+| Command | Description |
+|---|---|
+| `explore-trajectory --n N [--delta F] [--smoothing F] [--lookahead N]` | Per-layer speed optimization with MPC |
+| `adapt [--delta F] [--design-intent JSON]` | Inference + layer-by-layer online adaptation |
+
+```bash
+# Trajectory exploration: optimize print_speed per layer
+uv run cli.py explore-trajectory --n 3 --kappa 0.5 --delta 5.0 --smoothing 0.25
+
+# Online adaptation: inference + real-time layer-by-layer tuning
+uv run cli.py adapt --delta 5.0 --design-intent '{"n_layers":5}'
+```
 
 ## Simulated process
 
