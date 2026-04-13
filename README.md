@@ -11,8 +11,9 @@ uv venv && uv pip install -e ".[dev]"
 # Phase 0: Setup
 uv run cli.py reset
 uv run cli.py init-schema
-uv run cli.py init-physics --seed 42 --plot
+uv run cli.py init-agent
 uv run cli.py configure --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
+uv run cli.py init-physics --seed 42 --plot
 
 # Phase 1: Baseline (space-filling, no model)
 uv run cli.py baseline --n 10 --plot
@@ -38,8 +39,9 @@ uv run cli.py summary
 |---|---|
 | `reset` | Clear all session state, data, and plots |
 | `init-schema` | Show the problem schema (parameters, features, performance) |
+| `init-agent [--model {mlp,rf}]` | Initialize the agent and show its state |
 | `init-physics [--seed N] [--plot]` | Randomize physics constants and show topology |
-| `configure [--weights JSON] [--radius F] [--optimizer {de,lbfgsb}]` | Set agent configuration |
+| `configure [--weights JSON] [--radius F] [--buffer F] [--decay-exp F] [--optimizer {de,lbfgsb}]` | Set agent configuration |
 | `baseline --n N [--plot]` | Run N space-filling baseline experiments |
 | `explore --n N [--kappa F] [--plot] [--validate]` | Run N exploration rounds (incremental) |
 | `test-set --n N` | Create held-out test experiments for model evaluation |
@@ -47,7 +49,9 @@ uv run cli.py summary
 | `inference [--design-intent JSON] [--plot]` | Single-shot first-time-right proposal |
 | `summary` | Print run summary across all phases |
 
-All commands support `--plot` for inline terminal display (iTerm2/WezTerm/VSCode) or opens in system viewer. Plots are always saved to `./plots/`.
+All commands support `--plot` to display plots. Plots are always saved to `./plots/`.
+
+> **Inline plots** require [iTerm2](https://iterm2.com/) (`brew install --cask iterm2`). In other terminals, `--plot` saves the plot to disk without displaying it.
 
 ### Advanced commands
 

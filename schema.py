@@ -15,6 +15,7 @@ from pred_fab.core import (
 
 ROOT_FOLDER = "."
 SCHEMA_NAME = "extrusion_printing_v8"
+SCHEMA_TITLE = "Extrusion-based Additive Manufacturing"
 
 
 def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
@@ -30,7 +31,7 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
 
     # Spatial domain: n_layers is a design intent variable [3..8], n_segments fixed at 4
     spatial = Domain("spatial_segment", [
-        Dimension("n_layers",   "layer_idx",   min_val=3, max_val=8),
+        Dimension("n_layers",   "layer_idx",   min_val=5, max_val=5),
         Dimension("n_segments", "segment_idx", min_val=4, max_val=4),
     ])
     domains = Domains([spatial])
@@ -43,9 +44,9 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
         path_dev,
         Feature.array("energy_per_segment", domain=spatial),
         Feature.array("production_rate"),
-        # Recursive: lag 1 and 2 along each dimension
-        *Feature.recursive("prev_layer_dev",   source=path_dev, dimensions=(layer_dim,),   max_depth=2),
-        *Feature.recursive("prev_seg_dev", source=path_dev, dimensions=(segment_dim,), max_depth=2),
+        # Recursive: lag 1 along each dimension
+        *Feature.recursive("prev_layer_dev",   source=path_dev, dimensions=(layer_dim,),   max_depth=1),
+        *Feature.recursive("prev_seg_dev", source=path_dev, dimensions=(segment_dim,), max_depth=1),
     ])
 
     performance = PerformanceAttributes([

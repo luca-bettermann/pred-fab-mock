@@ -13,9 +13,6 @@ from sensors.physics import (
 )
 from models.evaluation_models import PathAccuracy, EnergyEfficiency, ProductionRate
 
-PERF_WEIGHTS_DEFAULT = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
-
-
 def save_fig(path: str) -> None:
     """Save current figure and close."""
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -30,7 +27,7 @@ def physics_combined_at(
     n_layers: int = N_LAYERS,
 ) -> float:
     """Compute combined physics performance score at a single (water, speed) point."""
-    pw = perf_weights or PERF_WEIGHTS_DEFAULT
+    pw = perf_weights or {}
     max_dev = PathAccuracy.MAX_DEVIATION
     target_e = EnergyEfficiency.TARGET_ENERGY
     max_e = EnergyEfficiency.MAX_ENERGY
@@ -44,9 +41,10 @@ def physics_combined_at(
 
     pr = production_rate(spd, w) / max_rate
 
-    total_w = sum(pw.values())
-    return (pw.get("path_accuracy", 1) * pa + pw.get("energy_efficiency", 1) * ee
-            + pw.get("production_rate", 1) * pr) / total_w
+    w_pa = pw.get("path_accuracy", 1)
+    w_ee = pw.get("energy_efficiency", 1)
+    w_pr = pw.get("production_rate", 1)
+    return (w_pa * pa + w_ee * ee + w_pr * pr) / (w_pa + w_ee + w_pr)
 
 
 def evaluate_physics_grid(
@@ -58,7 +56,7 @@ def evaluate_physics_grid(
 
     Returns (waters, speeds, metrics_dict).
     """
-    pw = perf_weights or PERF_WEIGHTS_DEFAULT
+    pw = perf_weights or {}
     max_dev = PathAccuracy.MAX_DEVIATION
     target_e = EnergyEfficiency.TARGET_ENERGY
     max_e = EnergyEfficiency.MAX_ENERGY
@@ -79,11 +77,10 @@ def evaluate_physics_grid(
             energy_eff[j, i] = max(0.0, 1.0 - abs(np.mean(energies) - target_e) / max_e)
             prod_rate[j, i] = production_rate(spd, w) / max_rate
 
-    total_w = sum(pw.values())
     w_pa = pw.get("path_accuracy", 1)
     w_ee = pw.get("energy_efficiency", 1)
     w_pr = pw.get("production_rate", 1)
-    combined = (w_pa * path_acc + w_ee * energy_eff + w_pr * prod_rate) / total_w
+    combined = (w_pa * path_acc + w_ee * energy_eff + w_pr * prod_rate) / (w_pa + w_ee + w_pr)
 
     label = f"Combined ({int(w_pa)}:{int(w_ee)}:{int(w_pr)})"
     return waters, speeds, {

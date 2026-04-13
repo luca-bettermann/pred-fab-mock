@@ -8,6 +8,50 @@ import matplotlib.pyplot as plt
 from .helpers import save_fig, evaluate_physics_grid, physics_combined_at
 
 
+def plot_inference_result(
+    save_path: str,
+    waters: np.ndarray,
+    speeds: np.ndarray,
+    pred_grid: np.ndarray,
+    proposed_water: float,
+    proposed_speed: float,
+    proposed_score: float,
+    opt_water: float,
+    opt_speed: float,
+    opt_score: float,
+    experiment_pts: list[dict[str, Any]] | None = None,
+) -> None:
+    """Single-shot inference result on the predicted performance topology."""
+    fig, ax = plt.subplots(1, 1, figsize=(7, 5.5))
+    fig.suptitle("Inference Result", fontsize=13, fontweight="bold")
+
+    im = ax.contourf(waters, speeds, pred_grid, levels=20, cmap="RdYlGn")
+    ax.contour(waters, speeds, pred_grid, levels=10, colors="white", linewidths=0.3, alpha=0.5)
+    plt.colorbar(im, ax=ax, shrink=0.8, label="Predicted Combined Score")
+
+    # Training experiments
+    if experiment_pts:
+        ew = [p["water_ratio"] for p in experiment_pts]
+        es = [p["print_speed"] for p in experiment_pts]
+        ax.scatter(ew, es, s=15, c="white", edgecolors="black", linewidth=0.4, zorder=4, alpha=0.6)
+
+    # Physics optimum (star)
+    ax.plot(opt_water, opt_speed, "*", color="white", ms=16,
+            markeredgecolor="black", markeredgewidth=1, zorder=8,
+            label=f"Physics optimum ({opt_score:.3f})")
+
+    # Proposed point (cross)
+    ax.plot(proposed_water, proposed_speed, "x", color="#EAB308", ms=14,
+            markeredgewidth=2.5, zorder=9,
+            label=f"Proposed ({proposed_score:.3f})")
+
+    ax.set_xlabel("Water Ratio")
+    ax.set_ylabel("Print Speed [mm/s]")
+    ax.legend(fontsize=8, loc="upper left")
+
+    save_fig(save_path)
+
+
 def plot_inference_convergence(
     save_path: str,
     infer_log: list[dict[str, Any]],

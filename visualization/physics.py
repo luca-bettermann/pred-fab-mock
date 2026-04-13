@@ -31,6 +31,14 @@ def plot_physics_topology(
     fig, axes = plt.subplots(1, 4, figsize=(18, 4.5))
     fig.suptitle("Physics Performance Topology", fontsize=14, fontweight="bold", y=1.02)
 
+    # Map metric names to their weights for display
+    pw = perf_weights or {}
+    weight_keys = {
+        "Path Accuracy": "path_accuracy",
+        "Energy Efficiency": "energy_efficiency",
+        "Production Rate": "production_rate",
+    }
+
     for ax, (title, data) in zip(axes, metrics.items()):
         # Individual metrics use YlGn (performance); combined uses RdYlGn (objective)
         cmap = "RdYlGn" if "Combined" in title else "YlGn"
@@ -47,13 +55,17 @@ def plot_physics_topology(
             cw, cs = optima[title]
             ax.plot(cw, cs, "*", color="white", ms=16,
                     markeredgecolor="black", markeredgewidth=0.8, zorder=9)
+            label = title
         else:
             # Individual panels: star at this metric's own optimum
             ow, os_ = optima[title]
             ax.plot(ow, os_, "*", color="white", ms=14,
                     markeredgecolor="black", markeredgewidth=0.8, zorder=8)
+            wk = weight_keys.get(title)
+            w_val = pw.get(wk, 1) if wk else None
+            label = f"{title} (w={w_val:g})" if w_val is not None else title
 
-        ax.set_title(title, fontsize=10)
+        ax.set_title(label, fontsize=10)
         ax.set_xlabel("Water Ratio")
         ax.set_ylabel("Print Speed [mm/s]")
         plt.colorbar(im, ax=ax, shrink=0.8)
@@ -97,41 +109,55 @@ def plot_cross_sections(
     save_fig(save_path)
 
 
-def plot_baseline_scatter(
+def plot_baseline_overview(
     save_path: str,
     params_list: list[dict[str, Any]],
+    waters_grid: np.ndarray,
+    speeds_grid: np.ndarray,
+    true_grid: np.ndarray,
+    pred_grid: np.ndarray,
+    n_baseline: int,
 ) -> None:
-    """Scatter of baseline experiments + nearest-neighbor distance histogram."""
-    waters = np.array([p["water_ratio"] for p in params_list])
-    speeds = np.array([p["print_speed"] for p in params_list])
-    n = len(waters)
+    """1x3 overview: parameter space scatter, ground truth topology, initial model topology."""
+    exp_waters = np.array([p["water_ratio"] for p in params_list])
+    exp_speeds = np.array([p["print_speed"] for p in params_list])
+    n = len(exp_waters)
 
-    normed = np.column_stack([(waters - 0.30) / 0.20, (speeds - 20.0) / 40.0])
-    nn_dists = np.array([
-        np.min(np.delete(np.linalg.norm(normed - normed[i], axis=1), i))
-        for i in range(n)
-    ])
+    # Use ground-truth range so physics topology always renders correctly;
+    # initial model is shown on the same scale for honest comparison.
+    vmin, vmax = true_grid.min(), true_grid.max()
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle("Baseline Sampling Coverage (\u03ba=1)", fontsize=13, fontweight="bold")
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 4.5))
+    fig.suptitle(f"Baseline ({n_baseline} experiments)", fontsize=14, fontweight="bold", y=1.02)
 
-    ax1.scatter(waters, speeds, s=60, c="#4878CF", edgecolors="white", linewidth=0.8, zorder=5)
-    for i, (w, s) in enumerate(zip(waters, speeds)):
+    # Panel 1: parameter space
+    ax1.scatter(exp_waters, exp_speeds, s=60, c="#4A7FA5", edgecolors="white", linewidth=0.8, zorder=5)
+    for i, (w, s) in enumerate(zip(exp_waters, exp_speeds)):
         ax1.annotate(f"{i+1}", (w, s), fontsize=6, ha="center", va="bottom",
                      xytext=(0, 5), textcoords="offset points", color="#666")
     ax1.set_xlim(0.30, 0.50)
     ax1.set_ylim(20.0, 60.0)
     ax1.set_xlabel("Water Ratio")
     ax1.set_ylabel("Print Speed [mm/s]")
-    ax1.set_title(f"Parameter Space ({n} experiments)")
+    ax1.set_title("Parameter Space", fontsize=10)
     ax1.grid(True, alpha=0.2)
 
-    ax2.bar(range(1, n + 1), nn_dists, color="#4878CF", edgecolor="white", linewidth=0.5)
-    ax2.axhline(nn_dists.mean(), color="#D65F5F", ls="--", lw=1.5, label=f"Mean={nn_dists.mean():.3f}")
-    ax2.set_xlabel("Experiment #")
-    ax2.set_ylabel("NN Distance (normalized)")
-    ax2.set_title("Spacing Uniformity")
-    ax2.legend(fontsize=8)
-    ax2.grid(True, alpha=0.2)
+    # Panel 2: ground truth
+    im2 = ax2.contourf(waters_grid, speeds_grid, true_grid, levels=20, cmap="RdYlGn", vmin=vmin, vmax=vmax)
+    ax2.contour(waters_grid, speeds_grid, true_grid, levels=10, colors="white", linewidths=0.3, alpha=0.5)
+    ax2.scatter(exp_waters, exp_speeds, s=20, c="white", edgecolors="black", linewidth=0.5, zorder=5)
+    ax2.set_xlabel("Water Ratio")
+    ax2.set_ylabel("Print Speed [mm/s]")
+    ax2.set_title("Ground Truth", fontsize=10)
+    plt.colorbar(im2, ax=ax2, shrink=0.8)
+
+    # Panel 3: initial model
+    im3 = ax3.contourf(waters_grid, speeds_grid, pred_grid, levels=20, cmap="RdYlGn", vmin=vmin, vmax=vmax)
+    ax3.contour(waters_grid, speeds_grid, pred_grid, levels=10, colors="white", linewidths=0.3, alpha=0.5)
+    ax3.scatter(exp_waters, exp_speeds, s=20, c="white", edgecolors="black", linewidth=0.5, zorder=5)
+    ax3.set_xlabel("Water Ratio")
+    ax3.set_ylabel("Print Speed [mm/s]")
+    ax3.set_title("Initial Model", fontsize=10)
+    plt.colorbar(im3, ax=ax3, shrink=0.8)
 
     save_fig(save_path)

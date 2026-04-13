@@ -17,7 +17,7 @@ from pred_fab.utils import SplitType
 from pred_fab import combined_score
 from sensors.physics import N_LAYERS, N_SEGMENTS
 from visualization import plot_prediction_scatter, plot_topology_comparison
-from visualization.helpers import physics_combined_at, PERF_WEIGHTS_DEFAULT
+from visualization.helpers import physics_combined_at
 from shared import make_env, run_baseline, train_models, ensure_plot_dir
 
 from pred_fab.core import DataModule
@@ -25,7 +25,7 @@ from pred_fab.core import DataModule
 N_BASELINE = 20
 VAL_SIZE = 0.25
 RESOLUTION = 40
-PERF_WEIGHTS = PERF_WEIGHTS_DEFAULT
+PERF_WEIGHTS = {}
 
 # Feature → performance weight mapping (features predict performance metrics)
 FEATURE_WEIGHTS = {

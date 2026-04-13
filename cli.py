@@ -3,8 +3,9 @@
 Quick start:
     uv run cli.py reset
     uv run cli.py init-schema
-    uv run cli.py init-physics --plot
+    uv run cli.py init-agent
     uv run cli.py configure --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
+    uv run cli.py init-physics --seed 42 --plot
     uv run cli.py baseline --n 10 --plot
     uv run cli.py explore --n 5 --kappa 0.5 --plot
     uv run cli.py test-set --n 20
@@ -107,12 +108,21 @@ def _rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Datase
     try:
         schema = build_schema()
         fab = FabricationSystem(CameraSystem(), EnergySensor())
-        agent = build_agent(schema, fab.camera, fab.energy, verbose=verbose)
+        model_type = config.get("model_type", "mlp")
+        agent = build_agent(schema, fab.camera, fab.energy, model_type=model_type, verbose=verbose)
 
         if config.get("performance_weights"):
             agent.configure_performance(weights=config["performance_weights"])
+
+        explore_kwargs: dict[str, Any] = {}
         if config.get("exploration_radius") is not None:
-            agent.configure_exploration(radius=config["exploration_radius"])
+            explore_kwargs["radius"] = config["exploration_radius"]
+        if config.get("buffer") is not None:
+            explore_kwargs["buffer"] = config["buffer"]
+        if config.get("decay_exp") is not None:
+            explore_kwargs["decay_exp"] = config["decay_exp"]
+        if explore_kwargs:
+            agent.configure_exploration(**explore_kwargs)
 
         opt_kwargs: dict[str, Any] = {}
         if config.get("optimizer"):
@@ -199,11 +209,10 @@ def cmd_reset(args: argparse.Namespace) -> None:
 
 
 def cmd_init_schema(args: argparse.Namespace) -> None:
-    """Show the problem schema: parameters, features, performance attributes."""
+    """Show the problem schema."""
+    from schema import SCHEMA_TITLE
     config: dict[str, Any] = {}
     state = JourneyState()
-
-    schema = build_schema()
 
     _B = "\033[1m"
     _C = "\033[36m"
@@ -212,27 +221,35 @@ def cmd_init_schema(args: argparse.Namespace) -> None:
     bar = "━" * 58
     print(f"\n{_B}{_C}{bar}{_R}")
     print(f"{_B}{_C}  PHASE 0.1{_R}{_B} ▸ Schema{_R}")
-    print(f"  {_D}{schema.name}{_R}")
+    print(f"  {_D}{SCHEMA_TITLE}{_R}")
     print(f"{_B}{_C}{bar}{_R}")
 
-    print(f"\n  Parameters:")
-    for code, obj in schema.parameters.items():
-        c = obj.constraints
-        lo, hi = c.get("min", ""), c.get("max", "")
-        bounds = f"[{lo}, {hi}]" if lo != "" else ""
-        runtime = " (runtime)" if obj.runtime_adjustable else ""
-        fixed = " (fixed)" if lo == hi and lo != "" else ""
-        print(f"    {code:<20s} {bounds:<15s}{runtime}{fixed}")
+    schema = build_schema()
+    schema.state_report()
 
-    print(f"\n  Features:")
-    for code in schema.features.keys():
-        print(f"    {code}")
+    _save_session(config, state)
 
-    print(f"\n  Performance attributes:")
-    for code in schema.performance_attrs.keys():
-        print(f"    {code}")
 
-    print()
+def cmd_init_agent(args: argparse.Namespace) -> None:
+    """Initialize the agent and show its state."""
+    config, state = _load_session()
+
+    model_type = args.model
+    config["model_type"] = model_type
+
+    _B = "\033[1m"
+    _C = "\033[36m"
+    _R = "\033[0m"
+    _D = "\033[2m"
+    bar = "━" * 58
+    print(f"\n{_B}{_C}{bar}{_R}")
+    print(f"{_B}{_C}  PHASE 0.2{_R}{_B} ▸ Agent{_R}")
+    print(f"  {_D}model={model_type}{_R}")
+    print(f"{_B}{_C}{bar}{_R}")
+
+    agent, _, _ = _rebuild(config)
+    agent.state_report()
+
     _save_session(config, state)
 
 
@@ -247,7 +264,7 @@ def cmd_init_physics(args: argparse.Namespace) -> None:
     _D = "\033[2m"
     bar = "━" * 58
     print(f"\n{_B}{_C}{bar}{_R}")
-    print(f"{_B}{_C}  PHASE 0.2{_R}{_B} ▸ Physics{_R}")
+    print(f"{_B}{_C}  PHASE 0.3{_R}{_B} ▸ Physics{_R}")
     seed_str = f"seed={args.seed}" if args.seed is not None else "random"
     print(f"  {_D}Randomize ground truth ({seed_str}){_R}")
     print(f"{_B}{_C}{bar}{_R}")
@@ -274,34 +291,49 @@ def cmd_init_physics(args: argparse.Namespace) -> None:
     _save_session(config, state)
 
 
+def _print_config_set(label: str, value: Any) -> None:
+    """Print a configuration confirmation line."""
+    _G = "\033[32m"
+    _D = "\033[2m"
+    _R = "\033[0m"
+    if isinstance(value, dict):
+        print(f"\n  {_D}{label}{_R}")
+        for k, v in value.items():
+            print(f"  {_G}✓{_R} {k} = {v}")
+    else:
+        print(f"  {_G}✓{_R} {label} = {value}")
+
+
 def cmd_configure(args: argparse.Namespace) -> None:
     """Set agent configuration."""
     config, state = _load_session()
 
-    if args.bounds:
-        config["bounds"] = json.loads(args.bounds)
     if args.weights:
         config["performance_weights"] = json.loads(args.weights)
+        _print_config_set("Weights", config["performance_weights"])
+    if args.bounds:
+        config["bounds"] = json.loads(args.bounds)
+        _print_config_set("Bounds", config["bounds"])
     if args.optimizer:
         config["optimizer"] = args.optimizer
+        _print_config_set("Optimizer", args.optimizer)
     if args.radius is not None:
         config["exploration_radius"] = args.radius
+        _print_config_set("Exploration radius", args.radius)
+    if args.buffer is not None:
+        config["buffer"] = args.buffer
+        _print_config_set("Buffer", args.buffer)
+    if args.decay_exp is not None:
+        config["decay_exp"] = args.decay_exp
+        _print_config_set("Decay exponent", args.decay_exp)
     if args.de_maxiter is not None:
         config["de_maxiter"] = args.de_maxiter
+        _print_config_set("DE max iterations", args.de_maxiter)
     if args.de_popsize is not None:
         config["de_popsize"] = args.de_popsize
+        _print_config_set("DE population size", args.de_popsize)
 
-    print("\n  Configuration:")
-    if config.get("performance_weights"):
-        pw = config["performance_weights"]
-        parts = [f"{k}={v}" for k, v in pw.items()]
-        print(f"    Weights: {', '.join(parts)}")
-    if config.get("exploration_radius") is not None:
-        print(f"    Exploration radius: {config['exploration_radius']}")
-    if config.get("optimizer"):
-        print(f"    Optimizer: {config['optimizer']}")
     print()
-
     _save_session(config, state)
 
 
@@ -309,7 +341,6 @@ def cmd_baseline(args: argparse.Namespace) -> None:
     """Run baseline experiments (space-filling, no model)."""
     config, state = _load_session()
     agent, dataset, fab = _rebuild(config)
-    perf_weights = config.get("performance_weights")
     plot_dir = _ensure_plot_dir()
 
     agent.console.print_phase_header(1, "Baseline", f"{args.n} experiments")
@@ -325,24 +356,27 @@ def cmd_baseline(args: argparse.Namespace) -> None:
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
 
-    # Plots
-    from visualization import plot_baseline_scatter, plot_topology_comparison
-    from visualization.helpers import physics_combined_at
+    # 3D filament view of a single experiment (last baseline)
+    from visualization import plot_path_comparison_3d
+    last_params = state.all_params[-1]
+    path_3d = os.path.join(plot_dir, "01_path_deviation_3d.png")
+    plot_path_comparison_3d(path_3d, fab.camera, last_params, exp_code=state.all_codes[-1])
+    show_plot(path_3d, inline=args.plot)
 
-    path = os.path.join(plot_dir, "01_baseline_scatter.png")
-    plot_baseline_scatter(path, state.all_params)
-    show_plot(path, inline=args.plot)
-
-    # Train initial model and compare topology
+    # Train initial model for topology comparison
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
 
+    # Combined 1x3 plot: parameter space + ground truth + initial model
+    from visualization import plot_baseline_overview
+    from visualization.helpers import physics_combined_at
+
     waters = np.linspace(0.30, 0.50, 40)
     speeds = np.linspace(20.0, 60.0, 40)
-    true_grid = np.array([[physics_combined_at(w, spd, perf_weights) for w in waters] for spd in speeds])
+    pw = agent.calibration_system.performance_weights
+    true_grid = np.array([[physics_combined_at(w, spd, pw) for w in waters] for spd in speeds])
     pred_grid = np.zeros_like(true_grid)
-    pw = perf_weights or {}
     for i, w in enumerate(waters):
         for j, spd in enumerate(speeds):
             try:
@@ -352,10 +386,9 @@ def cmd_baseline(args: argparse.Namespace) -> None:
             except Exception:
                 pred_grid[j, i] = 0.0
 
-    path = os.path.join(plot_dir, "02_initial_topology.png")
-    plot_topology_comparison(path, waters, speeds,
-                              {"Ground Truth": true_grid, f"Model ({args.n} baseline)": pred_grid},
-                              title="Initial Model vs Ground Truth")
+    path = os.path.join(plot_dir, "01_baseline.png")
+    plot_baseline_overview(path, state.all_params, waters, speeds,
+                           true_grid, pred_grid, n_baseline=args.n)
     show_plot(path, inline=args.plot)
 
     _save_session(config, state)
@@ -365,7 +398,6 @@ def cmd_explore(args: argparse.Namespace) -> None:
     """Run exploration rounds (incremental — can be called multiple times)."""
     config, state = _load_session()
     agent, dataset, fab = _rebuild(config)
-    perf_weights = config.get("performance_weights")
     plot_dir = _ensure_plot_dir()
 
     n_existing = len([p for p in state.all_phases if p == "exploration"])
@@ -378,8 +410,6 @@ def cmd_explore(args: argparse.Namespace) -> None:
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=args.validate)
 
-    optimum = _get_physics_optimum(perf_weights)
-
     for i in range(args.n):
         round_num = n_existing + i + 1
         spec = agent.exploration_step(dm, kappa=args.kappa)
@@ -387,47 +417,28 @@ def cmd_explore(args: argparse.Namespace) -> None:
         params = with_dimensions({**state.prev_params, **proposed})
         exp_code = _next_code(state, "explore")
 
+        # Snapshot acquisition landscape BEFORE running the experiment
+        # (the optimizer chose this point on the current landscape)
+        if args.plot:
+            from visualization import plot_acquisition_topology
+            acq_data = _compute_acquisition_grid(agent, dm, args.kappa, res=30)
+
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
         perf = get_performance(exp_data)
         state.record("exploration", exp_code, params, perf)
 
-        dm.update()
-        agent.train(dm, validate=False)
-
-        # Plot per round if --plot
+        # Plot the pre-retrain landscape with the proposed point
         if args.plot:
-            from visualization import plot_acquisition_topology
-            w, s, p, u, c = _compute_acquisition_grid(agent, dm, args.kappa, res=30)
+            w, s, p, u, c = acq_data
             path = os.path.join(plot_dir, f"03_explore_round_{round_num:02d}.png")
             plot_acquisition_topology(path, w, s, p, u, c,
-                                      experiment_pts=state.all_params,
-                                      optimum=optimum,
+                                      experiment_pts=state.all_params[:-1],
+                                      proposed=params,
                                       title=f"Exploration \u2014 Round {round_num}")
             show_plot(path, inline=True)
 
-    # Final topology comparison
-    from visualization import plot_topology_comparison
-    from visualization.helpers import physics_combined_at
-    waters = np.linspace(0.30, 0.50, 40)
-    speeds = np.linspace(20.0, 60.0, 40)
-    true_grid = np.array([[physics_combined_at(w, spd, perf_weights) for w in waters] for spd in speeds])
-    pred_grid = np.zeros_like(true_grid)
-    pw = perf_weights or {}
-    for i_w, w in enumerate(waters):
-        for j_s, spd in enumerate(speeds):
-            try:
-                perf = agent.predict_performance({"water_ratio": w, "print_speed": spd,
-                                                   "n_layers": N_LAYERS, "n_segments": N_SEGMENTS})
-                pred_grid[j_s, i_w] = combined_score(perf, pw)
-            except Exception:
-                pred_grid[j_s, i_w] = 0.0
-
-    n_total = len(state.all_params)
-    path = os.path.join(plot_dir, "04_topology_after_exploration.png")
-    plot_topology_comparison(path, waters, speeds,
-                              {"Ground Truth": true_grid, f"Model ({n_total} experiments)": pred_grid},
-                              title="Model After Exploration vs Ground Truth")
-    show_plot(path, inline=args.plot)
+        dm.update()
+        agent.train(dm, validate=False)
 
     _save_session(config, state)
 
@@ -457,7 +468,7 @@ def cmd_analyse(args: argparse.Namespace) -> None:
     """Evaluate the prediction model on the test set and show sensitivity analysis."""
     config, state = _load_session()
     agent, dataset, fab = _rebuild(config)
-    perf_weights = config.get("performance_weights", {})
+    perf_weights = agent.calibration_system.performance_weights
     plot_dir = _ensure_plot_dir()
 
     # Train on all non-test data
@@ -534,7 +545,7 @@ def cmd_inference(args: argparse.Namespace) -> None:
     """Single-shot inference with design intent."""
     config, state = _load_session()
     agent, dataset, fab = _rebuild(config)
-    perf_weights = config.get("performance_weights", {})
+    perf_weights = agent.calibration_system.performance_weights
     plot_dir = _ensure_plot_dir()
 
     # Parse design intent
@@ -580,6 +591,33 @@ def cmd_inference(args: argparse.Namespace) -> None:
     gap = opt_score - score
     print(f"\n  Physics optimum: combined={opt_score:.3f} (gap={gap:+.3f})")
 
+    # Prediction grid for inference topology
+    from visualization import plot_inference_result
+    waters = np.linspace(0.30, 0.50, 40)
+    speeds = np.linspace(20.0, 60.0, 40)
+    pred_grid = np.zeros((40, 40))
+    for i, w in enumerate(waters):
+        for j, spd in enumerate(speeds):
+            try:
+                p = agent.predict_performance({"water_ratio": w, "print_speed": spd,
+                                                "n_layers": N_LAYERS, "n_segments": N_SEGMENTS})
+                pred_grid[j, i] = combined_score(p, perf_weights)
+            except Exception:
+                pred_grid[j, i] = 0.0
+
+    path = os.path.join(plot_dir, "05_inference.png")
+    plot_inference_result(
+        path, waters, speeds, pred_grid,
+        proposed_water=params["water_ratio"],
+        proposed_speed=params["print_speed"],
+        proposed_score=score,
+        opt_water=opt_w,
+        opt_speed=opt_s,
+        opt_score=opt_score,
+        experiment_pts=state.all_params,
+    )
+    show_plot(path, inline=args.plot)
+
     _save_session(config, state)
 
 
@@ -589,7 +627,6 @@ def cmd_explore_trajectory(args: argparse.Namespace) -> None:
     """Trajectory exploration: per-layer speed optimization with MPC lookahead."""
     config, state = _load_session()
     agent, dataset, fab = _rebuild(config)
-    perf_weights = config.get("performance_weights", {})
 
     # Configure trajectory
     agent.configure_trajectory(
@@ -648,7 +685,7 @@ def cmd_adapt(args: argparse.Namespace) -> None:
     """
     config, state = _load_session()
     agent, dataset, fab = _rebuild(config)
-    perf_weights = config.get("performance_weights", {})
+    perf_weights = agent.calibration_system.performance_weights
 
     # Configure for adaptation
     agent.configure_trajectory(
@@ -745,7 +782,9 @@ def cmd_adapt(args: argparse.Namespace) -> None:
 def cmd_summary(args: argparse.Namespace) -> None:
     """Show run summary across all phases."""
     config, state = _load_session()
-    perf_weights = config.get("performance_weights", {})
+    perf_weights = config.get("performance_weights") or {
+        "path_accuracy": 1, "energy_efficiency": 1, "production_rate": 1,
+    }
 
     print(f"\n  Run Summary:")
     print(f"  {'─' * 60}")
@@ -779,10 +818,13 @@ def build_parser() -> argparse.ArgumentParser:
 Quick start:
   uv run cli.py reset
   uv run cli.py init-schema
-  uv run cli.py init-physics --plot
+  uv run cli.py init-agent
   uv run cli.py configure --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
+  uv run cli.py init-physics --seed 42 --plot
   uv run cli.py baseline --n 10 --plot
   uv run cli.py explore --n 5 --kappa 0.5 --plot
+  uv run cli.py test-set --n 20
+  uv run cli.py analyse --plot
   uv run cli.py inference --design-intent '{"n_layers":5}' --plot
   uv run cli.py summary
 """,
@@ -797,6 +839,11 @@ Quick start:
     p = sub.add_parser("init-schema", help="Show the problem schema")
     p.set_defaults(func=cmd_init_schema)
 
+    # init-agent
+    p = sub.add_parser("init-agent", help="Initialize the agent")
+    p.add_argument("--model", choices=["mlp", "rf"], default="mlp", help="Prediction model type (default: mlp)")
+    p.set_defaults(func=cmd_init_agent)
+
     # init-physics
     p = sub.add_parser("init-physics", help="Randomize physics constants and show topology")
     p.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
@@ -810,11 +857,13 @@ Quick start:
 Configuration groups:
 
   Performance:
-    --weights JSON        Performance attribute weights
-                          Example: '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
+    --weights JSON           Performance attribute weights
+                             Example: '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
 
   Exploration:
-    --radius FLOAT        KDE exploration radius (default: 0.15)
+    --radius FLOAT           KDE exploration radius (default: 0.15)
+    --buffer FLOAT           Normalization buffer for perf/unc (default: 0.5)
+    --decay-exp FLOAT        Bandwidth decay exponent (default: 0.5)
 
   Optimizer:
     --optimizer {de,lbfgsb}  Backend (default: de)
@@ -822,13 +871,15 @@ Configuration groups:
     --de-popsize INT         DE population size (default: 10)
 
   Bounds:
-    --bounds JSON         Parameter search bounds override
-                          Example: '{"water_ratio":[0.35,0.45]}'
+    --bounds JSON            Parameter search bounds override
+                             Example: '{"water_ratio":[0.35,0.45]}'
 """)
     p.add_argument("--bounds", type=str, help="JSON: parameter bounds override")
     p.add_argument("--weights", type=str, help="JSON: performance attribute weights")
     p.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None)
     p.add_argument("--radius", type=float, default=None, help="Exploration radius")
+    p.add_argument("--buffer", type=float, default=None, help="Normalization buffer (default: 0.5)")
+    p.add_argument("--decay-exp", type=float, default=None, help="Bandwidth decay exponent (default: 0.5)")
     p.add_argument("--de-maxiter", type=int, default=None)
     p.add_argument("--de-popsize", type=int, default=None)
     p.set_defaults(func=cmd_configure)

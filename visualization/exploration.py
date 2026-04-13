@@ -87,7 +87,6 @@ def plot_acquisition_topology(
     combined_grid: np.ndarray,
     experiment_pts: list[dict[str, Any]] | None = None,
     proposed: dict[str, float] | None = None,
-    optimum: tuple[float, float] | None = None,
     title: str = "Acquisition Topology",
 ) -> None:
     """3-panel: performance | uncertainty | combined acquisition."""
@@ -112,16 +111,11 @@ def plot_acquisition_topology(
             ax.scatter(ew, es, s=18, c="white", edgecolors="#3F3F46",
                        linewidth=0.5, zorder=5, label="Evaluated")
 
-        # Optimum cross (dark with white edge for readability on any background)
-        if optimum is not None:
-            ax.plot(optimum[0], optimum[1], "x", color="#18181B",
-                    ms=8, markeredgewidth=1.2, zorder=7, label="Optimum")
-
     # Proposed point only on combined panel
     if proposed is not None:
         axes[2].plot(proposed["water_ratio"], proposed["print_speed"],
-                     "x", color="#EAB308", ms=9,
-                     markeredgewidth=1.2, zorder=8, label="Proposed")
+                     "x", color="#EAB308", ms=10,
+                     markeredgewidth=2, zorder=8, label="Proposed")
 
     # Legend on combined panel only (rightmost)
     axes[2].legend(fontsize=7, loc="upper left", framealpha=0.8)

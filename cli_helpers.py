@@ -3,6 +3,7 @@
 import base64
 import json
 import os
+import subprocess
 import sys
 from typing import Any
 
@@ -12,36 +13,22 @@ import numpy as np
 # ── Inline plot display ───────────────────────────────────────────────────────
 
 def show_plot(path: str, inline: bool = True) -> None:
-    """Display a plot: save path always printed, inline display if requested.
+    """Display a plot: save path always printed, inline image if requested.
 
-    Tries iTerm2 imgcat protocol (works in iTerm2, WezTerm, VSCode terminal).
-    Falls back to macOS `open` command (non-blocking).
-    Always prints the file path regardless.
+    Uses the iTerm2 inline image protocol (works in iTerm2, WezTerm, Kitty).
+    Install iTerm2: ``brew install --cask iterm2``
     """
-    print(f"  Plot: {path}")
     if not inline:
+        print(f"  Plot: {path}")
         return
 
-    displayed = False
-
-    # Try iTerm2 inline image protocol
-    try:
-        with open(path, "rb") as f:
-            img_data = f.read()
-        b64 = base64.b64encode(img_data).decode("ascii")
-        sys.stdout.write(f"\033]1337;File=inline=1;size={len(img_data)}:{b64}\a\n")
-        sys.stdout.flush()
-        displayed = True
-    except Exception:
-        pass
-
-    # Fallback: open with system viewer (macOS)
-    if not displayed:
-        try:
-            import subprocess
-            subprocess.Popen(["open", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
+    print()
+    with open(path, "rb") as f:
+        img_data = f.read()
+    b64 = base64.b64encode(img_data).decode("ascii")
+    sys.stdout.write(f"\033]1337;File=inline=1;size={len(img_data)}:{b64}\a\n")
+    sys.stdout.flush()
+    print(f"  Plot: {path}")
 
 
 # ── Physics randomization ─────────────────────────────────────────────────────
@@ -112,31 +99,28 @@ def load_physics_from_session(session_config: dict[str, Any]) -> None:
 # ── Test set generation ───────────────────────────────────────────────────────
 
 def generate_test_params(n: int, seed: int = 99) -> list[dict[str, Any]]:
-    """Generate n test parameter sets on a Sobol-like grid.
+    """Generate n test parameter sets on a stratified grid.
 
     Uses a separate seed from training to ensure independence.
+    Reads dimension bounds from the physics constants to respect schema constraints.
     """
     rng = np.random.default_rng(seed)
 
-    # Simple stratified grid in 3D: water_ratio, print_speed, n_layers
-    from sensors.physics import N_SEGMENTS
+    from sensors.physics import N_LAYERS, N_SEGMENTS
 
-    waters = np.linspace(0.31, 0.49, max(int(np.ceil(n ** (1/3))), 2))
-    speeds = np.linspace(21.0, 59.0, max(int(np.ceil(n ** (1/3))), 2))
-    layers = [3, 4, 5, 6, 7, 8]
+    waters = np.linspace(0.31, 0.49, max(int(np.ceil(np.sqrt(n))), 2))
+    speeds = np.linspace(21.0, 59.0, max(int(np.ceil(np.sqrt(n))), 2))
 
     candidates = []
     for w in waters:
         for s in speeds:
-            for nl in layers:
-                candidates.append({
-                    "water_ratio": float(w),
-                    "print_speed": float(s),
-                    "n_layers": int(nl),
-                    "n_segments": N_SEGMENTS,
-                })
+            candidates.append({
+                "water_ratio": float(w),
+                "print_speed": float(s),
+                "n_layers": N_LAYERS,
+                "n_segments": N_SEGMENTS,
+            })
 
-    # Sample n from candidates (or take all if fewer)
     rng.shuffle(candidates)
     return candidates[:n]
 
