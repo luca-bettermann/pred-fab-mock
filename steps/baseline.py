@@ -5,6 +5,9 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from pred_fab.plotting import plot_parameter_space
+from visualization import plot_path_comparison_3d
+from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
@@ -31,7 +34,6 @@ def run(args: argparse.Namespace) -> None:
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
 
-    from visualization import plot_path_comparison_3d
     last_params = state.all_params[-1]
     path_3d = os.path.join(plot_dir, "01_path_deviation_3d.png")
     plot_path_comparison_3d(path_3d, fab.camera, last_params, exp_code=state.all_codes[-1])
@@ -40,9 +42,6 @@ def run(args: argparse.Namespace) -> None:
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
-
-    from pred_fab.plotting import plot_parameter_space
-    from visualization.helpers import physics_combined_at
 
     waters = np.linspace(0.30, 0.50, 40)
     speeds = np.linspace(20.0, 60.0, 40)

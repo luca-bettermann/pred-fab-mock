@@ -5,6 +5,8 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from pred_fab.plotting import plot_topology_comparison
+from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, rebuild, ensure_plot_dir, show_plot, get_physics_optimum,
     combined_score, compute_local_sensitivity, N_LAYERS, N_SEGMENTS,
@@ -47,8 +49,6 @@ def run(args: argparse.Namespace) -> None:
     print(f"    MAE (combined score): {mae:.4f}")
     print(f"    Max error:            {max(errors):.4f}")
 
-    from pred_fab.plotting import plot_topology_comparison
-    from visualization.helpers import physics_combined_at
     waters = np.linspace(0.30, 0.50, 40)
     speeds = np.linspace(20.0, 60.0, 40)
     true_grid = np.array([[physics_combined_at(w, spd, perf_weights) for w in waters] for spd in speeds])

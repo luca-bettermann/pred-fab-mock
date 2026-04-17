@@ -3,6 +3,7 @@ import argparse
 import os
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from pred_fab.plotting import plot_acquisition
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
@@ -34,7 +35,6 @@ def run(args: argparse.Namespace) -> None:
         exp_code = next_code(state, "explore")
 
         if args.plot:
-            from pred_fab.plotting import plot_acquisition
             acq_data = compute_acquisition_grid(agent, dm, args.kappa, res=30)
 
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)

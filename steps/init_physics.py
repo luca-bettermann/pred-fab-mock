@@ -3,6 +3,8 @@ import argparse
 import os
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from pred_fab.plotting import plot_metric_topology
+from visualization.helpers import evaluate_physics_grid
 from steps._common import (
     load_session, save_session, ensure_plot_dir, show_plot,
     randomize_physics, apply_physics_config, PHYSICS_CONFIG_KEY,
@@ -30,9 +32,6 @@ def run(args: argparse.Namespace) -> None:
             print(f"    {key:<25s} = [{', '.join(f'{v:.3f}' for v in val)}]")
         else:
             print(f"    {key:<25s} = {val:.6f}")
-
-    from pred_fab.plotting import plot_metric_topology
-    from visualization.helpers import evaluate_physics_grid
 
     perf_weights = config.get("performance_weights")
     waters, speeds, metrics = evaluate_physics_grid(50, perf_weights)
