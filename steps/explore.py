@@ -7,6 +7,7 @@ from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, compute_acquisition_grid,
+    X_AXIS, Y_AXIS, FIXED_DIMS,
 )
 
 
@@ -33,7 +34,7 @@ def run(args: argparse.Namespace) -> None:
         exp_code = next_code(state, "explore")
 
         if args.plot:
-            from visualization import plot_acquisition_topology
+            from pred_fab.plotting import plot_acquisition
             acq_data = compute_acquisition_grid(agent, dm, args.kappa, res=30)
 
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
@@ -43,10 +44,11 @@ def run(args: argparse.Namespace) -> None:
         if args.plot:
             w, s, p, u, c = acq_data
             path = os.path.join(plot_dir, f"03_explore_round_{round_num:02d}.png")
-            plot_acquisition_topology(path, w, s, p, u, c,
-                                      experiment_pts=state.all_params[:-1],
-                                      proposed=params,
-                                      title=f"Exploration \u2014 Round {round_num}")
+            plot_acquisition(path, X_AXIS, Y_AXIS, w, s, p, u, c,
+                             points=state.all_params[:-1],
+                             proposed=params,
+                             title=f"Exploration \u2014 Round {round_num}",
+                             fixed_params=FIXED_DIMS)
             show_plot(path, inline=True)
 
         dm.update()
