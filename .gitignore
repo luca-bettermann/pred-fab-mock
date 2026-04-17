@@ -4,11 +4,14 @@ build/
 __pycache__/
 **/__pycache__/
 *.pyc
+.pytest_cache/
 .DS_Store
 **/logs/
 
 # Runtime data
 local/
+pfab_data/
+.pfab_session.json
 
 # Generated plots and data (main workflow + dev scripts)
 plots/
