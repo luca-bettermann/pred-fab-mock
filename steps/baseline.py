@@ -5,14 +5,14 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.plotting import plot_parameter_space
+from pred_fab.plotting import plot_parameter_space, plot_parameter_space_3d
 from visualization import plot_path_comparison_3d
 from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, combined_score, N_LAYERS, N_SEGMENTS,
-    X_AXIS, Y_AXIS, FIXED_DIMS,
+    X_AXIS, Y_AXIS, Z_AXIS, FIXED_DIMS,
 )
 
 
@@ -62,6 +62,11 @@ def run(args: argparse.Namespace) -> None:
                          state.all_params, true_grid, pred_grid,
                          fixed_params=FIXED_DIMS)
     show_plot(path, inline=args.plot)
+
+    path_3d_params = os.path.join(plot_dir, "01_baseline_3d.png")
+    plot_parameter_space_3d(path_3d_params, X_AXIS, Y_AXIS, Z_AXIS,
+                             state.all_params, title="Baseline Parameter Space")
+    show_plot(path_3d_params, inline=args.plot)
 
     save_session(config, state)
 
