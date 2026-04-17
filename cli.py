@@ -91,6 +91,7 @@ Configuration groups:
     --bounds JSON            Parameter search bounds override
                              Example: '{"water_ratio":[0.35,0.45]}'
 """)
+    p.add_argument("--show", action="store_true", help="Show all current configuration values")
     p.add_argument("--bounds", type=str, help="JSON: parameter bounds override")
     p.add_argument("--weights", type=str, help="JSON: performance attribute weights")
     p.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None)

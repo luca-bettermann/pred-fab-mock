@@ -183,14 +183,72 @@ Z_AXIS = AxisSpec("n_layers", "Layers")
 FIXED_DIMS = {"n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
 
 
-def print_config_set(label: str, value: Any) -> None:
-    """Print a configuration confirmation line."""
+def print_config_set(label: str, old: Any, new: Any) -> None:
+    """Print a configuration change line showing old → new."""
     _G = "\033[32m"
     _D = "\033[2m"
     _R = "\033[0m"
-    if isinstance(value, dict):
+    if isinstance(new, dict):
         print(f"\n  {_D}{label}{_R}")
-        for k, v in value.items():
-            print(f"  {_G}\u2713{_R} {k} = {v}")
+        old_d = old if isinstance(old, dict) else {}
+        for k, v in new.items():
+            prev = old_d.get(k)
+            if prev is not None and prev != v:
+                print(f"  {_G}\u2713{_R} {k} = {prev} \u2192 {v}")
+            else:
+                print(f"  {_G}\u2713{_R} {k} = {v}")
     else:
-        print(f"  {_G}\u2713{_R} {label} = {value}")
+        if old is not None and old != new:
+            print(f"  {_G}\u2713{_R} {label} = {old} \u2192 {new}")
+        else:
+            print(f"  {_G}\u2713{_R} {label} = {new}")
+
+
+def print_config_show(config: dict[str, Any]) -> None:
+    """Print all current configuration values."""
+    _D = "\033[2m"
+    _R = "\033[0m"
+    _B = "\033[1m"
+
+    # Config keys with display labels, grouped
+    groups: list[tuple[str, list[tuple[str, str]]]] = [
+        ("Performance", [
+            ("performance_weights", "Weights"),
+        ]),
+        ("Exploration", [
+            ("exploration_radius", "Radius"),
+            ("buffer", "Buffer"),
+            ("decay_exp", "Decay exponent"),
+        ]),
+        ("Optimizer", [
+            ("optimizer", "Backend"),
+            ("de_maxiter", "DE max iterations"),
+            ("de_popsize", "DE population size"),
+        ]),
+        ("Bounds", [
+            ("bounds", "Bounds"),
+        ]),
+        ("Model", [
+            ("model_type", "Model type"),
+            ("test_set_n", "Test set size"),
+        ]),
+    ]
+
+    print(f"\n  {_B}Current Configuration{_R}")
+    any_set = False
+    for group_name, keys in groups:
+        items = [(label, config[key]) for key, label in keys if key in config and config[key] is not None]
+        if not items:
+            continue
+        any_set = True
+        print(f"\n  {_D}{group_name}{_R}")
+        for label, val in items:
+            if isinstance(val, dict):
+                for k, v in val.items():
+                    print(f"    {k:<20s} = {v}")
+            else:
+                print(f"    {label:<20s} = {val}")
+
+    if not any_set:
+        print(f"\n  {_D}No configuration set (using defaults){_R}")
+    print()
