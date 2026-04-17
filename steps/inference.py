@@ -6,10 +6,13 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from pred_fab.plotting import plot_inference_result
+from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, combined_score, get_physics_optimum, N_LAYERS, N_SEGMENTS,
+    X_AXIS, Y_AXIS, FIXED_DIMS,
 )
 
 
@@ -54,13 +57,11 @@ def run(args: argparse.Namespace) -> None:
         print(f"    {k:<20s} = {v:.3f}")
     print(f"    {'combined':<20s} = {score:.3f}")
 
-    from visualization.helpers import physics_combined_at
     opt_w, opt_s = get_physics_optimum(perf_weights, n_layers=n_layers)
     opt_score = physics_combined_at(opt_w, opt_s, perf_weights, n_layers=n_layers)
     gap = opt_score - score
     print(f"\n  Physics optimum: combined={opt_score:.3f} (gap={gap:+.3f})")
 
-    from visualization import plot_inference_result
     waters = np.linspace(0.30, 0.50, 40)
     speeds = np.linspace(20.0, 60.0, 40)
     pred_grid = np.zeros((40, 40))
@@ -75,14 +76,13 @@ def run(args: argparse.Namespace) -> None:
 
     path = os.path.join(plot_dir, "05_inference.png")
     plot_inference_result(
-        path, waters, speeds, pred_grid,
-        proposed_water=params["water_ratio"],
-        proposed_speed=params["print_speed"],
+        path, X_AXIS, Y_AXIS, waters, speeds, pred_grid,
+        proposed={X_AXIS.key: params["water_ratio"], Y_AXIS.key: params["print_speed"]},
         proposed_score=score,
-        opt_water=opt_w,
-        opt_speed=opt_s,
-        opt_score=opt_score,
-        experiment_pts=state.all_params,
+        optimum={X_AXIS.key: opt_w, Y_AXIS.key: opt_s},
+        optimum_score=opt_score,
+        points=state.all_params,
+        fixed_params=FIXED_DIMS,
     )
     show_plot(path, inline=args.plot)
 

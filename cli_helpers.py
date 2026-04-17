@@ -9,6 +9,11 @@ from typing import Any
 
 import numpy as np
 
+import sensors.physics as phys
+from sensors.physics import N_LAYERS, N_SEGMENTS
+from pred_fab import combined_score
+from pred_fab.plotting import plot_sensitivity as _pfab_plot_sensitivity
+
 
 # ── Inline plot display ───────────────────────────────────────────────────────
 
@@ -80,8 +85,6 @@ def randomize_physics(seed: int | None = None) -> dict[str, Any]:
 
 def apply_physics_config(config: dict[str, Any]) -> None:
     """Apply physics config to the sensors.physics module at runtime."""
-    import sensors.physics as phys
-
     for key, val in config.items():
         if key == "SEGMENT_CURVATURE":
             phys.SEGMENT_CURVATURE = list(val)
@@ -105,8 +108,6 @@ def generate_test_params(n: int, seed: int = 99) -> list[dict[str, Any]]:
     Reads dimension bounds from the physics constants to respect schema constraints.
     """
     rng = np.random.default_rng(seed)
-
-    from sensors.physics import N_LAYERS, N_SEGMENTS
 
     waters = np.linspace(0.31, 0.49, max(int(np.ceil(np.sqrt(n))), 2))
     speeds = np.linspace(21.0, 59.0, max(int(np.ceil(np.sqrt(n))), 2))
@@ -135,8 +136,6 @@ def compute_local_sensitivity(
     delta_frac: float = 0.02,
 ) -> dict[str, float]:
     """Compute local sensitivity |∂combined/∂param| at a point via finite differences."""
-    from pred_fab import combined_score
-
     base_perf = agent.predict_performance(params)
     base_score = combined_score(base_perf, perf_weights)
 
@@ -168,34 +167,5 @@ def plot_sensitivity(
     sensitivities: dict[str, float],
     title: str = "Local Sensitivity Analysis",
 ) -> None:
-    """Bar chart of parameter sensitivity at the inference point."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from visualization.helpers import save_fig
-
-    codes = list(sensitivities.keys())
-    values = [sensitivities[c] for c in codes]
-
-    # Sort by magnitude
-    sorted_pairs = sorted(zip(codes, values), key=lambda x: x[1], reverse=True)
-    codes = [p[0] for p in sorted_pairs]
-    values = [p[1] for p in sorted_pairs]
-
-    fig, ax = plt.subplots(figsize=(8, max(3, 0.6 * len(codes))))
-    y_pos = np.arange(len(codes))
-    ax.barh(y_pos, values, height=0.6, color="#4A7FA5", edgecolor="white", linewidth=0.5)
-
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(codes, fontsize=9, color="#52525B")
-    ax.invert_yaxis()
-    ax.set_xlabel("|∂combined/∂param|", fontsize=9, color="#52525B")
-    ax.set_title(title, fontsize=12, fontweight="bold", color="#3F3F46")
-    ax.tick_params(colors="#71717A", labelsize=8)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_color("#D4D4D8")
-    ax.spines["bottom"].set_color("#D4D4D8")
-    ax.grid(True, alpha=0.15, color="#A1A1AA", axis="x")
-
-    save_fig(save_path)
+    """Delegate to pred_fab.plotting.plot_sensitivity."""
+    _pfab_plot_sensitivity(save_path, sensitivities, title=title)

@@ -5,10 +5,14 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from pred_fab.plotting import plot_parameter_space
+from visualization import plot_path_comparison_3d
+from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, combined_score, N_LAYERS, N_SEGMENTS,
+    X_AXIS, Y_AXIS, FIXED_DIMS,
 )
 
 
@@ -30,7 +34,6 @@ def run(args: argparse.Namespace) -> None:
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
 
-    from visualization import plot_path_comparison_3d
     last_params = state.all_params[-1]
     path_3d = os.path.join(plot_dir, "01_path_deviation_3d.png")
     plot_path_comparison_3d(path_3d, fab.camera, last_params, exp_code=state.all_codes[-1])
@@ -39,9 +42,6 @@ def run(args: argparse.Namespace) -> None:
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
-
-    from visualization import plot_baseline_overview
-    from visualization.helpers import physics_combined_at
 
     waters = np.linspace(0.30, 0.50, 40)
     speeds = np.linspace(20.0, 60.0, 40)
@@ -58,8 +58,9 @@ def run(args: argparse.Namespace) -> None:
                 pred_grid[j, i] = 0.0
 
     path = os.path.join(plot_dir, "01_baseline.png")
-    plot_baseline_overview(path, state.all_params, waters, speeds,
-                           true_grid, pred_grid, n_baseline=args.n)
+    plot_parameter_space(path, X_AXIS, Y_AXIS, waters, speeds,
+                         state.all_params, true_grid, pred_grid,
+                         fixed_params=FIXED_DIMS)
     show_plot(path, inline=args.plot)
 
     save_session(config, state)

@@ -5,9 +5,12 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from pred_fab.plotting import plot_topology_comparison
+from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, rebuild, ensure_plot_dir, show_plot, get_physics_optimum,
     combined_score, compute_local_sensitivity, N_LAYERS, N_SEGMENTS,
+    X_AXIS, Y_AXIS, FIXED_DIMS,
 )
 
 
@@ -46,8 +49,6 @@ def run(args: argparse.Namespace) -> None:
     print(f"    MAE (combined score): {mae:.4f}")
     print(f"    Max error:            {max(errors):.4f}")
 
-    from visualization import plot_topology_comparison
-    from visualization.helpers import physics_combined_at, evaluate_physics_grid
     waters = np.linspace(0.30, 0.50, 40)
     speeds = np.linspace(20.0, 60.0, 40)
     true_grid = np.array([[physics_combined_at(w, spd, perf_weights) for w in waters] for spd in speeds])
@@ -62,9 +63,10 @@ def run(args: argparse.Namespace) -> None:
                 pred_grid[j, i] = 0.0
 
     path = os.path.join(plot_dir, "05_analysis_topology.png")
-    plot_topology_comparison(path, waters, speeds,
+    plot_topology_comparison(path, X_AXIS, Y_AXIS, waters, speeds,
                               {"Ground Truth": true_grid, "Model Prediction": pred_grid},
-                              title="Model Analysis on Test Set")
+                              title="Model Analysis on Test Set",
+                              fixed_params=FIXED_DIMS)
     show_plot(path, inline=args.plot)
 
     opt_w, opt_s = get_physics_optimum(perf_weights)

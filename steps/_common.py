@@ -10,6 +10,7 @@ import numpy as np
 from pred_fab.orchestration import Optimizer
 from pred_fab.core import Dataset
 from pred_fab import combined_score
+from pred_fab.plotting import AxisSpec
 
 from schema import build_schema
 from agent_setup import build_agent
@@ -173,6 +174,12 @@ def compute_acquisition_grid(agent, dm, kappa, res=30):
 
     combined_grid = (1 - kappa) * p_norm + kappa * unc_grid
     return waters, speeds, p_norm, unc_grid, combined_grid
+
+
+# Schema-specific axis definitions used across all steps
+X_AXIS = AxisSpec("water_ratio", "Water Ratio", bounds=(0.30, 0.50))
+Y_AXIS = AxisSpec("print_speed", "Print Speed", unit="mm/s", bounds=(20.0, 60.0))
+FIXED_DIMS = {"n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
 
 
 def print_config_set(label: str, value: Any) -> None:
