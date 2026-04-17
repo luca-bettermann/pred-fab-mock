@@ -19,7 +19,6 @@ def run(args: argparse.Namespace) -> None:
 
     agent.console.print_phase_header(1, "Baseline", f"{args.n} experiments")
     specs = agent.baseline_step(n=args.n)
-    nfev_suffix = f"nfev={agent.last_baseline_nfev}"
 
     for spec in specs:
         params = with_dimensions(params_from_spec(spec))
@@ -27,7 +26,7 @@ def run(args: argparse.Namespace) -> None:
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
         perf = get_performance(exp_data)
         state.record("baseline", exp_code, params, perf)
-        agent.console.print_experiment_row(exp_code, params, perf, suffix=nfev_suffix)
+        agent.console.print_experiment_row(exp_code, params, perf)
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
 
