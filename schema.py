@@ -31,7 +31,7 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
 
     # Spatial domain: n_layers is a design intent variable [3..8], n_segments fixed at 4
     spatial = Domain("spatial_segment", [
-        Dimension("n_layers",   "layer_idx",   min_val=5, max_val=5),
+        Dimension("n_layers",   "layer_idx",   min_val=4, max_val=8),
         Dimension("n_segments", "segment_idx", min_val=4, max_val=4),
     ])
     domains = Domains([spatial])

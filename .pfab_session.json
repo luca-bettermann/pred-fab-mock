@@ -1,155 +1,113 @@
 {
   "config": {
     "model_type": "mlp",
-    "performance_weights": {
-      "path_accuracy": 1,
-      "energy_efficiency": 1,
-      "production_rate": 3
-    },
     "physics_config": {
-      "W_OPTIMAL": 0.43739560485559636,
-      "W_ENERGY_OPT": 0.37388784397520525,
-      "DELTA": 1.787896879867074e-05,
-      "THETA": 0.014368416348712366,
-      "SAG": 1.1412660218314743,
-      "COMPLEXITY": 1.4780601164730802,
-      "LAYER_SPD_SHIFT": 0.6566838211942119,
-      "W_SLIP": 0.4628851444221563,
+      "W_OPTIMAL": 0.44370497803266307,
+      "W_ENERGY_OPT": 0.4090089386202334,
+      "DELTA": 6.7477020472332976e-06,
+      "THETA": 0.013538080061535538,
+      "SAG": 2.0411866278369604,
+      "COMPLEXITY": 0.777095043593615,
+      "LAYER_SPD_SHIFT": 0.301345127548797,
+      "W_SLIP": 0.44165320682769194,
       "SEGMENT_CURVATURE": [
-        1.0926764988848603,
-        0.8128113632675545,
-        1.1450385937895566,
-        0.9370798024232581
+        1.1381572450120057,
+        1.0067084556988783,
+        0.9589369380411861,
+        0.8990604390718925
       ]
-    },
-    "test_set_n": 20
+    }
   },
   "journey": {
     "all_params": [
       {
-        "water_ratio": 0.325,
-        "print_speed": 28.0,
+        "water_ratio": 0.347,
+        "print_speed": 28.571,
         "n_layers": 5,
         "n_segments": 4
       },
       {
-        "water_ratio": 0.375,
-        "print_speed": 28.0,
+        "water_ratio": 0.347,
+        "print_speed": 28.571,
+        "n_layers": 6,
+        "n_segments": 4
+      },
+      {
+        "water_ratio": 0.347,
+        "print_speed": 28.571,
+        "n_layers": 7,
+        "n_segments": 4
+      },
+      {
+        "water_ratio": 0.347,
+        "print_speed": 42.857,
         "n_layers": 5,
         "n_segments": 4
       },
       {
-        "water_ratio": 0.35,
-        "print_speed": 40.0,
+        "water_ratio": 0.347,
+        "print_speed": 54.286,
         "n_layers": 5,
         "n_segments": 4
       },
       {
-        "water_ratio": 0.325,
-        "print_speed": 52.0,
+        "water_ratio": 0.347,
+        "print_speed": 42.857,
+        "n_layers": 7,
+        "n_segments": 4
+      },
+      {
+        "water_ratio": 0.347,
+        "print_speed": 54.286,
+        "n_layers": 7,
+        "n_segments": 4
+      },
+      {
+        "water_ratio": 0.42,
+        "print_speed": 30.0,
         "n_layers": 5,
         "n_segments": 4
       },
       {
-        "water_ratio": 0.375,
-        "print_speed": 52.0,
+        "water_ratio": 0.473,
+        "print_speed": 30.0,
         "n_layers": 5,
         "n_segments": 4
       },
       {
-        "water_ratio": 0.425,
-        "print_speed": 28.0,
+        "water_ratio": 0.42,
+        "print_speed": 30.0,
+        "n_layers": 7,
+        "n_segments": 4
+      },
+      {
+        "water_ratio": 0.473,
+        "print_speed": 30.0,
+        "n_layers": 7,
+        "n_segments": 4
+      },
+      {
+        "water_ratio": 0.42,
+        "print_speed": 50.0,
         "n_layers": 5,
         "n_segments": 4
       },
       {
-        "water_ratio": 0.475,
-        "print_speed": 28.0,
+        "water_ratio": 0.473,
+        "print_speed": 50.0,
         "n_layers": 5,
         "n_segments": 4
       },
       {
-        "water_ratio": 0.45,
-        "print_speed": 40.0,
-        "n_layers": 5,
+        "water_ratio": 0.42,
+        "print_speed": 50.0,
+        "n_layers": 7,
         "n_segments": 4
       },
       {
-        "water_ratio": 0.425,
-        "print_speed": 52.0,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.475,
-        "print_speed": 52.0,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.411,
-        "print_speed": 57.47,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.487,
-        "print_speed": 57.588,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.45,
-        "print_speed": 57.691,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.466,
-        "print_speed": 45.648,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.351,
-        "print_speed": 57.862,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.31,
-        "print_speed": 57.934,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.31,
-        "print_speed": 43.537,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.398,
-        "print_speed": 43.653,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.391,
-        "print_speed": 35.9,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.427,
-        "print_speed": 58.162,
-        "n_layers": 5,
-        "n_segments": 4
-      },
-      {
-        "water_ratio": 0.371,
-        "print_speed": 58.735,
-        "n_layers": 5,
+        "water_ratio": 0.473,
+        "print_speed": 50.0,
+        "n_layers": 7,
         "n_segments": 4
       }
     ],
@@ -164,17 +122,11 @@
       "baseline",
       "baseline",
       "baseline",
-      "exploration",
-      "exploration",
-      "exploration",
-      "exploration",
-      "exploration",
-      "exploration",
-      "exploration",
-      "exploration",
-      "exploration",
-      "exploration",
-      "inference"
+      "baseline",
+      "baseline",
+      "baseline",
+      "baseline",
+      "baseline"
     ],
     "all_codes": [
       "baseline_01",
@@ -187,297 +139,213 @@
       "baseline_08",
       "baseline_09",
       "baseline_10",
-      "explore_01",
-      "explore_02",
-      "explore_03",
-      "explore_04",
-      "explore_05",
-      "explore_06",
-      "explore_07",
-      "explore_08",
-      "explore_09",
-      "explore_10",
-      "infer_01"
+      "baseline_11",
+      "baseline_12",
+      "baseline_13",
+      "baseline_14",
+      "baseline_15"
     ],
     "perf_history": [
       [
         {
-          "water_ratio": 0.325,
-          "print_speed": 28.0,
+          "water_ratio": 0.347,
+          "print_speed": 28.571,
           "n_layers": 5,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.354,
-          "energy_efficiency": 0.943,
-          "production_rate": 0.467
+          "path_accuracy": 0.207,
+          "energy_efficiency": 0.93,
+          "production_rate": 0.476
         }
       ],
       [
         {
-          "water_ratio": 0.375,
-          "print_speed": 28.0,
-          "n_layers": 5,
+          "water_ratio": 0.347,
+          "print_speed": 28.571,
+          "n_layers": 6,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.448,
-          "energy_efficiency": 0.949,
-          "production_rate": 0.467
+          "path_accuracy": 0.172,
+          "energy_efficiency": 0.933,
+          "production_rate": 0.476
         }
       ],
       [
         {
-          "water_ratio": 0.35,
-          "print_speed": 40.0,
-          "n_layers": 5,
+          "water_ratio": 0.347,
+          "print_speed": 28.571,
+          "n_layers": 7,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.225,
-          "energy_efficiency": 0.854,
-          "production_rate": 0.667
+          "path_accuracy": 0.148,
+          "energy_efficiency": 0.935,
+          "production_rate": 0.476
         }
       ],
       [
         {
-          "water_ratio": 0.325,
-          "print_speed": 52.0,
+          "water_ratio": 0.347,
+          "print_speed": 42.857,
           "n_layers": 5,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.003,
-          "energy_efficiency": 0.763,
-          "production_rate": 0.867
+          "path_accuracy": 0.319,
+          "energy_efficiency": 0.818,
+          "production_rate": 0.714
         }
       ],
       [
         {
-          "water_ratio": 0.375,
-          "print_speed": 52.0,
+          "water_ratio": 0.347,
+          "print_speed": 54.286,
           "n_layers": 5,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.064,
-          "energy_efficiency": 0.775,
-          "production_rate": 0.867
+          "path_accuracy": 0.251,
+          "energy_efficiency": 0.734,
+          "production_rate": 0.905
         }
       ],
       [
         {
-          "water_ratio": 0.425,
-          "print_speed": 28.0,
-          "n_layers": 5,
+          "water_ratio": 0.347,
+          "print_speed": 42.857,
+          "n_layers": 7,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.462,
-          "energy_efficiency": 0.938,
-          "production_rate": 0.467
+          "path_accuracy": 0.228,
+          "energy_efficiency": 0.824,
+          "production_rate": 0.714
         }
       ],
       [
         {
-          "water_ratio": 0.475,
-          "print_speed": 28.0,
+          "water_ratio": 0.347,
+          "print_speed": 54.286,
+          "n_layers": 7,
+          "n_segments": 4
+        },
+        {
+          "path_accuracy": 0.179,
+          "energy_efficiency": 0.74,
+          "production_rate": 0.905
+        }
+      ],
+      [
+        {
+          "water_ratio": 0.42,
+          "print_speed": 30.0,
           "n_layers": 5,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.473,
-          "energy_efficiency": 0.91,
+          "path_accuracy": 0.231,
+          "energy_efficiency": 0.93,
+          "production_rate": 0.5
+        }
+      ],
+      [
+        {
+          "water_ratio": 0.473,
+          "print_speed": 30.0,
+          "n_layers": 5,
+          "n_segments": 4
+        },
+        {
+          "path_accuracy": 0.209,
+          "energy_efficiency": 0.92,
           "production_rate": 0.461
         }
       ],
       [
         {
-          "water_ratio": 0.45,
-          "print_speed": 40.0,
-          "n_layers": 5,
+          "water_ratio": 0.42,
+          "print_speed": 30.0,
+          "n_layers": 7,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.301,
-          "energy_efficiency": 0.836,
-          "production_rate": 0.667
+          "path_accuracy": 0.165,
+          "energy_efficiency": 0.935,
+          "production_rate": 0.5
         }
       ],
       [
         {
-          "water_ratio": 0.425,
-          "print_speed": 52.0,
-          "n_layers": 5,
+          "water_ratio": 0.473,
+          "print_speed": 30.0,
+          "n_layers": 7,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.09,
-          "energy_efficiency": 0.756,
-          "production_rate": 0.867
+          "path_accuracy": 0.149,
+          "energy_efficiency": 0.924,
+          "production_rate": 0.461
         }
       ],
       [
         {
-          "water_ratio": 0.475,
-          "print_speed": 52.0,
+          "water_ratio": 0.42,
+          "print_speed": 50.0,
           "n_layers": 5,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.099,
-          "energy_efficiency": 0.714,
-          "production_rate": 0.856
+          "path_accuracy": 0.339,
+          "energy_efficiency": 0.787,
+          "production_rate": 0.833
         }
       ],
       [
         {
-          "water_ratio": 0.411,
-          "print_speed": 57.47,
+          "water_ratio": 0.473,
+          "print_speed": 50.0,
           "n_layers": 5,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.035,
-          "energy_efficiency": 0.728,
-          "production_rate": 0.958
+          "path_accuracy": 0.332,
+          "energy_efficiency": 0.767,
+          "production_rate": 0.768
         }
       ],
       [
         {
-          "water_ratio": 0.487,
-          "print_speed": 57.588,
-          "n_layers": 5,
+          "water_ratio": 0.42,
+          "print_speed": 50.0,
+          "n_layers": 7,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.044,
-          "energy_efficiency": 0.65,
-          "production_rate": 0.915
+          "path_accuracy": 0.242,
+          "energy_efficiency": 0.792,
+          "production_rate": 0.833
         }
       ],
       [
         {
-          "water_ratio": 0.45,
-          "print_speed": 57.691,
-          "n_layers": 5,
+          "water_ratio": 0.473,
+          "print_speed": 50.0,
+          "n_layers": 7,
           "n_segments": 4
         },
         {
-          "path_accuracy": 0.043,
-          "energy_efficiency": 0.692,
-          "production_rate": 0.962
-        }
-      ],
-      [
-        {
-          "water_ratio": 0.466,
-          "print_speed": 45.648,
-          "n_layers": 5,
-          "n_segments": 4
-        },
-        {
-          "path_accuracy": 0.208,
-          "energy_efficiency": 0.77,
-          "production_rate": 0.76
-        }
-      ],
-      [
-        {
-          "water_ratio": 0.351,
-          "print_speed": 57.862,
-          "n_layers": 5,
-          "n_segments": 4
-        },
-        {
-          "path_accuracy": 0.007,
-          "energy_efficiency": 0.726,
-          "production_rate": 0.964
-        }
-      ],
-      [
-        {
-          "water_ratio": 0.31,
-          "print_speed": 57.934,
-          "n_layers": 5,
-          "n_segments": 4
-        },
-        {
-          "path_accuracy": 0.0,
-          "energy_efficiency": 0.703,
-          "production_rate": 0.966
-        }
-      ],
-      [
-        {
-          "water_ratio": 0.31,
-          "print_speed": 43.537,
-          "n_layers": 5,
-          "n_segments": 4
-        },
-        {
-          "path_accuracy": 0.019,
-          "energy_efficiency": 0.817,
-          "production_rate": 0.726
-        }
-      ],
-      [
-        {
-          "water_ratio": 0.398,
-          "print_speed": 43.653,
-          "n_layers": 5,
-          "n_segments": 4
-        },
-        {
-          "path_accuracy": 0.215,
-          "energy_efficiency": 0.83,
-          "production_rate": 0.728
-        }
-      ],
-      [
-        {
-          "water_ratio": 0.391,
-          "print_speed": 35.9,
-          "n_layers": 5,
-          "n_segments": 4
-        },
-        {
-          "path_accuracy": 0.34,
-          "energy_efficiency": 0.894,
-          "production_rate": 0.598
-        }
-      ],
-      [
-        {
-          "water_ratio": 0.427,
-          "print_speed": 58.162,
-          "n_layers": 5,
-          "n_segments": 4
-        },
-        {
-          "path_accuracy": 0.035,
-          "energy_efficiency": 0.714,
-          "production_rate": 0.969
-        }
-      ],
-      [
-        {
-          "water_ratio": 0.371,
-          "print_speed": 58.735,
-          "n_layers": 5,
-          "n_segments": 4
-        },
-        {
-          "path_accuracy": 0.014,
-          "energy_efficiency": 0.72,
-          "production_rate": 0.979
+          "path_accuracy": 0.237,
+          "energy_efficiency": 0.769,
+          "production_rate": 0.768
         }
       ]
     ],
     "prev_params": {
-      "water_ratio": 0.371,
-      "print_speed": 58.735,
-      "n_layers": 5,
+      "water_ratio": 0.473,
+      "print_speed": 50.0,
+      "n_layers": 7,
       "n_segments": 4
     }
   }
