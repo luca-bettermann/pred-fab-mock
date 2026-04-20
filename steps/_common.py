@@ -255,3 +255,20 @@ def print_config_show(config: dict[str, Any]) -> None:
     if not any_set:
         print(f"\n  {_D}No configuration set (using defaults){_R}")
     print()
+
+
+def apply_schedule_args(agent: Any, args: Any) -> None:
+    """Parse --schedule PARAM:DIM flags and configure the agent."""
+    schedules = getattr(args, "schedule", None)
+    if not schedules:
+        return
+    for spec in schedules:
+        if ":" not in spec:
+            print(f"  Warning: ignoring malformed --schedule '{spec}' (expected PARAM:DIM)")
+            continue
+        param, dim = spec.split(":", 1)
+        agent.configure_schedule(
+            param.strip(), dim.strip(),
+            delta=getattr(args, "delta", None),
+            smoothing=getattr(args, "smoothing", None),
+        )

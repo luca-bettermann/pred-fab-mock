@@ -14,6 +14,7 @@ Quick start:
     uv run cli.py test-set --n 20
     uv run cli.py analyse --plot
     uv run cli.py inference --design-intent '{"n_layers":5}' --plot
+    uv run cli.py adapt --schedule print_speed:n_layers --delta 5.0
     uv run cli.py summary
 """
 
@@ -43,6 +44,7 @@ Quick start:
   uv run cli.py test-set --n 20
   uv run cli.py analyse --plot
   uv run cli.py inference --design-intent '{"n_layers":5}' --plot
+  uv run cli.py adapt --schedule print_speed:n_layers --delta 5.0
   uv run cli.py summary
 """,
     )
@@ -108,7 +110,8 @@ Configuration groups:
     p = sub.add_parser("baseline", help="Run baseline experiments (space-filling)")
     p.add_argument("--n", type=int, default=10, help="Number of experiments")
     p.add_argument("--plot", action="store_true", help="Show plots inline")
-    p.add_argument("--schedule", action="store_true", help="Enable schedule mode")
+    p.add_argument("--schedule", action="append", metavar="PARAM:DIM",
+                   help="Schedule a parameter per dimension step (e.g. print_speed:n_layers). Repeatable.")
     p.add_argument("--delta", type=float, default=None, help="Schedule trust region delta")
     p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty")
     p.set_defaults(func=baseline.run)
@@ -119,7 +122,8 @@ Configuration groups:
     p.add_argument("--kappa", type=float, default=0.5, help="Exploration weight (0=exploit, 1=explore)")
     p.add_argument("--plot", action="store_true", help="Show per-round plots inline")
     p.add_argument("--validate", action="store_true", help="Validate model during training")
-    p.add_argument("--schedule", action="store_true", help="Enable schedule mode")
+    p.add_argument("--schedule", action="append", metavar="PARAM:DIM",
+                   help="Schedule a parameter per dimension step (e.g. print_speed:n_layers). Repeatable.")
     p.add_argument("--delta", type=float, default=None, help="Schedule trust region delta")
     p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty")
     p.add_argument("--design-intent", type=str, default=None, help="JSON: fix parameters for schedule mode")
@@ -140,7 +144,8 @@ Configuration groups:
     p.add_argument("--design-intent", type=str, default=None,
                    help="JSON: fix parameters for inference. Example: '{\"n_layers\":5}'")
     p.add_argument("--plot", action="store_true", help="Show plots inline")
-    p.add_argument("--schedule", action="store_true", help="Enable schedule mode")
+    p.add_argument("--schedule", action="append", metavar="PARAM:DIM",
+                   help="Schedule a parameter per dimension step (e.g. print_speed:n_layers). Repeatable.")
     p.add_argument("--delta", type=float, default=None, help="Schedule trust region delta")
     p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty")
     p.set_defaults(func=inference.run)
@@ -149,7 +154,10 @@ Configuration groups:
 
     # adapt
     p = sub.add_parser("adapt", help="Online inference with layer-by-layer adaptation")
-    p.add_argument("--delta", type=float, default=5.0, help="Trust region half-width for speed (mm/s)")
+    p.add_argument("--schedule", action="append", metavar="PARAM:DIM",
+                   help="Schedule a parameter per dimension step (e.g. print_speed:n_layers). Repeatable.")
+    p.add_argument("--delta", type=float, default=None, help="Trust region half-width")
+    p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty")
     p.add_argument("--design-intent", type=str, default=None, help="JSON: fix parameters")
     p.set_defaults(func=adapt.run)
 

@@ -8,7 +8,7 @@ from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, compute_acquisition_grid,
-    X_AXIS, Y_AXIS, FIXED_DIMS,
+    X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
 )
 
 
@@ -17,15 +17,11 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     plot_dir = ensure_plot_dir()
 
-    if getattr(args, 'schedule', False):
-        agent.configure_schedule(
-            "print_speed", "n_layers",
-            delta=args.delta, smoothing=args.smoothing,
-        )
-        if getattr(args, 'design_intent', None):
-            import json
-            design_intent = json.loads(args.design_intent)
-            agent.calibration_system.configure_fixed_params(design_intent, force=True)
+    apply_schedule_args(agent, args)
+    if getattr(args, 'schedule', None) and getattr(args, 'design_intent', None):
+        import json
+        design_intent = json.loads(args.design_intent)
+        agent.calibration_system.configure_fixed_params(design_intent, force=True)
 
     n_existing = len([p for p in state.all_phases if p == "exploration"])
     total_after = n_existing + args.n

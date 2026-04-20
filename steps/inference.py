@@ -12,7 +12,7 @@ from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, combined_score, get_physics_optimum, N_LAYERS, N_SEGMENTS,
-    X_AXIS, Y_AXIS, FIXED_DIMS,
+    X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
 )
 
 
@@ -22,11 +22,7 @@ def run(args: argparse.Namespace) -> None:
     perf_weights = agent.calibration_system.performance_weights
     plot_dir = ensure_plot_dir()
 
-    if getattr(args, 'schedule', False):
-        agent.configure_schedule(
-            "print_speed", "n_layers",
-            delta=args.delta, smoothing=args.smoothing,
-        )
+    apply_schedule_args(agent, args)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
     n_layers = design_intent.get("n_layers", N_LAYERS)

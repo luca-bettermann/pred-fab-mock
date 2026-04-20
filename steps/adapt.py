@@ -10,7 +10,7 @@ import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__)
 from steps._common import (
     load_session, save_session, rebuild, next_code,
     with_dimensions, params_from_spec, get_performance,
-    combined_score, N_LAYERS, N_SEGMENTS,
+    combined_score, N_LAYERS, N_SEGMENTS, apply_schedule_args,
 )
 
 
@@ -19,15 +19,25 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     perf_weights = agent.calibration_system.performance_weights
 
-    agent.configure_schedule("print_speed", "n_layers", delta=args.delta)
+    apply_schedule_args(agent, args)
+
+    # Derive scheduled params and dimension from what was just configured
+    cal = agent.calibration_system
+    sched_params = list(cal.schedule_configs.keys())
+    sched_dims = list(cal.schedule_configs.values())
+    if not sched_params:
+        print("  Error: --schedule PARAM:DIM is required for adapt.")
+        return
+    # Use the first dimension for the adaptation loop
+    adapt_dim = sched_dims[0]
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
-    n_layers = design_intent.get("n_layers", N_LAYERS)
+    n_steps = design_intent.get(adapt_dim, N_LAYERS)
     if design_intent:
         agent.calibration_system.configure_fixed_params(design_intent, force=True)
 
     agent.console.print_phase_header(5, "Online Inference",
-                                      f"Inference + layer-by-layer adaptation")
+                                      f"Inference + step-by-step adaptation")
 
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
@@ -39,41 +49,46 @@ def run(args: argparse.Namespace) -> None:
     params = with_dimensions({**state.prev_params, **proposed})
     params.update(design_intent)
 
-    print(f"    Starting params: w={params['water_ratio']:.3f}, spd={params['print_speed']:.1f}")
+    # Display starting values for scheduled params
+    sched_summary = ", ".join(f"{p}={params.get(p, '?')}" for p in sched_params)
+    print(f"    Starting params: {sched_summary}")
 
     exp_code = next_code(state, "adapt")
     exp_data = dataset.create_experiment(exp_code, parameters=params)
 
-    print(f"\n  Step 2: Fabrication with online adaptation ({n_layers} layers):")
-    print(f"    {'Layer':<8s}  {'Speed':>8s}  {'Adapted':>8s}  {'Deviation':>10s}")
-    print(f"    {'─' * 38}")
+    # Build table header from scheduled param names
+    hdr_params = "  ".join(f"{p:>10s}" for p in sched_params)
+    hdr_adapted = "  ".join(f"{'adapted':>10s}" for _ in sched_params)
+    print(f"\n  Step 2: Fabrication with online adaptation ({n_steps} steps, dim={adapt_dim}):")
+    print(f"    {'Step':<6s}  {hdr_params}  {hdr_adapted}  {'Deviation':>10s}")
+    print(f"    {'─' * (8 + 24 * len(sched_params) + 12)}")
 
-    for layer_idx in range(n_layers):
-        fab.run_layer(params, layer_idx)
+    for step_idx in range(n_steps):
+        fab.run_layer(params, step_idx)
         agent.evaluate(exp_data)
 
-        speed_before = params["print_speed"]
+        vals_before = {p: params.get(p) for p in sched_params}
 
-        if layer_idx < n_layers - 1:
+        if step_idx < n_steps - 1:
             agent.set_active_experiment(exp_data)
             adapt_spec = agent.adaptation_step(
-                dimension="n_layers",
-                step_index=layer_idx + 1,
+                dimension=adapt_dim,
+                step_index=step_idx + 1,
                 exp_data=exp_data,
                 mode=Mode.INFERENCE,
                 kappa=0.0,
                 record=True,
             )
-            new_speed = adapt_spec.initial_params.get("print_speed", speed_before)
-            params = {**params, "print_speed": float(new_speed)}
-        else:
-            new_speed = speed_before
+            for p in sched_params:
+                new_val = adapt_spec.initial_params.get(p, vals_before[p])
+                params = {**params, p: float(new_val)}
 
+        # Compute layer deviation (mock-specific sensor data)
         dev_vals = exp_data.features.get_value("path_deviation")
         if dev_vals is not None and hasattr(dev_vals, '__len__'):
             flat = np.array(dev_vals).flatten()
             n_segs = int(params.get("n_segments", N_SEGMENTS))
-            start_idx = layer_idx * n_segs
+            start_idx = step_idx * n_segs
             end_idx = min(start_idx + n_segs, len(flat))
             if end_idx > start_idx:
                 layer_dev = float(np.mean(flat[start_idx:end_idx]))
@@ -82,8 +97,13 @@ def run(args: argparse.Namespace) -> None:
         else:
             layer_dev = 0.0
 
-        adapted_str = f"{new_speed:.1f}" if new_speed != speed_before else "\u2014"
-        print(f"    {layer_idx+1:<8d}  {speed_before:8.1f}  {adapted_str:>8s}  {layer_dev:10.6f}")
+        # Format table row
+        before_cols = "  ".join(f"{float(vals_before[p]):10.1f}" for p in sched_params)
+        after_cols = "  ".join(
+            f"{float(params.get(p, 0)):10.1f}" if params.get(p) != vals_before[p] else f"{'—':>10s}"
+            for p in sched_params
+        )
+        print(f"    {step_idx+1:<6d}  {before_cols}  {after_cols}  {layer_dev:10.6f}")
 
     dataset.save_experiment(exp_code)
     perf = get_performance(exp_data)
@@ -100,7 +120,10 @@ def run(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Online inference with layer-by-layer adaptation")
-    parser.add_argument("--delta", type=float, default=5.0)
+    parser.add_argument("--schedule", action="append", metavar="PARAM:DIM",
+                        help="Schedule a parameter per dimension step (e.g. print_speed:n_layers). Required.")
+    parser.add_argument("--delta", type=float, default=None)
+    parser.add_argument("--smoothing", type=float, default=None)
     parser.add_argument("--design-intent", type=str, default=None)
     return parser.parse_args()
 
