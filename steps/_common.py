@@ -270,7 +270,7 @@ def apply_schedule_args(agent: Any, args: Any) -> None:
     for spec in schedules:
         parts = spec.split(":")
         if len(parts) < 2:
-            print(f"  Warning: ignoring malformed --schedule '{spec}' (expected PARAM:DIM[:DELTA])")
+            agent.logger.console_warning(f"Ignoring malformed --schedule '{spec}' (expected PARAM:DIM[:DELTA])")
             continue
         param = parts[0].strip()
         dim = parts[1].strip()
