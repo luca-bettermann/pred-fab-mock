@@ -22,7 +22,7 @@ import argparse
 from steps import (
     reset, init_schema, init_agent, init_physics, configure,
     baseline, explore, test_set, analyse, inference,
-    explore_trajectory, adapt, summary,
+    adapt, summary,
 )
 
 
@@ -100,12 +100,17 @@ Configuration groups:
     p.add_argument("--decay-exp", type=float, default=None, help="Bandwidth decay exponent (default: 0.5)")
     p.add_argument("--de-maxiter", type=int, default=None)
     p.add_argument("--de-popsize", type=int, default=None)
+    p.add_argument("--schedule-smoothing", type=float, default=None, help="Default schedule smoothing")
+    p.add_argument("--schedule-delta", type=float, default=None, help="Default schedule delta")
     p.set_defaults(func=configure.run)
 
     # baseline
     p = sub.add_parser("baseline", help="Run baseline experiments (space-filling)")
     p.add_argument("--n", type=int, default=10, help="Number of experiments")
     p.add_argument("--plot", action="store_true", help="Show plots inline")
+    p.add_argument("--schedule", action="store_true", help="Enable schedule mode")
+    p.add_argument("--delta", type=float, default=None, help="Schedule trust region delta")
+    p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty")
     p.set_defaults(func=baseline.run)
 
     # explore
@@ -114,6 +119,10 @@ Configuration groups:
     p.add_argument("--kappa", type=float, default=0.5, help="Exploration weight (0=exploit, 1=explore)")
     p.add_argument("--plot", action="store_true", help="Show per-round plots inline")
     p.add_argument("--validate", action="store_true", help="Validate model during training")
+    p.add_argument("--schedule", action="store_true", help="Enable schedule mode")
+    p.add_argument("--delta", type=float, default=None, help="Schedule trust region delta")
+    p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty")
+    p.add_argument("--design-intent", type=str, default=None, help="JSON: fix parameters for schedule mode")
     p.set_defaults(func=explore.run)
 
     # test-set
@@ -131,21 +140,12 @@ Configuration groups:
     p.add_argument("--design-intent", type=str, default=None,
                    help="JSON: fix parameters for inference. Example: '{\"n_layers\":5}'")
     p.add_argument("--plot", action="store_true", help="Show plots inline")
+    p.add_argument("--schedule", action="store_true", help="Enable schedule mode")
+    p.add_argument("--delta", type=float, default=None, help="Schedule trust region delta")
+    p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty")
     p.set_defaults(func=inference.run)
 
     # ── Advanced commands ──
-
-    # explore-trajectory
-    p = sub.add_parser("explore-trajectory", help="Trajectory exploration: per-layer speed optimization")
-    p.add_argument("--n", type=int, default=3, help="Number of trajectory rounds")
-    p.add_argument("--kappa", type=float, default=0.5, help="Exploration weight")
-    p.add_argument("--delta", type=float, default=5.0, help="Trust region half-width for speed (mm/s)")
-    p.add_argument("--smoothing", type=float, default=0.25, help="Smoothing penalty (0=off, 0.3=strong)")
-    p.add_argument("--lookahead", type=int, default=2, help="MPC lookahead steps")
-    p.add_argument("--discount", type=float, default=0.9, help="MPC discount factor")
-    p.add_argument("--design-intent", type=str, default=None, help="JSON: fix parameters")
-    p.add_argument("--plot", action="store_true", help="Show plots inline")
-    p.set_defaults(func=explore_trajectory.run)
 
     # adapt
     p = sub.add_parser("adapt", help="Online inference with layer-by-layer adaptation")

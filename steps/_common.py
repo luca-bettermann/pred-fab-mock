@@ -117,6 +117,9 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
         if opt_kwargs:
             agent.configure_optimizer(**opt_kwargs)
 
+        if config.get("schedule_smoothing") is not None:
+            agent.calibration_system.schedule_smoothing = config["schedule_smoothing"]
+
         if config.get("bounds"):
             bounds = {k: tuple(v) for k, v in config["bounds"].items()}
             agent.calibration_system.configure_param_bounds(bounds)

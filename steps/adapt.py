@@ -19,10 +19,7 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     perf_weights = agent.calibration_system.performance_weights
 
-    agent.configure_trajectory(
-        step_parameters={"print_speed": "n_layers"},
-        adaptation_delta={"print_speed": args.delta},
-    )
+    agent.configure_schedule("print_speed", "n_layers", delta=args.delta)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
     n_layers = design_intent.get("n_layers", N_LAYERS)

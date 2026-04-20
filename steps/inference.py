@@ -22,6 +22,12 @@ def run(args: argparse.Namespace) -> None:
     perf_weights = agent.calibration_system.performance_weights
     plot_dir = ensure_plot_dir()
 
+    if getattr(args, 'schedule', False):
+        agent.configure_schedule(
+            "print_speed", "n_layers",
+            delta=args.delta, smoothing=args.smoothing,
+        )
+
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
     n_layers = design_intent.get("n_layers", N_LAYERS)
 

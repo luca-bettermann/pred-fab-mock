@@ -21,6 +21,12 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     plot_dir = ensure_plot_dir()
 
+    if getattr(args, 'schedule', False):
+        agent.configure_schedule(
+            "print_speed", "n_layers",
+            delta=args.delta, smoothing=args.smoothing,
+        )
+
     agent.console.print_phase_header(1, "Baseline", f"{args.n} experiments")
     specs = agent.baseline_step(n=args.n)
 
