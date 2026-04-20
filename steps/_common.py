@@ -258,11 +258,7 @@ def print_config_show(config: dict[str, Any]) -> None:
 
 
 def apply_schedule_args(agent: Any, args: Any) -> None:
-    """Parse --schedule PARAM:DIM[:DELTA] flags and configure the agent.
-
-    Format: PARAM:DIM or PARAM:DIM:DELTA (e.g. print_speed:n_layers:5.0).
-    --smoothing is global and applied to all schedules.
-    """
+    """Parse --schedule PARAM:DIM[:DELTA] flags and configure the agent."""
     schedules = getattr(args, "schedule", None)
     if not schedules:
         return
@@ -270,7 +266,9 @@ def apply_schedule_args(agent: Any, args: Any) -> None:
     for spec in schedules:
         parts = spec.split(":")
         if len(parts) < 2:
-            agent.logger.console_warning(f"Ignoring malformed --schedule '{spec}' (expected PARAM:DIM[:DELTA])")
+            agent.logger.console_warning(
+                f"Ignoring malformed --schedule '{spec}' (expected PARAM:DIM[:DELTA])"
+            )
             continue
         param = parts[0].strip()
         dim = parts[1].strip()
