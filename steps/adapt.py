@@ -120,9 +120,8 @@ def run(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Online inference with layer-by-layer adaptation")
-    parser.add_argument("--schedule", action="append", metavar="PARAM:DIM",
-                        help="Schedule a parameter per dimension step (e.g. print_speed:n_layers). Required.")
-    parser.add_argument("--delta", type=float, default=None)
+    parser.add_argument("--schedule", action="append", metavar="PARAM:DIM[:DELTA]",
+                        help="Schedule a parameter per dimension step (e.g. print_speed:n_layers:5.0). Required.")
     parser.add_argument("--smoothing", type=float, default=None)
     parser.add_argument("--design-intent", type=str, default=None)
     return parser.parse_args()
