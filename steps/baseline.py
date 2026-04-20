@@ -12,7 +12,7 @@ from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, combined_score, N_LAYERS, N_SEGMENTS,
-    X_AXIS, Y_AXIS, Z_AXIS, FIXED_DIMS,
+    X_AXIS, Y_AXIS, Z_AXIS, FIXED_DIMS, apply_schedule_args,
 )
 
 
@@ -20,6 +20,8 @@ def run(args: argparse.Namespace) -> None:
     config, state = load_session()
     agent, dataset, fab = rebuild(config)
     plot_dir = ensure_plot_dir()
+
+    apply_schedule_args(agent, args)
 
     agent.console.print_phase_header(1, "Baseline", f"{args.n} experiments")
     specs = agent.baseline_step(n=args.n)

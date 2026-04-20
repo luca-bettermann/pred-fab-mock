@@ -117,6 +117,9 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
         if opt_kwargs:
             agent.configure_optimizer(**opt_kwargs)
 
+        if config.get("schedule_smoothing") is not None:
+            agent.calibration_system.schedule_smoothing = config["schedule_smoothing"]
+
         if config.get("bounds"):
             bounds = {k: tuple(v) for k, v in config["bounds"].items()}
             agent.calibration_system.configure_param_bounds(bounds)
@@ -252,3 +255,22 @@ def print_config_show(config: dict[str, Any]) -> None:
     if not any_set:
         print(f"\n  {_D}No configuration set (using defaults){_R}")
     print()
+
+
+def apply_schedule_args(agent: Any, args: Any) -> None:
+    """Parse --schedule PARAM:DIM[:DELTA] flags and configure the agent."""
+    schedules = getattr(args, "schedule", None)
+    if not schedules:
+        return
+    smoothing = getattr(args, "smoothing", None)
+    for spec in schedules:
+        parts = spec.split(":")
+        if len(parts) < 2:
+            agent.logger.console_warning(
+                f"Ignoring malformed --schedule '{spec}' (expected PARAM:DIM[:DELTA])"
+            )
+            continue
+        param = parts[0].strip()
+        dim = parts[1].strip()
+        delta = float(parts[2]) if len(parts) >= 3 else None
+        agent.configure_schedule(param, dim, delta=delta, smoothing=smoothing)

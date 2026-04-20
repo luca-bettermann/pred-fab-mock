@@ -39,6 +39,12 @@ def run(args: argparse.Namespace) -> None:
     if args.de_popsize is not None:
         print_config_set("DE population size", config.get("de_popsize"), args.de_popsize)
         config["de_popsize"] = args.de_popsize
+    if getattr(args, 'schedule_smoothing', None) is not None:
+        print_config_set("Schedule smoothing", config.get("schedule_smoothing"), args.schedule_smoothing)
+        config["schedule_smoothing"] = args.schedule_smoothing
+    if getattr(args, 'schedule_delta', None) is not None:
+        print_config_set("Schedule delta", config.get("schedule_delta"), args.schedule_delta)
+        config["schedule_delta"] = args.schedule_delta
     print()
     save_session(config, state)
 

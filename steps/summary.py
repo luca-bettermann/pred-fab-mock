@@ -16,7 +16,7 @@ def run(args: argparse.Namespace) -> None:
     print(f"  {'Phase':<15s}  {'Experiments':>11s}  {'Best Combined':>14s}")
     print(f"  {'─' * 60}")
 
-    for phase in ["baseline", "exploration", "trajectory", "inference", "adaptation"]:
+    for phase in ["baseline", "exploration", "schedule", "inference", "adaptation"]:
         indices = [i for i, p in enumerate(state.all_phases) if p == phase]
         if not indices:
             continue

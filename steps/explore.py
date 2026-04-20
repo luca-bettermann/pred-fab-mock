@@ -8,7 +8,7 @@ from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, compute_acquisition_grid,
-    X_AXIS, Y_AXIS, FIXED_DIMS,
+    X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
 )
 
 
@@ -16,6 +16,12 @@ def run(args: argparse.Namespace) -> None:
     config, state = load_session()
     agent, dataset, fab = rebuild(config)
     plot_dir = ensure_plot_dir()
+
+    apply_schedule_args(agent, args)
+    if getattr(args, 'schedule', None) and getattr(args, 'design_intent', None):
+        import json
+        design_intent = json.loads(args.design_intent)
+        agent.calibration_system.configure_fixed_params(design_intent, force=True)
 
     n_existing = len([p for p in state.all_phases if p == "exploration"])
     total_after = n_existing + args.n
@@ -38,6 +44,8 @@ def run(args: argparse.Namespace) -> None:
             acq_data = compute_acquisition_grid(agent, dm, args.kappa, res=30)
 
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
+        if spec.schedules:
+            spec.apply_schedules(exp_data)
         perf = get_performance(exp_data)
         state.record("exploration", exp_code, params, perf)
 
