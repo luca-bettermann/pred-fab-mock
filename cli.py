@@ -11,11 +11,13 @@ Quick start:
     uv run cli.py init-physics --seed 42 --plot
     uv run cli.py baseline --n 10 --plot
     uv run cli.py explore --n 5 --kappa 0.5 --plot
+    uv run cli.py explore --n 5 --kappa 0.5 --schedule print_speed:n_layers:5.0
     uv run cli.py test-set --n 20
     uv run cli.py analyse --plot
     uv run cli.py inference --design-intent '{"n_layers":5}' --plot
     uv run cli.py adapt --schedule print_speed:n_layers:5.0
     uv run cli.py summary
+    uv run cli.py report base_01 --plot
 """
 
 import argparse
@@ -23,7 +25,7 @@ import argparse
 from steps import (
     reset, init_schema, init_agent, init_physics, configure,
     baseline, explore, test_set, analyse, inference,
-    adapt, summary,
+    adapt, summary, report,
 )
 
 
@@ -41,11 +43,13 @@ Quick start:
   uv run cli.py init-physics --seed 42 --plot
   uv run cli.py baseline --n 10 --plot
   uv run cli.py explore --n 5 --kappa 0.5 --plot
+  uv run cli.py explore --n 5 --kappa 0.5 --schedule print_speed:n_layers:5.0
   uv run cli.py test-set --n 20
   uv run cli.py analyse --plot
   uv run cli.py inference --design-intent '{"n_layers":5}' --plot
   uv run cli.py adapt --schedule print_speed:n_layers:5.0
   uv run cli.py summary
+  uv run cli.py report base_01 --plot
 """,
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -86,8 +90,8 @@ Configuration groups:
 
   Optimizer:
     --optimizer {de,lbfgsb}  Backend (default: de)
-    --de-maxiter INT         DE max generations (default: 100)
-    --de-popsize INT         DE population size (default: 10)
+    --de-maxiter INT         DE max generations (default: 1000)
+    --de-popsize INT         DE population size (default: 15)
 
   Bounds:
     --bounds JSON            Parameter search bounds override
@@ -160,6 +164,12 @@ Configuration groups:
     # summary
     p = sub.add_parser("summary", help="Show run summary across all phases")
     p.set_defaults(func=summary.run)
+
+    # report
+    p = sub.add_parser("report", help="Generate visual report for an experiment")
+    p.add_argument("exp_code", type=str, help="Experiment code (e.g. base_01, explore_03)")
+    p.add_argument("--plot", action="store_true", help="Show plots inline in terminal")
+    p.set_defaults(func=report.run)
 
     return parser
 

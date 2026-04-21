@@ -6,7 +6,6 @@ import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import plot_parameter_space, plot_parameter_space_3d
-from visualization import plot_path_comparison_3d
 from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
@@ -35,11 +34,6 @@ def run(args: argparse.Namespace) -> None:
         agent.console.print_experiment_row(exp_code, params, perf)
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
-
-    last_params = state.all_params[-1]
-    path_3d = os.path.join(plot_dir, "01_path_deviation_3d.png")
-    plot_path_comparison_3d(path_3d, fab.camera, last_params, exp_code=state.all_codes[-1])
-    show_plot(path_3d, inline=args.plot)
 
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
