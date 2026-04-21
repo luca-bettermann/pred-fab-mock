@@ -25,7 +25,7 @@ def run(args: argparse.Namespace) -> None:
         hi = obj.constraints.get("max", None)
         if lo is not None and hi is not None:
             schema_bounds[code] = [lo, hi]
-    for domain in schema.domains.domains:
+    for domain in schema.domains._domains.values():
         for dim in domain.dimensions:
             schema_bounds[dim.axis_code] = [dim.min_val, dim.max_val]
     config["schema_bounds"] = schema_bounds
