@@ -65,6 +65,7 @@ def run(args: argparse.Namespace) -> None:
             plot_acquisition(path, X_AXIS, Y_AXIS, w, s, p, u, c,
                              points=state.all_params[:-1],
                              proposed=params,
+                             schedules=state.schedules, codes=state.all_codes[:-1],
                              title=f"Exploration \u2014 Round {round_num}",
                              fixed_params=FIXED_DIMS)
             show_plot(path, inline=True)

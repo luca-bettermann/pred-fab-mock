@@ -77,6 +77,7 @@ def run(args: argparse.Namespace) -> None:
     path = os.path.join(plot_dir, "01_baseline.png")
     plot_parameter_space(path, X_AXIS, Y_AXIS, waters, speeds,
                          state.all_params, true_grid, pred_grid,
+                         schedules=state.schedules, codes=state.all_codes,
                          fixed_params=FIXED_DIMS)
     show_plot(path, inline=args.plot)
 
