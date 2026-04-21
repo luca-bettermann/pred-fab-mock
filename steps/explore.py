@@ -36,7 +36,9 @@ def run(args: argparse.Namespace) -> None:
 
     for i in range(args.n):
         round_num = n_existing + i + 1
-        spec = agent.exploration_step(dm, kappa=args.kappa)
+        # Pass current_params so schedule dimensions are resolved
+        current = with_dimensions(state.prev_params) if state.prev_params else None
+        spec = agent.exploration_step(dm, kappa=args.kappa, current_params=current)
         proposed = params_from_spec(spec)
         params = with_dimensions({**state.prev_params, **proposed})
         exp_code = next_code(state, "explore")

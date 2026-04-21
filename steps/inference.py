@@ -38,7 +38,8 @@ def run(args: argparse.Namespace) -> None:
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
 
-    spec = agent.exploration_step(dm, kappa=0.0)
+    current = with_dimensions(state.prev_params) if state.prev_params else None
+    spec = agent.exploration_step(dm, kappa=0.0, current_params=current)
     proposed = params_from_spec(spec)
     params = with_dimensions({**state.prev_params, **proposed})
     params.update(design_intent)
