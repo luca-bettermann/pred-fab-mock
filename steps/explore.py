@@ -4,7 +4,7 @@ import json
 import os
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.plotting import plot_acquisition
+from pred_fab.plotting import plot_acquisition, plot_convergence
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
@@ -38,6 +38,8 @@ def run(args: argparse.Namespace) -> None:
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=args.validate)
 
+    all_convergence: dict[str, list[float]] = {}
+
     for i in range(args.n):
         round_num = n_existing + i + 1
         # Pass current_params so schedule dimensions are resolved
@@ -67,8 +69,19 @@ def run(args: argparse.Namespace) -> None:
                              fixed_params=FIXED_DIMS)
             show_plot(path, inline=True)
 
+        # Collect convergence for this round
+        conv = agent.calibration_system.convergence_history
+        for label, hist in conv.items():
+            all_convergence[f"Round {round_num} ({label})"] = hist
+
         dm.update()
         agent.train(dm, validate=False)
+
+    # Convergence plot across all rounds
+    if all_convergence:
+        path_conv = os.path.join(plot_dir, "03_convergence.png")
+        plot_convergence(path_conv, all_convergence, title="Exploration Convergence")
+        show_plot(path_conv, inline=args.plot)
 
     save_session(config, state)
 

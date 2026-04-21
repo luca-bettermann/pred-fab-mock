@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.plotting import plot_parameter_space, plot_dimensional_trajectories
+from pred_fab.plotting import plot_parameter_space, plot_dimensional_trajectories, plot_convergence
 from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
@@ -88,6 +88,13 @@ def run(args: argparse.Namespace) -> None:
         title="Baseline Parameter Space",
     )
     show_plot(path_3d_params, inline=args.plot)
+
+    # Convergence plot
+    conv_history = agent.calibration_system.convergence_history
+    if conv_history:
+        path_conv = os.path.join(plot_dir, "01_convergence.png")
+        plot_convergence(path_conv, conv_history, title="Baseline Convergence")
+        show_plot(path_conv, inline=args.plot)
 
     save_session(config, state)
 
