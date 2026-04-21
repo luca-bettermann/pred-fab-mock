@@ -1,5 +1,6 @@
 """Run baseline experiments (space-filling, no model)."""
 import argparse
+import json
 import os
 
 import numpy as np
@@ -22,6 +23,10 @@ def run(args: argparse.Namespace) -> None:
     plot_dir = ensure_plot_dir()
 
     apply_schedule_args(agent, args)
+
+    design_intent = json.loads(args.design_intent) if args.design_intent else {}
+    if design_intent:
+        agent.calibration_system.configure_fixed_params(design_intent, force=True)
 
     agent.console.print_phase_header(1, "Baseline", f"{args.n} experiments")
     specs = agent.baseline_step(n=args.n)

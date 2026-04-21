@@ -117,6 +117,8 @@ Configuration groups:
     p.add_argument("--schedule", action="append", metavar="PARAM:DIM[:DELTA]",
                    help="Schedule a parameter per dimension step (e.g. print_speed:n_layers:5.0). Repeatable.")
     p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty (global)")
+    p.add_argument("--design-intent", type=str, default=None,
+                   help="JSON: fix parameters (required for schedule). Example: '{\"n_layers\":5}'")
     p.set_defaults(func=baseline.run)
 
     # explore
