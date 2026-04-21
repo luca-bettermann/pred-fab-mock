@@ -5,11 +5,11 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.plotting import plot_performance_radar, plot_schedule_detail
+from pred_fab.plotting import plot_performance_radar, plot_dimensional_trajectories, AxisSpec
 from visualization import plot_path_comparison_3d
 from steps._common import (
     load_session, rebuild, ensure_plot_dir, show_plot, combined_score,
-    N_LAYERS, N_SEGMENTS,
+    N_LAYERS, N_SEGMENTS, X_AXIS, Y_AXIS,
 )
 
 
@@ -65,35 +65,17 @@ def run(args: argparse.Namespace) -> None:
     show_plot(path_radar, inline=args.plot)
     print(f"  ✓ Performance radar: {path_radar}")
 
-    # ── 3. Schedule detail (if applicable) ──
-    if exp_code in state.schedules:
-        steps = state.schedules[exp_code]
-        if len(steps) > 1:
-            # Detect which params vary across steps
-            first_step = steps[0]
-            varying = []
-            for key in first_step:
-                if key in ("n_layers", "n_segments"):
-                    continue
-                vals = [s.get(key) for s in steps]
-                if any(v is not None for v in vals):
-                    unique = set(float(v) for v in vals if v is not None)
-                    if len(unique) > 1:
-                        varying.append(key)
-
-            for param_key in varying:
-                values = [float(s.get(param_key, 0)) for s in steps]
-                # Wrap as single-experiment schedule for plot_schedule_detail
-                sched_data = [{param_key: values}]
-                path_sched = os.path.join(report_dir, f"{exp_code}_schedule_{param_key}.png")
-                plot_schedule_detail(
-                    path_sched,
-                    schedules=sched_data,
-                    param_key=param_key,
-                    title=f"Schedule: {param_key}  ·  {exp_code}",
-                )
-                show_plot(path_sched, inline=args.plot)
-                print(f"  ✓ Schedule ({param_key}): {path_sched}")
+    # ── 3. Dimensional trajectories (highlighted) ──
+    path_traj = os.path.join(report_dir, f"{exp_code}_trajectories.png")
+    plot_dimensional_trajectories(
+        path_traj, X_AXIS, Y_AXIS, "n_layers",
+        state.all_params,
+        schedules=state.schedules, codes=state.all_codes,
+        highlight=exp_code,
+        title="Parameter Space",
+    )
+    show_plot(path_traj, inline=args.plot)
+    print(f"  ✓ Trajectories: {path_traj}")
 
     print(f"  {'─' * 50}")
     print(f"  Combined score: {score:.3f}  (dataset avg: {dataset_avg:.3f})")
