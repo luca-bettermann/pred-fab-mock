@@ -17,6 +17,19 @@ def run(args: argparse.Namespace) -> None:
     print(f"{_B}{_C}{bar}{_R}")
     schema = build_schema()
     schema.state_report()
+
+    # Store schema bounds in config for configure --show
+    schema_bounds: dict[str, list[float]] = {}
+    for code, obj in schema.parameters.data_objects.items():
+        lo = obj.constraints.get("min", None)
+        hi = obj.constraints.get("max", None)
+        if lo is not None and hi is not None:
+            schema_bounds[code] = [lo, hi]
+    for domain in schema.domains.domains:
+        for dim in domain.dimensions:
+            schema_bounds[dim.axis_code] = [dim.min_val, dim.max_val]
+    config["schema_bounds"] = schema_bounds
+
     save_session(config, state)
 
 

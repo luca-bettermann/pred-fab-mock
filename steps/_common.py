@@ -210,13 +210,20 @@ def print_config_set(label: str, old: Any, new: Any) -> None:
 
 
 def print_config_show(config: dict[str, Any]) -> None:
-    """Print all current configuration values, including defaults."""
+    """Print all current configuration values, including defaults and schema bounds."""
     _D = "\033[2m"
     _R = "\033[0m"
     _B = "\033[1m"
 
-    # Config keys with display labels and defaults, grouped
-    # (config_key, display_label, default_value)
+    # Bounds from schema (stored at init) + user overrides
+    all_bounds: dict[str, tuple[float, float]] = {}
+    for k, v in (config.get("schema_bounds", {}) or {}).items():
+        all_bounds[k] = (v[0], v[1])
+    user_bounds = config.get("bounds", {}) or {}
+    for k, v in user_bounds.items():
+        all_bounds[k] = (v[0], v[1])
+
+    # Config groups
     groups: list[tuple[str, list[tuple[str, str, Any]]]] = [
         ("Performance", [
             ("performance_weights", "Weights", {"path_accuracy": 1, "energy_efficiency": 1, "production_rate": 1}),
@@ -235,13 +242,6 @@ def print_config_show(config: dict[str, Any]) -> None:
             ("schedule_smoothing", "Smoothing", 0.05),
             ("schedule_delta", "Default delta", None),
         ]),
-        ("Bounds", [
-            ("bounds", "Bounds", None),
-        ]),
-        ("Model", [
-            ("model_type", "Model type", "mlp"),
-            ("test_set_n", "Test set size", None),
-        ]),
     ]
 
     print(f"\n  {_B}Current Configuration{_R}")
@@ -258,6 +258,13 @@ def print_config_show(config: dict[str, Any]) -> None:
                 is_default = config_key not in config or config[config_key] is None
                 suffix = f" {_D}(default){_R}" if is_default else ""
                 print(f"    {label:<20s} = {val}{suffix}")
+
+    # Bounds section — always show from schema + user overrides
+    print(f"\n  {_D}Bounds{_R}")
+    for code, (lo, hi) in sorted(all_bounds.items()):
+        is_overridden = code in user_bounds
+        suffix = "" if is_overridden else f" {_D}(schema){_R}"
+        print(f"    {code:<20s} = [{lo}, {hi}]{suffix}")
 
     print()
 
