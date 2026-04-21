@@ -26,8 +26,9 @@ def run(args: argparse.Namespace) -> None:
         if lo is not None and hi is not None:
             schema_bounds[code] = [lo, hi]
     for domain in schema.domains._domains.values():
-        for dim in domain.dimensions:
-            schema_bounds[dim.axis_code] = [dim.min_val, dim.max_val]
+        for dim in domain.axes:
+            if dim.max_val is not None:
+                schema_bounds[dim.code] = [float(dim.min_val), float(dim.max_val)]
     config["schema_bounds"] = schema_bounds
 
     save_session(config, state)
