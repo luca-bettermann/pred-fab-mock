@@ -210,52 +210,55 @@ def print_config_set(label: str, old: Any, new: Any) -> None:
 
 
 def print_config_show(config: dict[str, Any]) -> None:
-    """Print all current configuration values."""
+    """Print all current configuration values, including defaults."""
     _D = "\033[2m"
     _R = "\033[0m"
     _B = "\033[1m"
 
-    # Config keys with display labels, grouped
-    groups: list[tuple[str, list[tuple[str, str]]]] = [
+    # Config keys with display labels and defaults, grouped
+    # (config_key, display_label, default_value)
+    groups: list[tuple[str, list[tuple[str, str, Any]]]] = [
         ("Performance", [
-            ("performance_weights", "Weights"),
+            ("performance_weights", "Weights", {"path_accuracy": 1, "energy_efficiency": 1, "production_rate": 1}),
         ]),
         ("Exploration", [
-            ("exploration_radius", "Radius"),
-            ("buffer", "Buffer"),
-            ("decay_exp", "Decay exponent"),
+            ("exploration_radius", "Radius", 0.20),
+            ("buffer", "Buffer", 0.5),
+            ("decay_exp", "Decay exponent", 0.5),
         ]),
         ("Optimizer", [
-            ("optimizer", "Backend"),
-            ("de_maxiter", "DE max iterations"),
-            ("de_popsize", "DE population size"),
+            ("optimizer", "Backend", "de"),
+            ("de_maxiter", "DE max iterations", 1000),
+            ("de_popsize", "DE population size", 15),
+        ]),
+        ("Schedule", [
+            ("schedule_smoothing", "Smoothing", 0.05),
+            ("schedule_delta", "Default delta", None),
         ]),
         ("Bounds", [
-            ("bounds", "Bounds"),
+            ("bounds", "Bounds", None),
         ]),
         ("Model", [
-            ("model_type", "Model type"),
-            ("test_set_n", "Test set size"),
+            ("model_type", "Model type", "mlp"),
+            ("test_set_n", "Test set size", None),
         ]),
     ]
 
     print(f"\n  {_B}Current Configuration{_R}")
-    any_set = False
     for group_name, keys in groups:
-        items = [(label, config[key]) for key, label in keys if key in config and config[key] is not None]
-        if not items:
-            continue
-        any_set = True
         print(f"\n  {_D}{group_name}{_R}")
-        for label, val in items:
+        for config_key, label, default in keys:
+            val = config.get(config_key, default)
+            if val is None:
+                continue
             if isinstance(val, dict):
                 for k, v in val.items():
                     print(f"    {k:<20s} = {v}")
             else:
-                print(f"    {label:<20s} = {val}")
+                is_default = config_key not in config or config[config_key] is None
+                suffix = f" {_D}(default){_R}" if is_default else ""
+                print(f"    {label:<20s} = {val}{suffix}")
 
-    if not any_set:
-        print(f"\n  {_D}No configuration set (using defaults){_R}")
     print()
 
 
