@@ -106,6 +106,7 @@ Configuration groups:
     p.add_argument("--decay-exp", type=float, default=None, help="Bandwidth decay exponent (default: 0.5)")
     p.add_argument("--de-maxiter", type=int, default=None)
     p.add_argument("--de-popsize", type=int, default=None)
+    p.add_argument("--de-tol", type=float, default=None, help="DE convergence tolerance")
     p.add_argument("--schedule-smoothing", type=float, default=None, help="Default schedule smoothing")
     p.add_argument("--schedule-delta", type=float, default=None, help="Default schedule delta")
     p.set_defaults(func=configure.run)
@@ -119,6 +120,7 @@ Configuration groups:
     p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty (global)")
     p.add_argument("--design-intent", type=str, default=None,
                    help="JSON: fix parameters (required for schedule). Example: '{\"n_layers\":5}'")
+    p.add_argument("--iterations", type=int, default=None, help="DE max iterations for this run")
     p.set_defaults(func=baseline.run)
 
     # explore
@@ -131,6 +133,7 @@ Configuration groups:
                    help="Schedule a parameter per dimension step (e.g. print_speed:n_layers:5.0). Repeatable.")
     p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty (global)")
     p.add_argument("--design-intent", type=str, default=None, help="JSON: fix parameters for schedule mode")
+    p.add_argument("--iterations", type=int, default=None, help="DE max iterations for this run")
     p.set_defaults(func=explore.run)
 
     # test-set
@@ -151,6 +154,7 @@ Configuration groups:
     p.add_argument("--schedule", action="append", metavar="PARAM:DIM[:DELTA]",
                    help="Schedule a parameter per dimension step (e.g. print_speed:n_layers:5.0). Repeatable.")
     p.add_argument("--smoothing", type=float, default=None, help="Schedule smoothing penalty (global)")
+    p.add_argument("--iterations", type=int, default=None, help="DE max iterations for this run")
     p.set_defaults(func=inference.run)
 
     # ── Advanced commands ──

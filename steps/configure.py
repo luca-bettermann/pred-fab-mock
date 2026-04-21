@@ -39,6 +39,9 @@ def run(args: argparse.Namespace) -> None:
     if args.de_popsize is not None:
         print_config_set("DE population size", config.get("de_popsize"), args.de_popsize)
         config["de_popsize"] = args.de_popsize
+    if getattr(args, 'de_tol', None) is not None:
+        print_config_set("DE tolerance", config.get("de_tol"), args.de_tol)
+        config["de_tol"] = args.de_tol
     if getattr(args, 'schedule_smoothing', None) is not None:
         print_config_set("Schedule smoothing", config.get("schedule_smoothing"), args.schedule_smoothing)
         config["schedule_smoothing"] = args.schedule_smoothing

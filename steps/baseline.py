@@ -22,6 +22,9 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     plot_dir = ensure_plot_dir()
 
+    if getattr(args, 'iterations', None) is not None:
+        agent.calibration_system.de_maxiter = args.iterations
+
     apply_schedule_args(agent, args)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
@@ -42,6 +45,14 @@ def run(args: argparse.Namespace) -> None:
             sched_data = extract_schedule_steps(spec, params)
         state.record("baseline", exp_code, params, perf, schedule=sched_data)
         agent.console.print_experiment_row(exp_code, params, perf)
+
+        # Show schedule table if present
+        if sched_data and len(sched_data) > 1:
+            cal = agent.calibration_system
+            tunable_codes = set(cal.schedule_configs.keys())
+            agent.console.print_schedule_table(
+                sched_data, tunable_codes, cal.schedule_configs,
+            )
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
 

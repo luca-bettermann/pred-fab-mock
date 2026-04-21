@@ -116,6 +116,8 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
             opt_kwargs["de_maxiter"] = config["de_maxiter"]
         if config.get("de_popsize") is not None:
             opt_kwargs["de_popsize"] = config["de_popsize"]
+        if config.get("de_tol") is not None:
+            opt_kwargs["de_tol"] = config["de_tol"]
         if opt_kwargs:
             agent.configure_optimizer(**opt_kwargs)
 
@@ -237,6 +239,7 @@ def print_config_show(config: dict[str, Any]) -> None:
             ("optimizer", "Backend", "de"),
             ("de_maxiter", "DE max iterations", 1000),
             ("de_popsize", "DE population size", 15),
+            ("de_tol", "DE tolerance", 0.001),
         ]),
         ("Schedule", [
             ("schedule_smoothing", "Smoothing", 0.05),
