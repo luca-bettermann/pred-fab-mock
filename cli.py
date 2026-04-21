@@ -92,6 +92,11 @@ Configuration groups:
     --optimizer {de,lbfgsb}  Backend (default: de)
     --de-maxiter INT         DE max generations (default: 1000)
     --de-popsize INT         DE population size (default: 15)
+    --de-tol FLOAT           DE convergence tolerance (default: 0.0001)
+
+  Schedule:
+    --schedule-smoothing FLOAT  Smoothing penalty (default: 0.05)
+    --schedule-delta FLOAT      Default delta for scheduled params
 
   Bounds:
     --bounds JSON            Parameter search bounds override

@@ -239,7 +239,7 @@ def print_config_show(config: dict[str, Any]) -> None:
             ("optimizer", "Backend", "de"),
             ("de_maxiter", "DE max iterations", 1000),
             ("de_popsize", "DE population size", 15),
-            ("de_tol", "DE tolerance", 0.001),
+            ("de_tol", "DE tolerance", 0.0001),
         ]),
         ("Schedule", [
             ("schedule_smoothing", "Smoothing", 0.05),
