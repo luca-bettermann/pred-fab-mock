@@ -42,12 +42,12 @@ def run(args: argparse.Namespace) -> None:
     if getattr(args, 'de_tol', None) is not None:
         print_config_set("DE tolerance", config.get("de_tol"), args.de_tol)
         config["de_tol"] = args.de_tol
-    if getattr(args, 'schedule_smoothing', None) is not None:
-        print_config_set("Schedule smoothing", config.get("schedule_smoothing"), args.schedule_smoothing)
-        config["schedule_smoothing"] = args.schedule_smoothing
-    if getattr(args, 'schedule_delta', None) is not None:
-        print_config_set("Schedule delta", config.get("schedule_delta"), args.schedule_delta)
-        config["schedule_delta"] = args.schedule_delta
+    if getattr(args, 'smoothing', None) is not None:
+        print_config_set("Smoothing", config.get("schedule_smoothing"), args.smoothing)
+        config["schedule_smoothing"] = args.smoothing
+    if getattr(args, 'delta', None) is not None:
+        print_config_set("Delta", config.get("schedule_delta"), args.delta)
+        config["schedule_delta"] = args.delta
     print()
     save_session(config, state)
 

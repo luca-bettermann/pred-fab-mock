@@ -95,8 +95,8 @@ Configuration groups:
     --de-tol FLOAT           DE convergence tolerance (default: 0.0001)
 
   Schedule:
-    --schedule-smoothing FLOAT  Smoothing penalty (default: 0.05)
-    --schedule-delta FLOAT      Default delta for scheduled params
+    --smoothing FLOAT        Smoothing penalty (default: 0.05)
+    --delta FLOAT            Default delta for scheduled params
 
   Bounds:
     --bounds JSON            Parameter search bounds override
@@ -112,8 +112,8 @@ Configuration groups:
     p.add_argument("--de-maxiter", type=int, default=None)
     p.add_argument("--de-popsize", type=int, default=None)
     p.add_argument("--de-tol", type=float, default=None, help="DE convergence tolerance")
-    p.add_argument("--schedule-smoothing", type=float, default=None, help="Default schedule smoothing")
-    p.add_argument("--schedule-delta", type=float, default=None, help="Default schedule delta")
+    p.add_argument("--smoothing", type=float, default=None, help="Smoothing penalty (default: 0.05)")
+    p.add_argument("--delta", type=float, default=None, help="Default delta for scheduled params")
     p.set_defaults(func=configure.run)
 
     # baseline
