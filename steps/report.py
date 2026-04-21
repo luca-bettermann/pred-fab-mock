@@ -66,32 +66,25 @@ def run(args: argparse.Namespace) -> None:
     print(f"  ✓ Performance radar: {path_radar}")
 
     # ── 3. Schedule detail (if applicable) ──
-    # Check if this experiment was part of a schedule phase
-    if phase in ("schedule", "adaptation"):
-        # Collect all schedule experiments' params as pseudo-schedules
-        sched_indices = [i for i, p in enumerate(state.all_phases) if p == phase]
-        schedules = []
-        for si in sched_indices:
-            p = state.all_params[si]
-            # Build a single-point "schedule" from params (for schedule_detail)
-            schedules.append(p)
-
-        # Find which param was likely scheduled (varying across schedule experiments)
-        if len(sched_indices) > 1:
-            # Detect which parameters vary across the scheduled experiments
-            first_p = state.all_params[sched_indices[0]]
+    if exp_code in state.schedules:
+        steps = state.schedules[exp_code]
+        if len(steps) > 1:
+            # Detect which params vary across steps
+            first_step = steps[0]
             varying = []
-            for key in first_p:
+            for key in first_step:
                 if key in ("n_layers", "n_segments"):
                     continue
-                vals = [state.all_params[i].get(key) for i in sched_indices]
-                if len(set(float(v) for v in vals if v is not None)) > 1:
-                    varying.append(key)
+                vals = [s.get(key) for s in steps]
+                if any(v is not None for v in vals):
+                    unique = set(float(v) for v in vals if v is not None)
+                    if len(unique) > 1:
+                        varying.append(key)
 
             for param_key in varying:
-                # Build per-experiment value list for the schedule detail plot
-                sched_data = [{param_key: [state.all_params[i][param_key]]}
-                              for i in sched_indices]
+                values = [float(s.get(param_key, 0)) for s in steps]
+                # Wrap as single-experiment schedule for plot_schedule_detail
+                sched_data = [{param_key: values}]
                 path_sched = os.path.join(report_dir, f"{exp_code}_schedule_{param_key}.png")
                 plot_schedule_detail(
                     path_sched,

@@ -57,6 +57,7 @@ def save_session(config: dict[str, Any], journey: JourneyState) -> None:
             "all_codes": journey.all_codes,
             "perf_history": [(p, pf) for p, pf in journey.perf_history],
             "prev_params": journey.prev_params,
+            "schedules": journey.schedules,
         },
     }
     with open(SESSION_FILE, "w") as f:
@@ -77,6 +78,7 @@ def load_session() -> tuple[dict[str, Any], JourneyState]:
     state.all_codes = j["all_codes"]
     state.perf_history = [(p, pf) for p, pf in j["perf_history"]]
     state.prev_params = j["prev_params"]
+    state.schedules = j.get("schedules", {})
     return config, state
 
 
@@ -274,3 +276,21 @@ def apply_schedule_args(agent: Any, args: Any) -> None:
         dim = parts[1].strip()
         delta = float(parts[2]) if len(parts) >= 3 else None
         agent.configure_schedule(param, dim, delta=delta, smoothing=smoothing)
+
+
+def extract_schedule_steps(spec: Any, base_params: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build per-step param dicts from an ExperimentSpec's schedules."""
+    if not spec.schedules:
+        return [base_params]
+    # Determine L from the first schedule's entries
+    first_sched = next(iter(spec.schedules.values()))
+    L = max(idx for idx, _ in first_sched.entries) + 1 if first_sched.entries else 1
+    steps: list[dict[str, Any]] = []
+    for step_i in range(L):
+        step_params = dict(base_params)
+        for _dim, sched in spec.schedules.items():
+            for idx, proposal in sched.entries:
+                if idx == step_i:
+                    step_params.update(proposal.to_dict())
+        steps.append(step_params)
+    return steps

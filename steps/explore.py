@@ -9,6 +9,7 @@ from steps._common import (
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, compute_acquisition_grid,
     X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
+    extract_schedule_steps,
 )
 
 
@@ -47,7 +48,8 @@ def run(args: argparse.Namespace) -> None:
         if spec.schedules:
             spec.apply_schedules(exp_data)
         perf = get_performance(exp_data)
-        state.record("exploration", exp_code, params, perf)
+        sched_data = extract_schedule_steps(spec, params) if spec.schedules else None
+        state.record("exploration", exp_code, params, perf, schedule=sched_data)
 
         if args.plot:
             w, s, p, u, c = acq_data

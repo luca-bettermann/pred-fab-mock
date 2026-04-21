@@ -12,7 +12,7 @@ from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, combined_score, get_physics_optimum, N_LAYERS, N_SEGMENTS,
-    X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
+    X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args, extract_schedule_steps,
 )
 
 
@@ -46,7 +46,8 @@ def run(args: argparse.Namespace) -> None:
 
     exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
     perf = get_performance(exp_data)
-    state.record("inference", exp_code, params, perf)
+    sched_data = extract_schedule_steps(spec, params) if spec.schedules else None
+    state.record("inference", exp_code, params, perf, schedule=sched_data)
 
     score = combined_score(perf, perf_weights)
     print(f"\n  Proposed parameters:")

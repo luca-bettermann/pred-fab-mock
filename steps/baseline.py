@@ -12,6 +12,7 @@ from steps._common import (
     show_plot, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, combined_score, N_LAYERS, N_SEGMENTS,
     X_AXIS, Y_AXIS, Z_AXIS, FIXED_DIMS, apply_schedule_args,
+    extract_schedule_steps,
 )
 
 
@@ -30,7 +31,11 @@ def run(args: argparse.Namespace) -> None:
         exp_code = next_code(state, "baseline")
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
         perf = get_performance(exp_data)
-        state.record("baseline", exp_code, params, perf)
+        # Extract per-step schedule if present
+        sched_data = None
+        if spec.schedules:
+            sched_data = extract_schedule_steps(spec, params)
+        state.record("baseline", exp_code, params, perf, schedule=sched_data)
         agent.console.print_experiment_row(exp_code, params, perf)
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
