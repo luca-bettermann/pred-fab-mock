@@ -22,6 +22,9 @@ def run(args: argparse.Namespace) -> None:
     perf_weights = agent.calibration_system.performance_weights
     plot_dir = ensure_plot_dir()
 
+    if getattr(args, 'iterations', None) is not None:
+        agent.calibration_system.de_maxiter = args.iterations
+
     apply_schedule_args(agent, args)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
@@ -39,7 +42,7 @@ def run(args: argparse.Namespace) -> None:
     agent.train(dm, validate=False)
 
     current = with_dimensions(state.prev_params) if state.prev_params else None
-    spec = agent.exploration_step(dm, kappa=0.0, current_params=current)
+    spec = agent.acquisition_step(dm, kappa=0.0, current_params=current)
     proposed = params_from_spec(spec)
     params = with_dimensions({**state.prev_params, **proposed})
     params.update(design_intent)

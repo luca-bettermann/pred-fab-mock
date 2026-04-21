@@ -44,7 +44,7 @@ def run(args: argparse.Namespace) -> None:
     agent.train(dm, validate=False)
 
     print(f"\n  Step 1: Initial inference...")
-    spec = agent.exploration_step(dm, kappa=0.0)
+    spec = agent.acquisition_step(dm, kappa=0.0)
     proposed = params_from_spec(spec)
     params = with_dimensions({**state.prev_params, **proposed})
     params.update(design_intent)

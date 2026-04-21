@@ -1,5 +1,6 @@
 """Run exploration rounds (incremental -- can be called multiple times)."""
 import argparse
+import json
 import os
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
@@ -18,10 +19,13 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     plot_dir = ensure_plot_dir()
 
+    if getattr(args, 'iterations', None) is not None:
+        agent.calibration_system.de_maxiter = args.iterations
+
     apply_schedule_args(agent, args)
-    if getattr(args, 'schedule', None) and getattr(args, 'design_intent', None):
-        import json
-        design_intent = json.loads(args.design_intent)
+
+    design_intent = json.loads(args.design_intent) if args.design_intent else {}
+    if design_intent:
         agent.calibration_system.configure_fixed_params(design_intent, force=True)
 
     n_existing = len([p for p in state.all_phases if p == "exploration"])
@@ -38,7 +42,7 @@ def run(args: argparse.Namespace) -> None:
         round_num = n_existing + i + 1
         # Pass current_params so schedule dimensions are resolved
         current = with_dimensions(state.prev_params) if state.prev_params else None
-        spec = agent.exploration_step(dm, kappa=args.kappa, current_params=current)
+        spec = agent.acquisition_step(dm, kappa=args.kappa, current_params=current)
         proposed = params_from_spec(spec)
         params = with_dimensions({**state.prev_params, **proposed})
         exp_code = next_code(state, "explore")
