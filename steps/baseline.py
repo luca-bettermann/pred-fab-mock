@@ -21,8 +21,7 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     plot_dir = ensure_plot_dir()
 
-    if getattr(args, "schedule", None):
-        print("  ⚠ --schedule is not yet supported for baseline (use explore or inference)")
+    apply_schedule_args(agent, args)
 
     agent.console.print_phase_header(1, "Baseline", f"{args.n} experiments")
     specs = agent.baseline_step(n=args.n)
