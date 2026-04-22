@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.plotting import plot_parameter_space, plot_dimensional_trajectories, plot_convergence
+from pred_fab.plotting import plot_parameter_space, plot_dimensional_trajectories, plot_convergence, plot_phase_validation
 from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
@@ -97,8 +97,21 @@ def run(args: argparse.Namespace) -> None:
     )
     show_plot(path_3d_params, inline=args.plot)
 
+    # Phase validation plot
+    cal = agent.calibration_system
+    path_val = os.path.join(plot_dir, "01_phase_validation.png")
+    plot_phase_validation(
+        path_val, X_AXIS, Y_AXIS,
+        domain_values=cal.last_domain_values,
+        process_points=cal.last_process_points,
+        schedule_points=cal.last_schedule_points,
+        schedule_exp_ids=cal.last_schedule_exp_ids,
+        title="Phase Validation",
+    )
+    show_plot(path_val, inline=args.plot)
+
     # Convergence plot
-    conv_history = agent.calibration_system.convergence_history
+    conv_history = cal.convergence_history
     if conv_history:
         path_conv = os.path.join(plot_dir, "01_convergence.png")
         plot_convergence(path_conv, conv_history, title="Baseline Convergence")
