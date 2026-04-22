@@ -44,15 +44,22 @@ def run(args: argparse.Namespace) -> None:
         if spec.schedules:
             sched_data = extract_schedule_steps(spec, params)
         state.record("baseline", exp_code, params, perf, schedule=sched_data)
-        agent.console.print_experiment_row(exp_code, params, perf)
 
-        # Show schedule table if present
-        if sched_data and len(sched_data) > 1:
-            cal = agent.calibration_system
-            tunable_codes = set(cal.schedule_configs.keys())
-            agent.console.print_schedule_table(
-                sched_data, tunable_codes, cal.schedule_configs,
-            )
+        # Performance-only summary: attributes in grey, sys= colored
+        pw = agent.calibration_system.performance_weights
+        sys_score = combined_score(perf, pw)
+        _D = "\033[2m"
+        _R = "\033[0m"
+        _S = "\033[38;2;45;95;133m"  # Steel-700
+        perf_parts = "  ".join(f"{k[:3]}={v:.3f}" for k, v in perf.items())
+        # Score color
+        if sys_score >= 0.70:
+            _C = "\033[32m"  # green
+        elif sys_score >= 0.45:
+            _C = "\033[33m"  # yellow
+        else:
+            _C = "\033[31m"  # red
+        print(f"  {_S}{exp_code}{_R}  {_D}{perf_parts}{_R}  {_C}sys={sys_score:.3f}{_R}")
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
 
