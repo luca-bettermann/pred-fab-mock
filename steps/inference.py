@@ -11,8 +11,9 @@ from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
-    run_and_evaluate, combined_score, get_physics_optimum, N_LAYERS, N_SEGMENTS,
-    X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args, extract_schedule_steps,
+    run_and_evaluate, run_and_record, combined_score, get_physics_optimum,
+    N_LAYERS, N_SEGMENTS,
+    X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
 )
 
 
@@ -43,14 +44,17 @@ def run(args: argparse.Namespace) -> None:
 
     current = with_dimensions(state.prev_params) if state.prev_params else None
     spec = agent.acquisition_step(dm, kappa=0.0, current_params=current)
-    proposed = params_from_spec(spec)
-    params = with_dimensions({**state.prev_params, **proposed})
-    params.update(design_intent)
     exp_code = next_code(state, "infer")
 
-    exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
+    # Merge design_intent into extra_params so it overrides schedule proposals if needed.
+    extra = dict(state.prev_params) if state.prev_params else {}
+    extra.update(design_intent)
+    exp_data, params, sched_data = run_and_record(
+        dataset, agent, fab, spec, exp_code, extra_params=extra,
+    )
+    # Re-apply design_intent on top of returned params (schedule may have overridden).
+    params.update(design_intent)
     perf = get_performance(exp_data)
-    sched_data = extract_schedule_steps(spec, params) if spec.schedules else None
     state.record("inference", exp_code, params, perf, schedule=sched_data)
 
     score = combined_score(perf, perf_weights)
