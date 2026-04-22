@@ -65,7 +65,6 @@ def run(args: argparse.Namespace) -> None:
     path = os.path.join(plot_dir, "05_analysis_topology.png")
     plot_topology_comparison(path, X_AXIS, Y_AXIS, waters, speeds,
                               {"Ground Truth": true_grid, "Model Prediction": pred_grid},
-                              title="Model Analysis on Test Set",
                               fixed_params=FIXED_DIMS)
     show_plot(path, inline=args.plot)
 

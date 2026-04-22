@@ -97,28 +97,25 @@ def run(args: argparse.Namespace) -> None:
         path_3d_params, X_AXIS, Y_AXIS, "n_layers",
         state.all_params,
         schedules=state.schedules, codes=state.all_codes,
-        title="Baseline Parameter Space",
     )
     show_plot(path_3d_params, inline=args.plot)
 
     # Phase validation plot
     cal = agent.calibration_system
     path_val = os.path.join(plot_dir, "01_phase_validation.png")
-    plot_phase_validation(
-        path_val, X_AXIS, Y_AXIS,
-        domain_values=cal.last_domain_values,
-        process_points=cal.last_process_points,
-        schedule_points=cal.last_schedule_points,
-        schedule_exp_ids=cal.last_schedule_exp_ids,
-        title="Phase Validation",
-    )
+    validation_panels: list[tuple] = []
+    if cal.last_process_points is not None:
+        validation_panels.append(("Process", X_AXIS, Y_AXIS, cal.last_process_points, None))
+    if cal.last_schedule_points is not None:
+        validation_panels.append(("Schedule", X_AXIS, Y_AXIS, cal.last_schedule_points, cal.last_schedule_exp_ids))
+    plot_phase_validation(path_val, validation_panels)
     show_plot(path_val, inline=args.plot)
 
     # Convergence plot
     conv_history = cal.convergence_history
     if conv_history:
         path_conv = os.path.join(plot_dir, "01_convergence.png")
-        plot_convergence(path_conv, conv_history, title="Baseline Convergence")
+        plot_convergence(path_conv, conv_history)
         show_plot(path_conv, inline=args.plot)
 
     save_session(config, state)

@@ -45,7 +45,6 @@ def run(args: argparse.Namespace) -> None:
                           individual, combined,
                           combined_label=metric_names[-1],
                           weights=perf_weights,
-                          title="Physics Performance Topology",
                           fixed_params=FIXED_DIMS)
     show_plot(path, inline=args.plot)
     save_session(config, state)
