@@ -9,7 +9,7 @@ import numpy as np
 
 from pred_fab.orchestration import Optimizer
 from pred_fab.core import Dataset
-from pred_fab import combined_score
+from pred_fab.utils.metrics import combined_score
 from pred_fab.plotting import AxisSpec
 
 from schema import build_schema
@@ -186,7 +186,7 @@ def compute_acquisition_grid(agent, dm, kappa, res=30):
 # Schema-specific axis definitions used across all steps
 X_AXIS = AxisSpec("water_ratio", "Water Ratio", bounds=(0.30, 0.50))
 Y_AXIS = AxisSpec("print_speed", "Print Speed", unit="mm/s", bounds=(20.0, 60.0))
-Z_AXIS = AxisSpec("n_layers", "Layers")
+Z_AXIS = AxisSpec("n_layers", "Layers", integer=True)
 FIXED_DIMS = {"n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
 
 
@@ -307,3 +307,32 @@ def extract_schedule_steps(spec: Any, base_params: dict[str, Any]) -> list[dict[
                     step_params.update(proposal.to_dict())
         steps.append(step_params)
     return steps
+
+
+def run_and_record(
+    dataset: Dataset,
+    agent: Any,
+    fab: FabricationSystem,
+    spec: Any,
+    exp_code: str,
+    extra_params: dict[str, Any] | None = None,
+) -> tuple[Any, dict[str, Any], list[dict[str, Any]] | None]:
+    """Run an experiment from a spec, apply schedules, persist parameter_updates to disk.
+
+    run_and_evaluate() saves the experiment before apply_schedules can populate
+    parameter_updates, so a second save_experiment is required after apply_schedules to
+    persist the schedule across sessions. Without this, reload-from-disk strips the
+    parameter_updates and the KDE never sees trajectory segments. Returns (exp_data,
+    params, sched_data).
+    """
+    proposed = params_from_spec(spec)
+    merged = dict(extra_params) if extra_params else {}
+    merged.update(proposed)
+    params = with_dimensions(merged)
+    exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
+    if spec.schedules:
+        spec.apply_schedules(exp_data)
+        # run_and_evaluate saved pre-apply state; persist parameter_updates now.
+        dataset.save_experiment(exp_code)
+    sched_data = extract_schedule_steps(spec, params) if spec.schedules else None
+    return exp_data, params, sched_data

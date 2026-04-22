@@ -8,9 +8,8 @@ from pred_fab.plotting import plot_acquisition, plot_convergence
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
-    run_and_evaluate, compute_acquisition_grid,
+    run_and_evaluate, run_and_record, compute_acquisition_grid,
     X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
-    extract_schedule_steps,
 )
 
 
@@ -45,27 +44,25 @@ def run(args: argparse.Namespace) -> None:
         # Pass current_params so schedule dimensions are resolved
         current = with_dimensions(state.prev_params) if state.prev_params else None
         spec = agent.acquisition_step(dm, kappa=args.kappa, current_params=current)
-        proposed = params_from_spec(spec)
-        params = with_dimensions({**state.prev_params, **proposed})
         exp_code = next_code(state, "explore")
 
         if args.plot:
             acq_data = compute_acquisition_grid(agent, dm, args.kappa, res=30)
 
-        exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
-        if spec.schedules:
-            spec.apply_schedules(exp_data)
+        exp_data, params, sched_data = run_and_record(
+            dataset, agent, fab, spec, exp_code, extra_params=state.prev_params,
+        )
         perf = get_performance(exp_data)
-        sched_data = extract_schedule_steps(spec, params) if spec.schedules else None
         state.record("exploration", exp_code, params, perf, schedule=sched_data)
 
         if args.plot:
             w, s, p, u, c = acq_data
             path = os.path.join(plot_dir, f"03_explore_round_{round_num:02d}.png")
+            print(f"  \033[2mExploration: Round {round_num}\033[0m")
             plot_acquisition(path, X_AXIS, Y_AXIS, w, s, p, u, c,
                              points=state.all_params[:-1],
                              proposed=params,
-                             title=f"Exploration \u2014 Round {round_num}",
+                             schedules=state.schedules, codes=state.all_codes[:-1],
                              fixed_params=FIXED_DIMS)
             show_plot(path, inline=True)
 
@@ -80,7 +77,7 @@ def run(args: argparse.Namespace) -> None:
     # Convergence plot across all rounds
     if all_convergence:
         path_conv = os.path.join(plot_dir, "03_convergence.png")
-        plot_convergence(path_conv, all_convergence, title="Exploration Convergence")
+        plot_convergence(path_conv, all_convergence)
         show_plot(path_conv, inline=args.plot)
 
     save_session(config, state)
