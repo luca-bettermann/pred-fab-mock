@@ -66,7 +66,6 @@ def run(args: argparse.Namespace) -> None:
                              points=state.all_params[:-1],
                              proposed=params,
                              schedules=state.schedules, codes=state.all_codes[:-1],
-                             title=f"Exploration \u2014 Round {round_num}",
                              fixed_params=FIXED_DIMS)
             show_plot(path, inline=True)
 
@@ -81,7 +80,7 @@ def run(args: argparse.Namespace) -> None:
     # Convergence plot across all rounds
     if all_convergence:
         path_conv = os.path.join(plot_dir, "03_convergence.png")
-        plot_convergence(path_conv, all_convergence, title="Exploration Convergence")
+        plot_convergence(path_conv, all_convergence)
         show_plot(path_conv, inline=args.plot)
 
     save_session(config, state)

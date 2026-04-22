@@ -72,7 +72,6 @@ def run(args: argparse.Namespace) -> None:
         state.all_params,
         schedules=state.schedules, codes=state.all_codes,
         highlight=exp_code,
-        title="Parameter Space",
     )
     show_plot(path_traj, inline=args.plot)
     print(f"  ✓ Trajectories: {path_traj}")
