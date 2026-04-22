@@ -186,7 +186,7 @@ def compute_acquisition_grid(agent, dm, kappa, res=30):
 # Schema-specific axis definitions used across all steps
 X_AXIS = AxisSpec("water_ratio", "Water Ratio", bounds=(0.30, 0.50))
 Y_AXIS = AxisSpec("print_speed", "Print Speed", unit="mm/s", bounds=(20.0, 60.0))
-Z_AXIS = AxisSpec("n_layers", "Layers")
+Z_AXIS = AxisSpec("n_layers", "Layers", integer=True)
 FIXED_DIMS = {"n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
 
 
