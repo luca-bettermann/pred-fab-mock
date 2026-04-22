@@ -317,11 +317,13 @@ def run_and_record(
     exp_code: str,
     extra_params: dict[str, Any] | None = None,
 ) -> tuple[Any, dict[str, Any], list[dict[str, Any]] | None]:
-    """Run an experiment from a spec, apply schedules, extract step-by-step schedule data.
+    """Run an experiment from a spec, apply schedules, persist parameter_updates to disk.
 
-    Consolidates the common pattern across step files so the schedule is always recorded
-    on exp_data (adding to parameter_updates so the KDE sees per-segment points), not just
-    tracked in the journey state. Returns (exp_data, params, sched_data).
+    run_and_evaluate() saves the experiment before apply_schedules can populate
+    parameter_updates, so a second save_experiment is required after apply_schedules to
+    persist the schedule across sessions. Without this, reload-from-disk strips the
+    parameter_updates and the KDE never sees trajectory segments. Returns (exp_data,
+    params, sched_data).
     """
     proposed = params_from_spec(spec)
     merged = dict(extra_params) if extra_params else {}
@@ -330,5 +332,7 @@ def run_and_record(
     exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
     if spec.schedules:
         spec.apply_schedules(exp_data)
+        # run_and_evaluate saved pre-apply state; persist parameter_updates now.
+        dataset.save_experiment(exp_code)
     sched_data = extract_schedule_steps(spec, params) if spec.schedules else None
     return exp_data, params, sched_data
