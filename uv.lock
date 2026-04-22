@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12"
 
 [[package]]
@@ -457,6 +457,7 @@ name = "pred-fab"
 version = "0.1.0"
 source = { editable = "../pred-fab" }
 dependencies = [
+    { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pytest" },
@@ -466,6 +467,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "matplotlib", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "pandas", specifier = ">=2.3.1" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.0" },
