@@ -34,32 +34,36 @@ def run(args: argparse.Namespace) -> None:
     agent.console.print_phase_header(1, "Baseline", f"{args.n} experiments")
     specs = agent.baseline_step(n=args.n)
 
+    exp_results: list[tuple[str, dict[str, float], float]] = []
+    pw = agent.calibration_system.performance_weights
+
     for spec in specs:
         params = with_dimensions(params_from_spec(spec))
         exp_code = next_code(state, "baseline")
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
         perf = get_performance(exp_data)
-        # Extract per-step schedule if present
         sched_data = None
         if spec.schedules:
             sched_data = extract_schedule_steps(spec, params)
         state.record("baseline", exp_code, params, perf, schedule=sched_data)
+        exp_results.append((exp_code, perf, combined_score(perf, pw)))
 
-        # Performance-only summary: attributes in grey, sys= colored
-        pw = agent.calibration_system.performance_weights
-        sys_score = combined_score(perf, pw)
-        _D = "\033[2m"
-        _R = "\033[0m"
-        _S = "\033[38;2;45;95;133m"  # Steel-700
+    # Performance summary: attributes in grey, sys= in green spectrum
+    _D = "\033[2m"
+    _R = "\033[0m"
+    _N = "\033[38;2;39;63;70m"  # Zinc-800 for experiment names
+    scores = [s for _, _, s in exp_results]
+    s_min, s_max = min(scores), max(scores)
+    s_range = max(s_max - s_min, 1e-6)
+    for exp_code, perf, sys_score in exp_results:
         perf_parts = "  ".join(f"{k[:3]}={v:.3f}" for k, v in perf.items())
-        # Score color
-        if sys_score >= 0.70:
-            _C = "\033[32m"  # green
-        elif sys_score >= 0.45:
-            _C = "\033[33m"  # yellow
-        else:
-            _C = "\033[31m"  # red
-        print(f"  {_S}{exp_code}{_R}  {_D}{perf_parts}{_R}  {_C}sys={sys_score:.3f}{_R}")
+        # Green spectrum: Emerald-300 (low) → Emerald-700 (high)
+        t = (sys_score - s_min) / s_range
+        r = int(110 - t * 106)  # 110 → 4
+        g = int(231 - t * 111)  # 231 → 120
+        b = int(183 - t * 96)   # 183 → 87
+        _C = f"\033[38;2;{r};{g};{b}m"
+        print(f"  {_N}{exp_code}{_R}  {_D}{perf_parts}{_R}  {_C}sys={sys_score:.3f}{_R}")
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
 
