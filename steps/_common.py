@@ -9,7 +9,7 @@ import numpy as np
 
 from pred_fab.orchestration import Optimizer
 from pred_fab.core import Dataset
-from pred_fab import combined_score
+from pred_fab.utils.metrics import combined_score
 from pred_fab.plotting import AxisSpec
 
 from schema import build_schema
@@ -307,3 +307,28 @@ def extract_schedule_steps(spec: Any, base_params: dict[str, Any]) -> list[dict[
                     step_params.update(proposal.to_dict())
         steps.append(step_params)
     return steps
+
+
+def run_and_record(
+    dataset: Dataset,
+    agent: Any,
+    fab: FabricationSystem,
+    spec: Any,
+    exp_code: str,
+    extra_params: dict[str, Any] | None = None,
+) -> tuple[Any, dict[str, Any], list[dict[str, Any]] | None]:
+    """Run an experiment from a spec, apply schedules, extract step-by-step schedule data.
+
+    Consolidates the common pattern across step files so the schedule is always recorded
+    on exp_data (adding to parameter_updates so the KDE sees per-segment points), not just
+    tracked in the journey state. Returns (exp_data, params, sched_data).
+    """
+    proposed = params_from_spec(spec)
+    merged = dict(extra_params) if extra_params else {}
+    merged.update(proposed)
+    params = with_dimensions(merged)
+    exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
+    if spec.schedules:
+        spec.apply_schedules(exp_data)
+    sched_data = extract_schedule_steps(spec, params) if spec.schedules else None
+    return exp_data, params, sched_data

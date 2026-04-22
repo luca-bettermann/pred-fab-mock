@@ -12,9 +12,8 @@ from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot, with_dimensions, params_from_spec, get_performance,
-    run_and_evaluate, combined_score, N_LAYERS, N_SEGMENTS,
+    run_and_evaluate, run_and_record, combined_score, N_LAYERS, N_SEGMENTS,
     X_AXIS, Y_AXIS, Z_AXIS, FIXED_DIMS, apply_schedule_args,
-    extract_schedule_steps,
 )
 
 
@@ -39,13 +38,9 @@ def run(args: argparse.Namespace) -> None:
     pw = agent.calibration_system.performance_weights
 
     for spec in specs:
-        params = with_dimensions(params_from_spec(spec))
         exp_code = next_code(state, "baseline")
-        exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
+        exp_data, params, sched_data = run_and_record(dataset, agent, fab, spec, exp_code)
         perf = get_performance(exp_data)
-        sched_data = None
-        if spec.schedules:
-            sched_data = extract_schedule_steps(spec, params)
         state.record("baseline", exp_code, params, perf, schedule=sched_data)
         exp_results.append((exp_code, perf, combined_score(perf, pw)))
 
