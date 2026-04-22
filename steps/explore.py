@@ -62,6 +62,7 @@ def run(args: argparse.Namespace) -> None:
         if args.plot:
             w, s, p, u, c = acq_data
             path = os.path.join(plot_dir, f"03_explore_round_{round_num:02d}.png")
+            print(f"  \033[2mExploration: Round {round_num}\033[0m")
             plot_acquisition(path, X_AXIS, Y_AXIS, w, s, p, u, c,
                              points=state.all_params[:-1],
                              proposed=params,

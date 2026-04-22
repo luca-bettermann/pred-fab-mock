@@ -86,7 +86,11 @@ def run(args: argparse.Namespace) -> None:
             except Exception:
                 pred_grid[j, i] = 0.0
 
+    _D = "\033[2m"
+    _R = "\033[0m"
+
     path = os.path.join(plot_dir, "01_baseline.png")
+    print(f"  {_D}Baseline: Ground Truth vs Initial Model{_R}")
     plot_parameter_space(path, X_AXIS, Y_AXIS, waters, speeds,
                          state.all_params, true_grid, pred_grid,
                          schedules=state.schedules, codes=state.all_codes,
@@ -94,6 +98,7 @@ def run(args: argparse.Namespace) -> None:
     show_plot(path, inline=args.plot)
 
     path_3d_params = os.path.join(plot_dir, "01_baseline_3d.png")
+    print(f"  {_D}Baseline: Dimensional Trajectories{_R}")
     plot_dimensional_trajectories(
         path_3d_params, X_AXIS, Y_AXIS, "n_layers",
         state.all_params,
@@ -123,6 +128,7 @@ def run(args: argparse.Namespace) -> None:
             sched_dicts.append({"water_ratio": water, "print_speed": speed})
         validation_panels.append(("Schedule", X_AXIS, Y_AXIS, sched_dicts, sched_ids))
     if validation_panels:
+        print(f"  {_D}Phase Validation{_R}")
         plot_phase_validation(path_val, validation_panels)
         show_plot(path_val, inline=args.plot)
 
@@ -130,6 +136,7 @@ def run(args: argparse.Namespace) -> None:
     conv_history = cal.convergence_history
     if conv_history:
         path_conv = os.path.join(plot_dir, "01_convergence.png")
+        print(f"  {_D}Baseline Convergence{_R}")
         plot_convergence(path_conv, conv_history)
         show_plot(path_conv, inline=args.plot)
 
