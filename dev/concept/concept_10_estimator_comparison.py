@@ -95,6 +95,28 @@ def estimate_sobol(centers, sigma, budget: int, D: int, seed: int = 0):
 
 # ---------- Reference ----------
 
+def reference_per_kernel_is(
+    centers: np.ndarray, sigma: float, D: int,
+    n_per_kernel: int = 200_000, seed: int = 42,
+) -> float:
+    """Ground truth via per-kernel importance sampling — robust at any σ.
+
+    Uses the identity ∫E dz = Σⱼ ∫ρⱼ·u dz = Σⱼ E_{z~ρⱼ}[u(z)]. Sampling from
+    each ρⱼ individually means we always hit the kernel, so works at arbitrarily
+    small σ where uniform samplers collapse.
+    """
+    rng = np.random.default_rng(seed)
+    N = len(centers)
+    total = 0.0
+    for j in range(N):
+        eps = rng.standard_normal((n_per_kernel, D)) * sigma
+        samples = centers[j] + eps
+        in_domain = np.all((samples >= 0.0) & (samples <= 1.0), axis=1)
+        D_vals = raw_density(samples, centers, np.ones(N), sigma)
+        total += float(np.where(in_domain, 1.0 / (1.0 + D_vals), 0.0).mean())
+    return total
+
+
 def reference(centers, sigma: float, D: int, res: int = 81) -> float:
     if D == 2:
         u = np.linspace(0, 1, res)
@@ -293,6 +315,69 @@ def print_summary(results, Ds, n_dirs_values):
     print()
 
 
+# ---------- Figure 4: σ-sweep — where each estimator breaks ----------
+
+def figure_sigma_sweep(
+    Ds: tuple[int, ...] = (2, 3, 5),
+    sigmas: np.ndarray | None = None,
+    n_dirs: int = 32,
+    N_kernels: int = 6,
+):
+    """Sweep σ across two decades. Truth via per-kernel IS (200k/kernel).
+
+    Expectation: Sobol collapses at small σ in higher D (kernels become a
+    vanishing fraction of the cube volume, so uniform samples miss them).
+    KernelField and IS stay kernel-adaptive and should hold.
+    """
+    apply_style()
+    if sigmas is None:
+        sigmas = np.logspace(-2.5, -0.5, 15)
+
+    fig, axes = plt.subplots(1, len(Ds), figsize=(4.8 * len(Ds), 4.0),
+                             constrained_layout=True)
+    print("\nσ-sweep errors [%]  (n_dirs={}, N={} kernels)".format(n_dirs, N_kernels))
+    print("-" * 96)
+    header = "           σ:" + "".join(f"{s:>8.3f}" for s in sigmas)
+    print(header)
+    for ax, D in zip(axes, Ds):
+        centers = _test_centers(D, N=N_kernels)
+        kf_errs, is_errs, sb_errs = [], [], []
+        for sigma in sigmas:
+            truth = reference_per_kernel_is(centers, float(sigma), D)
+            kf_val, budget = estimate_field(centers, float(sigma), n_dirs, D)
+            is_val, _ = estimate_importance(centers, float(sigma), budget, D)
+            sb_val, _ = estimate_sobol(centers, float(sigma), budget, D)
+            denom = abs(truth) + 1e-12
+            kf_errs.append(100 * (kf_val - truth) / denom)
+            is_errs.append(100 * (is_val - truth) / denom)
+            sb_errs.append(100 * (sb_val - truth) / denom)
+
+        print(f"D={D} KField :" + "".join(f"{e:>+8.1f}" for e in kf_errs))
+        print(f"D={D} Import :" + "".join(f"{e:>+8.1f}" for e in is_errs))
+        print(f"D={D} Sobol  :" + "".join(f"{e:>+8.1f}" for e in sb_errs))
+
+        ax.plot(sigmas, kf_errs, color=STEEL[500], lw=1.6, marker="o", ms=4, label="KernelField")
+        ax.plot(sigmas, is_errs, color=EMERALD[500], lw=1.6, marker="s", ms=4, label="Importance")
+        ax.plot(sigmas, sb_errs, color=RED, lw=1.6, marker="^", ms=4, label="Sobol")
+        ax.axhline(0, color=ZINC[400], lw=0.8, ls="--")
+        ax.set_xscale("log")
+        ax.set_xlabel("σ")
+        ax.set_ylabel("relative error [%]")
+        ax.set_title(f"D = {D}", pad=6)
+        if D == Ds[0]:
+            ax.legend(fontsize=8, loc="best")
+        strip_spines(ax)
+
+    fig.suptitle(
+        f"σ-sweep — where each estimator breaks   "
+        f"(n_dirs={n_dirs}, N={N_kernels} kernels, χ² quantile shells)",
+        fontsize=11, color=ZINC[700],
+    )
+    path = save(fig, "10d_sigma_sweep")
+    plt.close(fig)
+    return path
+
+
 def print_radii_diagnostic(Ds, n_dirs_ref: int = 32):
     print()
     print("χ² quantile shells — D-aware radii (in σ units) and mass conservation")
@@ -315,5 +400,6 @@ if __name__ == "__main__":
     p1 = figure_vs_ndirs(results, Ds, n_dirs_values)
     p2 = figure_vs_D(results, Ds, n_dirs_values)
     p3 = figure_heatmap(results, Ds, n_dirs_values)
-    for p in (p1, p2, p3):
+    p4 = figure_sigma_sweep()
+    for p in (p1, p2, p3, p4):
         print(f"Saved: {p}")
