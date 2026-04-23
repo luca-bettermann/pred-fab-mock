@@ -27,12 +27,6 @@ def run(args: argparse.Namespace) -> None:
     if args.radius is not None:
         print_config_set("Exploration radius", config.get("exploration_radius"), args.radius)
         config["exploration_radius"] = args.radius
-    if args.buffer is not None:
-        print_config_set("Buffer", config.get("buffer"), args.buffer)
-        config["buffer"] = args.buffer
-    if args.decay_exp is not None:
-        print_config_set("Decay exponent", config.get("decay_exp"), args.decay_exp)
-        config["decay_exp"] = args.decay_exp
     if args.de_maxiter is not None:
         print_config_set("DE max iterations", config.get("de_maxiter"), args.de_maxiter)
         config["de_maxiter"] = args.de_maxiter
@@ -59,8 +53,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--weights", type=str, default=None)
     parser.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None)
     parser.add_argument("--radius", type=float, default=None)
-    parser.add_argument("--buffer", type=float, default=None)
-    parser.add_argument("--decay-exp", type=float, default=None)
     parser.add_argument("--de-maxiter", type=int, default=None)
     parser.add_argument("--de-popsize", type=int, default=None)
     return parser.parse_args()

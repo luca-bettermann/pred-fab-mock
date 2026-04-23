@@ -28,7 +28,7 @@ EXPLORATION_RADIUS = 0.25
 
 
 def _compute_acquisition_grid(agent, dm, kappa, res):
-    """Compute performance, uncertainty (with buffer), and combined grids.
+    """Compute performance, uncertainty, and combined grids.
 
     Uses the calibration system's perf range for normalization — matching
     what the optimizer actually sees.
@@ -45,7 +45,7 @@ def _compute_acquisition_grid(agent, dm, kappa, res):
                 perf_grid[j, i] = combined_score(perf, PERF_WEIGHTS)
             except Exception:
                 perf_grid[j, i] = 0.0
-            unc_grid[j, i] = agent.predict_uncertainty(p, dm)  # includes buffer
+            unc_grid[j, i] = agent.predict_uncertainty(p, dm)
 
     # Normalize performance using training-data range (same as optimizer)
     cal = agent.calibration_system
@@ -56,7 +56,7 @@ def _compute_acquisition_grid(agent, dm, kappa, res):
     span = max(p_max - p_min, 1e-10)
     p_norm = np.clip((perf_grid - p_min) / span, 0, 1)
 
-    # Uncertainty is already [0,1] with buffer — no renormalization
+    # Uncertainty is already [0,1] — no renormalization
     combined = (1 - kappa) * p_norm + kappa * unc_grid
     return waters, speeds, p_norm, unc_grid, combined
 

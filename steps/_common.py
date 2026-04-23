@@ -102,10 +102,6 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
         explore_kwargs: dict[str, Any] = {}
         if config.get("exploration_radius") is not None:
             explore_kwargs["radius"] = config["exploration_radius"]
-        if config.get("buffer") is not None:
-            explore_kwargs["buffer"] = config["buffer"]
-        if config.get("decay_exp") is not None:
-            explore_kwargs["decay_exp"] = config["decay_exp"]
         if explore_kwargs:
             agent.configure_exploration(**explore_kwargs)
 
@@ -232,8 +228,6 @@ def print_config_show(config: dict[str, Any]) -> None:
         ]),
         ("Exploration", [
             ("exploration_radius", "Radius", 0.20),
-            ("buffer", "Buffer", 0.5),
-            ("decay_exp", "Decay exponent", 0.5),
         ]),
         ("Optimizer", [
             ("optimizer", "Backend", "de"),

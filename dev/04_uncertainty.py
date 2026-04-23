@@ -1,7 +1,7 @@
-"""04 — KDE Uncertainty Validation.
+"""04 — Evidence Model Uncertainty Validation.
 
-Verify that KDE-based uncertainty is high where data is sparse
-and low near training points. Boundary buffer is included automatically.
+Verify that evidence-based uncertainty is high where data is sparse
+and low near training points. Boundary evidence is included automatically.
 """
 
 import os
@@ -22,7 +22,7 @@ EXPLORATION_RADIUS = 0.2
 
 
 def _compute_uncertainty_grid(agent, dm, res):
-    """Compute uncertainty grid (includes boundary buffer)."""
+    """Compute uncertainty grid (includes boundary evidence)."""
     waters = np.linspace(0.30, 0.50, res)
     speeds = np.linspace(20.0, 60.0, res)
     unc = np.zeros((res, res))
@@ -82,16 +82,16 @@ def main():
         u = agent.predict_uncertainty(full_p, dm)
         print(f"  {label:35s}  {u:6.3f}")
 
-    # KDE diagnostics: check latent space health
-    print(f"\n  KDE diagnostics:")
+    # Evidence model diagnostics
+    print(f"\n  Evidence model diagnostics:")
     for kid, kde in agent.pred_system._model_kdes.items():
         model_name = kde.model.outputs[0] if kde.model.outputs else "?"
         print(f"    {model_name}: {kde.n_active_dims} active dims, "
-              f"{len(kde.latent_points)} points, q_max={kde.q_max:.4f}")
+              f"{len(kde.latent_points)} points, σ={kde.sigma:.4f}")
 
     out = os.path.join(plot_dir, "04_uncertainty.png")
     _plot_uncertainty(out, waters, speeds, unc_grid, baseline_params,
-                      title=f"KDE Uncertainty (radius={EXPLORATION_RADIUS}, N={N_BASELINE})")
+                      title=f"Evidence Uncertainty (radius={EXPLORATION_RADIUS}, N={N_BASELINE})")
     print(f"\n  Saved: {out}")
 
 
