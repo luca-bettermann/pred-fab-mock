@@ -91,12 +91,14 @@ def radial_shell_weights(radii: np.ndarray, sigma: float, D: int) -> tuple[np.nd
 class KernelField:
     """A deterministic field of probes around each kernel center.
 
-    The same offset set is applied to every datapoint, so the field is built
-    once per (D, σ) and reused. Probes lie on:
+    Two modes for shell placement:
 
-        - the central point (r=0)
-        - concentric shells at radii σ · radius_multipliers, each populated by
-          `n_directions` quasi-uniformly-spaced unit vectors
+        radii_mode = "fixed"           — shells at σ · radius_multipliers
+        radii_mode = "chi2_quantile"   — shells at σ · √χ²_D.ppf(q) for q in
+                                         radii_quantiles, so each shell sits at
+                                         a fixed *mass percentile* of the
+                                         radial Gaussian distribution. Outer
+                                         radius scales with D automatically.
 
     Integration weights come from a radial-shell quadrature of the Gaussian
     density — no Monte Carlo, no sampling variance.
@@ -106,11 +108,19 @@ class KernelField:
     sigma: float
     radius_multipliers: tuple[float, ...] = (0.1, 0.2, 0.5, 1.0, 2.0)
     n_directions: int = 16
+    radii_mode: str = "fixed"
+    radii_quantiles: tuple[float, ...] = (0.02, 0.2, 0.5, 0.8, 0.98)
 
     # ----- Derived geometry -----
 
     @cached_property
     def radii(self) -> np.ndarray:
+        if self.radii_mode == "chi2_quantile":
+            from scipy.stats import chi2
+            qs = np.asarray(self.radii_quantiles, dtype=float)
+            return np.sqrt(chi2.ppf(qs, df=self.D)) * self.sigma
+        if self.radii_mode != "fixed":
+            raise ValueError(f"unknown radii_mode: {self.radii_mode!r}")
         return np.asarray(self.radius_multipliers, dtype=float) * self.sigma
 
     @cached_property

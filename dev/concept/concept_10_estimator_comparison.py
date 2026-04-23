@@ -3,7 +3,7 @@
 Parameter sweep:
     n_dirs  ∈ {4, 8, 16, 32, 64, 128}     — angular resolution per shell
     D       ∈ {2, 3, 4, 5}                 — kernel dimensionality
-    n_radii = 4                            — (0.25, 0.5, 1, 2) σ, compact design
+    n_radii = 5                            — D-aware χ² quantile shells
     topology = 3 clustered + 3 scattered   — realistic overlap regime
 
 For each (n_dirs, D) cell:
@@ -34,8 +34,8 @@ from kernel_field import KernelField
 from concept_02_raw_density import raw_density
 
 
-N_RADII = 4
-RADII = (0.25, 0.5, 1.0, 2.0)   # compact ≤2σ design — ρ(3σ) ≈ 0
+N_RADII = 5
+QUANTILES = (0.02, 0.2, 0.5, 0.8, 0.98)   # D-aware shells via χ² quantiles
 
 
 # ---------- Test problem ----------
@@ -58,7 +58,10 @@ def _test_centers(D: int, N: int = 6, seed: int = 0) -> np.ndarray:
 # ---------- Estimators (at matched probe budget) ----------
 
 def estimate_field(centers, sigma, n_dirs: int, D: int):
-    field = KernelField(D=D, sigma=sigma, radius_multipliers=RADII, n_directions=n_dirs)
+    field = KernelField(
+        D=D, sigma=sigma, n_directions=n_dirs,
+        radii_mode="chi2_quantile", radii_quantiles=QUANTILES,
+    )
     probes = field.probes_for_batch(centers)
     flat = probes.reshape(-1, D)
     in_domain = np.all((flat >= 0.0) & (flat <= 1.0), axis=1)
@@ -179,7 +182,7 @@ def figure_vs_ndirs(results, Ds, n_dirs_values):
         strip_spines(ax)
     fig.suptitle(
         "Error vs angular resolution at fixed budget, per D   "
-        "(σ=0.10, ≤2σ radii, N=6 kernels: 3 clustered + 3 scattered)",
+        "(σ=0.10, χ² quantile shells, N=6 kernels: 3 clustered + 3 scattered)",
         fontsize=11, color=ZINC[700],
     )
     path = save(fig, "10a_error_vs_ndirs")
@@ -254,7 +257,7 @@ def figure_heatmap(results, Ds, n_dirs_values):
         fig.colorbar(im, ax=ax, shrink=0.85, label="% error")
     fig.suptitle(
         "Relative error on the (n_dirs, D) grid — budget matched per cell  "
-        "(σ=0.10, ≤2σ radii, realistic topology)",
+        "(σ=0.10, χ² quantile shells, realistic topology)",
         fontsize=11, color=ZINC[700],
     )
     path = save(fig, "10c_error_heatmap")
@@ -290,9 +293,23 @@ def print_summary(results, Ds, n_dirs_values):
     print()
 
 
+def print_radii_diagnostic(Ds, n_dirs_ref: int = 32):
+    print()
+    print("χ² quantile shells — D-aware radii (in σ units) and mass conservation")
+    print("-" * 78)
+    for D in Ds:
+        field = KernelField(
+            D=D, sigma=1.0, n_directions=n_dirs_ref,
+            radii_mode="chi2_quantile", radii_quantiles=QUANTILES,
+        )
+        radii_str = " ".join(f"{r:5.2f}" for r in field.radii)
+        print(f"D={D}   radii_σ = [{radii_str}]   Σw = {field.check_mass():.4f}")
+
+
 if __name__ == "__main__":
     Ds = (2, 3, 4, 5)
     n_dirs_values = (4, 8, 16, 32, 64, 128)
+    print_radii_diagnostic(Ds)
     results = sweep(sigma=0.10, Ds=Ds, n_dirs_values=n_dirs_values)
     print_summary(results, Ds, n_dirs_values)
     p1 = figure_vs_ndirs(results, Ds, n_dirs_values)
