@@ -119,10 +119,7 @@ def run(args: argparse.Namespace) -> None:
                 unc_grid[j_s, i_w] = agent.predict_uncertainty(p, dm)
         unc_grid_data = (unc_waters, unc_speeds, unc_grid, "Blues")
 
-    if cal.last_domain_values is not None:
-        domain_x = AxisSpec("n_layers", "Layers", integer=True)
-        domain_y = AxisSpec("n_segments", "Segments", integer=True)
-        validation_panels.append(("Domain", domain_x, domain_y, cal.last_domain_values, None))
+    # Domain axes are now optimized jointly in Process — no separate Domain panel
     if cal.last_process_points is not None:
         validation_panels.append(("Process", X_AXIS, Y_AXIS, cal.last_process_points, None, unc_grid_data))
     if cal.last_schedule_points is not None and cal.last_schedule_exp_ids is not None and cal.last_process_points is not None:
