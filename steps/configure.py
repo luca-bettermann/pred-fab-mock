@@ -27,6 +27,12 @@ def run(args: argparse.Namespace) -> None:
     if args.radius is not None:
         print_config_set("Exploration radius", config.get("exploration_radius"), args.radius)
         config["exploration_radius"] = args.radius
+    if getattr(args, 'sigma', None) is not None:
+        print_config_set("Sigma override", config.get("sigma"), args.sigma)
+        config["sigma"] = args.sigma
+    if getattr(args, 'mc_exp_offset', None) is not None:
+        print_config_set("MC exponent offset", config.get("mc_exponent_offset"), args.mc_exp_offset)
+        config["mc_exponent_offset"] = args.mc_exp_offset
     if args.de_maxiter is not None:
         print_config_set("DE max iterations", config.get("de_maxiter"), args.de_maxiter)
         config["de_maxiter"] = args.de_maxiter
@@ -52,7 +58,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bounds", type=str, default=None)
     parser.add_argument("--weights", type=str, default=None)
     parser.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None)
-    parser.add_argument("--radius", type=float, default=None)
+    parser.add_argument("--radius", type=float, default=None,
+                        help="Exploration radius (sets σ = radius · √n_active_dims)")
+    parser.add_argument("--sigma", type=float, default=None,
+                        help="Direct σ override (bypasses radius × √D scaling)")
+    parser.add_argument("--mc-exp-offset", type=float, default=None,
+                        help="Sobol MC sample exponent offset; M = round(2^(n_active + offset)), default 3.0")
     parser.add_argument("--de-maxiter", type=int, default=None)
     parser.add_argument("--de-popsize", type=int, default=None)
     return parser.parse_args()

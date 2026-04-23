@@ -102,6 +102,10 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
         explore_kwargs: dict[str, Any] = {}
         if config.get("exploration_radius") is not None:
             explore_kwargs["radius"] = config["exploration_radius"]
+        if config.get("sigma") is not None:
+            explore_kwargs["sigma"] = config["sigma"]
+        if config.get("mc_exponent_offset") is not None:
+            explore_kwargs["mc_exponent_offset"] = config["mc_exponent_offset"]
         if explore_kwargs:
             agent.configure_exploration(**explore_kwargs)
 
@@ -227,7 +231,9 @@ def print_config_show(config: dict[str, Any]) -> None:
             ("performance_weights", "Weights", {"path_accuracy": 1, "energy_efficiency": 1, "production_rate": 1}),
         ]),
         ("Exploration", [
-            ("exploration_radius", "Radius", 0.20),
+            ("exploration_radius", "Radius", 0.09),
+            ("sigma", "Sigma override", None),
+            ("mc_exponent_offset", "MC exp offset", 3.0),
         ]),
         ("Optimizer", [
             ("optimizer", "Backend", "de"),

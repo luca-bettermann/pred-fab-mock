@@ -84,7 +84,9 @@ Configuration groups:
                              Example: '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
 
   Exploration:
-    --radius FLOAT           Evidence decay radius (default: 0.20)
+    --radius FLOAT           Evidence decay radius (default: 0.09)
+    --sigma FLOAT            Direct σ override (bypasses radius × √D scaling)
+    --mc-exp-offset FLOAT    Sobol MC samples exponent offset; M = round(2^(D + offset)), default 3.0
 
   Optimizer:
     --optimizer {de,lbfgsb}  Backend (default: de)
@@ -104,7 +106,10 @@ Configuration groups:
     p.add_argument("--bounds", type=str, help="JSON: parameter bounds override")
     p.add_argument("--weights", type=str, help="JSON: performance attribute weights")
     p.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None)
-    p.add_argument("--radius", type=float, default=None, help="Evidence decay radius (default: 0.20)")
+    p.add_argument("--radius", type=float, default=None, help="Evidence decay radius (default: 0.09)")
+    p.add_argument("--sigma", type=float, default=None, help="Direct σ override (bypasses radius × √D scaling)")
+    p.add_argument("--mc-exp-offset", type=float, default=None, dest="mc_exp_offset",
+                   help="Sobol MC samples exponent offset; M = round(2^(D + offset)), default 3.0")
     p.add_argument("--de-maxiter", type=int, default=None)
     p.add_argument("--de-popsize", type=int, default=None)
     p.add_argument("--de-tol", type=float, default=None, help="DE convergence tolerance")
