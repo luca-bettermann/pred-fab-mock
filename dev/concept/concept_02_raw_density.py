@@ -166,9 +166,7 @@ def print_magnitudes(sigma: float = 0.10, D_dim: int = 2):
 
 if __name__ == "__main__":
     print_magnitudes()
-    for kernel in ("gaussian", "cauchy"):
-        print(f"\n-- {kernel} --")
-        p1 = figure_three_configs(sigma=0.10, kernel=kernel)
-        p2 = figure_five_spread(sigma=0.12, kernel=kernel)
-        print(f"Saved: {p1}")
-        print(f"Saved: {p2}")
+    p1 = figure_three_configs(sigma=0.10, kernel="gaussian")
+    p2 = figure_five_spread(sigma=0.12, kernel="gaussian")
+    print(f"Saved: {p1}")
+    print(f"Saved: {p2}")

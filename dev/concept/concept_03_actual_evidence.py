@@ -117,6 +117,5 @@ def figure_three_views(sigma: float = 0.10, kernel: str = "gaussian"):
 if __name__ == "__main__":
     p1 = figure_scalar_transform()
     print(f"Saved: {p1}")
-    for kernel in ("gaussian", "cauchy"):
-        p2 = figure_three_views(sigma=0.10, kernel=kernel)
-        print(f"Saved: {p2}")
+    p2 = figure_three_views(sigma=0.10, kernel="gaussian")
+    print(f"Saved: {p2}")

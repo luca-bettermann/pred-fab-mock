@@ -20,7 +20,7 @@ from _style import (
     apply_style, STEEL, EMERALD, ZINC, YELLOW, RED,
     evidence_cmap, save, strip_spines,
 )
-from sampling_space import SamplingSpace
+from kernel_field import KernelField
 from concept_02_raw_density import raw_density, grid_2d
 from concept_03_actual_evidence import E_of_D
 from concept_05_integrated_objective import integrated_E_via_stencil
@@ -30,7 +30,6 @@ def acquisition_landscape(
     existing_centers: np.ndarray,
     existing_weights: np.ndarray,
     sigma: float,
-    kernel: str = "gaussian",
     res: int = 41,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Δ∫E(z_new) for z_new swept over [0,1]^2.
@@ -39,8 +38,7 @@ def acquisition_landscape(
     """
     x = np.linspace(0.02, 0.98, res)
     y = np.linspace(0.02, 0.98, res)
-    I_old, _ = integrated_E_via_stencil(existing_centers, existing_weights,
-                                         sigma=sigma, kernel=kernel)
+    I_old, _ = integrated_E_via_stencil(existing_centers, existing_weights, sigma=sigma)
 
     dI = np.zeros((res, res))
     for j, yv in enumerate(y):
@@ -48,15 +46,14 @@ def acquisition_landscape(
             z_new = np.array([xv, yv])
             centers = np.vstack([existing_centers, z_new[None, :]])
             weights = np.concatenate([existing_weights, [1.0]])
-            I_new, _ = integrated_E_via_stencil(centers, weights,
-                                                 sigma=sigma, kernel=kernel)
+            I_new, _ = integrated_E_via_stencil(centers, weights, sigma=sigma)
             dI[j, i] = I_new - I_old
     return x, y, dI
 
 
 # ---------- Figure: acquisition landscape at different sigmas ----------
 
-def figure_landscape_sigma_sweep(kernel: str = "gaussian"):
+def figure_landscape_sigma_sweep():
     apply_style()
     existing = np.array([[0.30, 0.60], [0.70, 0.35]])
     e_weights = np.ones(len(existing))
@@ -65,10 +62,9 @@ def figure_landscape_sigma_sweep(kernel: str = "gaussian"):
 
     fig, axes = plt.subplots(1, 4, figsize=(16, 4.2), constrained_layout=True)
     for ax, sigma in zip(axes, sigmas):
-        x, y, dI = acquisition_landscape(existing, e_weights, sigma, kernel=kernel, res=33)
-        # Background: current E field at this sigma
+        x, y, dI = acquisition_landscape(existing, e_weights, sigma, res=33)
         u, v, Z = grid_2d(res=121)
-        D_now = raw_density(Z, existing, e_weights, sigma, kernel=kernel)
+        D_now = raw_density(Z, existing, e_weights, sigma)
         E_now = E_of_D(D_now)
 
         im1 = ax.contourf(u, v, E_now, levels=20, cmap=evidence_cmap(),
@@ -76,11 +72,8 @@ def figure_landscape_sigma_sweep(kernel: str = "gaussian"):
         cs = ax.contourf(x, y, dI, levels=20, cmap="YlOrRd", alpha=0.85)
         ax.contour(x, y, dI, levels=8, colors=ZINC[400], linewidths=0.4, alpha=0.6)
 
-        # Max
         j_max, i_max = np.unravel_index(np.argmax(dI), dI.shape)
         ax.scatter(x[i_max], y[j_max], marker="x", c=YELLOW, s=90, linewidths=1.5, zorder=6)
-
-        # Existing kernels
         ax.scatter(existing[:, 0], existing[:, 1],
                    c="white", edgecolors=ZINC[900], s=45, linewidths=0.8, zorder=5)
 
@@ -94,17 +87,17 @@ def figure_landscape_sigma_sweep(kernel: str = "gaussian"):
         strip_spines(ax)
 
     fig.suptitle(
-        f"Δ∫E(z_new) — where would a new point contribute most?  ({kernel})",
+        "Δ∫E(z_new) — where would a new point contribute most?",
         fontsize=11, color=ZINC[700],
     )
-    path = save(fig, f"06a_acquisition_landscape_sigma_sweep_{kernel}")
+    path = save(fig, "06a_acquisition_landscape_sigma_sweep")
     plt.close(fig)
     return path
 
 
-# ---------- Figure: landscape for 4 existing, different σ ----------
+# ---------- Figure: landscape for 5 existing at a fixed σ ----------
 
-def figure_landscape_with_existing(sigma: float = 0.12, kernel: str = "gaussian"):
+def figure_landscape_with_existing(sigma: float = 0.12):
     apply_style()
     existing = np.array([
         [0.20, 0.25], [0.75, 0.20], [0.45, 0.50],
@@ -112,7 +105,7 @@ def figure_landscape_with_existing(sigma: float = 0.12, kernel: str = "gaussian"
     ])
     e_weights = np.ones(len(existing))
 
-    x, y, dI = acquisition_landscape(existing, e_weights, sigma, kernel=kernel, res=41)
+    x, y, dI = acquisition_landscape(existing, e_weights, sigma, res=41)
 
     fig, ax = plt.subplots(figsize=(6.0, 5.2), constrained_layout=True)
     im = ax.contourf(x, y, dI, levels=25, cmap="YlOrRd")
@@ -135,11 +128,11 @@ def figure_landscape_with_existing(sigma: float = 0.12, kernel: str = "gaussian"
     fig.colorbar(im, ax=ax, shrink=0.85, label="Δ∫E")
 
     fig.suptitle(
-        f"Acquisition surface for the 6th point — existing 5 kernels\n"
-        f"σ = {sigma}, {kernel},  max Δ∫E = {dI.max():.3f}",
+        f"Acquisition surface for the 6th point — existing 5 kernels, σ = {sigma}, "
+        f"max Δ∫E = {dI.max():.3f}",
         fontsize=11, color=ZINC[700],
     )
-    path = save(fig, f"06b_acquisition_5existing_{kernel}")
+    path = save(fig, "06b_acquisition_5existing")
     plt.close(fig)
     return path
 
@@ -177,8 +170,7 @@ def print_summary():
 
 if __name__ == "__main__":
     print_summary()
-    for kernel in ("gaussian", "cauchy"):
-        p1 = figure_landscape_sigma_sweep(kernel=kernel)
-        p2 = figure_landscape_with_existing(kernel=kernel)
-        print(f"Saved: {p1}")
-        print(f"Saved: {p2}")
+    p1 = figure_landscape_sigma_sweep()
+    p2 = figure_landscape_with_existing()
+    print(f"Saved: {p1}")
+    print(f"Saved: {p2}")

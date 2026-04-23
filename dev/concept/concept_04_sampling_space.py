@@ -1,4 +1,4 @@
-"""Concept 04 — the SamplingSpace stencil.
+"""Concept 04 — the KernelField stencil.
 
 A deterministic, kernel-anchored set of query points. The same offsets go
 around every datapoint, so we compute them once and reuse everywhere. Each
@@ -22,7 +22,7 @@ from _style import (
     apply_style, STEEL, EMERALD, ZINC, YELLOW, RED,
     density_cmap, save, strip_spines,
 )
-from sampling_space import SamplingSpace
+from kernel_field import KernelField
 from concept_01_kernels import gaussian_density
 
 
@@ -30,9 +30,9 @@ from concept_01_kernels import gaussian_density
 
 def figure_stencil_2d(sigma: float = 0.15, n_directions: int = 16):
     apply_style()
-    space = SamplingSpace(D=2, sigma=sigma, kernel="gaussian", n_directions=n_directions)
+    space = KernelField(D=2, sigma=sigma, n_directions=n_directions)
     center = np.array([0.5, 0.5])
-    samples = space.samples_at(center)
+    samples = space.probes_at(center)
 
     # Background: the kernel we're integrating against
     u = np.linspace(0, 1, 301)
@@ -84,8 +84,8 @@ def figure_stencil_2d(sigma: float = 0.15, n_directions: int = 16):
         strip_spines(ax)
 
     fig.suptitle(
-        f"SamplingSpace — deterministic stencil, σ = {sigma}, "
-        f"{space.n_samples} points total",
+        f"KernelField — deterministic stencil, σ = {sigma}, "
+        f"{space.n_probes} points total",
         fontsize=11, color=ZINC[700],
     )
     path = save(fig, "04a_stencil_2d")
@@ -97,9 +97,9 @@ def figure_stencil_2d(sigma: float = 0.15, n_directions: int = 16):
 
 def figure_stencil_3d(sigma: float = 0.15, n_directions: int = 16):
     apply_style()
-    space = SamplingSpace(D=3, sigma=sigma, kernel="gaussian", n_directions=n_directions)
+    space = KernelField(D=3, sigma=sigma, n_directions=n_directions)
     center = np.array([0.5, 0.5, 0.5])
-    samples = space.samples_at(center)
+    samples = space.probes_at(center)
 
     fig = plt.figure(figsize=(6.5, 5.5), constrained_layout=True)
     ax = fig.add_subplot(111, projection="3d")
@@ -131,7 +131,7 @@ def figure_stencil_3d(sigma: float = 0.15, n_directions: int = 16):
     ax.set_ylim(0, 1)
     ax.set_zlim(0, 1)
     ax.set_title(
-        f"3-D stencil, σ = {sigma}, {space.n_samples} points\n"
+        f"3-D stencil, σ = {sigma}, {space.n_probes} points\n"
         f"(wireframe: unit σ-sphere; red ×: kernel center)",
         fontsize=10, color=ZINC[700],
     )
@@ -166,8 +166,8 @@ def figure_integration_accuracy():
         return float(f(z_j + eps).mean())
 
     def stencil_I(sigma, z_j, n_dir=16):
-        space = SamplingSpace(D=2, sigma=sigma, kernel="gaussian", n_directions=n_dir)
-        samples = space.samples_at(z_j)
+        space = KernelField(D=2, sigma=sigma, n_directions=n_dir)
+        samples = space.probes_at(z_j)
         vals = f(samples)
         # ∫ f·ρ = Σ w_i · f(z_i). Weights already include density → no /ρ.
         return float(np.sum(space.weights * vals))
@@ -200,7 +200,7 @@ def figure_integration_accuracy():
     strip_spines(ax)
 
     fig.suptitle(
-        "SamplingSpace integration accuracy — polynomial integrand f · Gaussian ρ",
+        "KernelField integration accuracy — polynomial integrand f · Gaussian ρ",
         fontsize=11, color=ZINC[700],
     )
     path = save(fig, "04c_stencil_accuracy")
@@ -211,41 +211,38 @@ def figure_integration_accuracy():
 # ---------- Figure 4: mass conservation across D ----------
 
 def figure_mass_vs_kernel():
-    """The stencil's approximation of ∫ρ dz (should be 1) — shows the
-    Gaussian/Cauchy asymmetry we observed earlier.
+    """Stencil's approximation of ∫ρ dz across σ (analytically = 1).
+
+    Bias comes from the 2σ-radius cutoff — Gaussian tails beyond 2σ hold
+    ~13% of mass in 3-D, which the stencil misses. Bias is σ-independent.
     """
     apply_style()
     sigmas = np.logspace(-2.5, 0, 25)
     n_dirs = 16
 
-    mass_G_2d = [SamplingSpace(D=2, sigma=s, kernel="gaussian", n_directions=n_dirs).check_mass() for s in sigmas]
-    mass_G_3d = [SamplingSpace(D=3, sigma=s, kernel="gaussian", n_directions=n_dirs).check_mass() for s in sigmas]
-    mass_C_2d = [SamplingSpace(D=2, sigma=s, kernel="cauchy",   n_directions=n_dirs).check_mass() for s in sigmas]
-    mass_C_3d = [SamplingSpace(D=3, sigma=s, kernel="cauchy",   n_directions=n_dirs).check_mass() for s in sigmas]
+    mass_2d = [KernelField(D=2, sigma=s, n_directions=n_dirs).check_mass() for s in sigmas]
+    mass_3d = [KernelField(D=3, sigma=s, n_directions=n_dirs).check_mass() for s in sigmas]
 
     fig, ax = plt.subplots(figsize=(7.5, 4.0), constrained_layout=True)
-    ax.plot(sigmas, mass_G_2d, color=STEEL[500], lw=1.8, label="Gaussian, D=2")
-    ax.plot(sigmas, mass_G_3d, color=STEEL[700], lw=1.8, ls="--", label="Gaussian, D=3")
-    ax.plot(sigmas, mass_C_2d, color=EMERALD[500], lw=1.8, label="Cauchy, D=2")
-    ax.plot(sigmas, mass_C_3d, color=EMERALD[700], lw=1.8, ls="--", label="Cauchy, D=3")
+    ax.plot(sigmas, mass_2d, color=STEEL[500], lw=1.8, label="Gaussian, D=2")
+    ax.plot(sigmas, mass_3d, color=STEEL[700], lw=1.8, ls="--", label="Gaussian, D=3")
     ax.axhline(1.0, color=ZINC[300], lw=0.8, ls="--", alpha=0.6)
     ax.set_xscale("log")
     ax.set_xlabel("σ")
-    ax.set_ylabel("Σ stencil weights  ≈  ∫ρ dz")
+    ax.set_ylabel("Σ shell weights  ≈  ∫ρ dz")
     ax.set_title(
-        "Stencil's estimate of kernel mass\n"
-        "Gaussian: ~0.87-0.95 (2σ cutoff misses the tail)\n"
-        "Cauchy: heavy-tailed → stencil misses most of the mass",
+        "Kernel field's mass estimate: ~0.87–0.95 (2σ cutoff, σ-independent bias)",
         pad=6,
     )
+    ax.set_ylim(0.8, 1.05)
     ax.legend(loc="lower left")
     strip_spines(ax)
 
     fig.suptitle(
-        "Mass conservation of the stencil — why Gaussian is more stencil-friendly",
+        "Mass conservation of the kernel field",
         fontsize=11, color=ZINC[700],
     )
-    path = save(fig, "04d_stencil_mass")
+    path = save(fig, "04d_kernel_field_mass")
     plt.close(fig)
     return path
 
@@ -255,16 +252,15 @@ def figure_mass_vs_kernel():
 def print_summary():
     print()
     print("=" * 70)
-    print("SamplingSpace summary")
+    print("KernelField summary")
     print("=" * 70)
     for D_dim in [2, 3]:
         for sigma in [0.01, 0.05, 0.10, 0.15, 0.30]:
-            for kernel in ["gaussian", "cauchy"]:
-                s = SamplingSpace(D=D_dim, sigma=sigma, kernel=kernel, n_directions=16)
-                print(
-                    f"D={D_dim}  σ={sigma:>5.2f}  {kernel:>8s}  "
-                    f"n_samples={s.n_samples:>4d}  ∫ρ≈{s.check_mass():.4f}"
-                )
+            s = KernelField(D=D_dim, sigma=sigma, n_directions=16)
+            print(
+                f"D={D_dim}  σ={sigma:>5.2f}  "
+                f"n_probes={s.n_probes:>4d}  ∫ρ≈{s.check_mass():.4f}"
+            )
     print()
 
 

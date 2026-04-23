@@ -1,6 +1,6 @@
 """Concept 07 — 3-D evidence packing, *stencil-only*.
 
-No grid. Only the points the SamplingSpace actually evaluates:
+No grid. Only the points the KernelField actually evaluates:
 
     - yellow × at each placement z_j (the kernel centers)
     - a stencil of points on concentric (D−1)-spheres around each z_j,
@@ -24,7 +24,7 @@ from _style import (
     apply_style, STEEL, EMERALD, ZINC, YELLOW,
     save, uncertainty_cmap,
 )
-from sampling_space import SamplingSpace
+from kernel_field import KernelField
 from concept_02_raw_density import raw_density
 from concept_03_actual_evidence import E_of_D
 from concept_05_integrated_objective import integrated_E_via_stencil
@@ -42,7 +42,7 @@ def optimize_placements(
     def objective(x_flat: np.ndarray) -> float:
         centers = x_flat.reshape(N, D)
         I, _ = integrated_E_via_stencil(
-            centers, np.ones(N), sigma=sigma, kernel="gaussian",
+            centers, np.ones(N), sigma=sigma,
         )
         return -I
 
@@ -84,17 +84,17 @@ def _build_stencil_data(
     """
     D = placements.shape[1]
     N = placements.shape[0]
-    space = SamplingSpace(D=D, sigma=sigma, kernel="gaussian",
+    space = KernelField(D=D, sigma=sigma, 
                            n_directions=n_directions)
     # (N, M_stencil, D). Offsets[0] is the center of the stencil.
-    samples_per = space.samples_for_batch(placements)
+    samples_per = space.probes_for_batch(placements)
     if skip_center:
         samples_per = samples_per[:, 1:, :]  # drop the r=0 offset
 
     all_samples = samples_per.reshape(-1, D)
 
     # E at each sample, considering ALL placements' kernels
-    D_vals = raw_density(all_samples, placements, np.ones(N), sigma, kernel="gaussian")
+    D_vals = raw_density(all_samples, placements, np.ones(N), sigma)
     E_vals = E_of_D(D_vals)
 
     in_domain = np.all((all_samples >= 0.0) & (all_samples <= 1.0), axis=1)
@@ -168,7 +168,7 @@ def figure_stencil_packing(
     ax.set_zlim(0, 1)
     ax.view_init(elev=22, azim=35)
 
-    I_total, _ = integrated_E_via_stencil(placements, np.ones(N), sigma=sigma, kernel="gaussian")
+    I_total, _ = integrated_E_via_stencil(placements, np.ones(N), sigma=sigma)
 
     fig.suptitle(
         f"Stencil-only evidence packing   |   N={N}, σ={sigma},   "
