@@ -20,10 +20,9 @@ from _style import (
     apply_style, STEEL, EMERALD, ZINC, YELLOW, RED,
     evidence_cmap, save, strip_spines,
 )
-from kernel_field import KernelField
 from concept_02_raw_density import raw_density, grid_2d
 from concept_03_actual_evidence import E_of_D
-from concept_05_integrated_objective import integrated_E_via_stencil
+from concept_05_integrated_objective import integrated_E_sobol
 
 
 def acquisition_landscape(
@@ -38,7 +37,7 @@ def acquisition_landscape(
     """
     x = np.linspace(0.02, 0.98, res)
     y = np.linspace(0.02, 0.98, res)
-    I_old, _ = integrated_E_via_stencil(existing_centers, existing_weights, sigma=sigma)
+    I_old, _ = integrated_E_sobol(existing_centers, existing_weights, sigma=sigma)
 
     dI = np.zeros((res, res))
     for j, yv in enumerate(y):
@@ -46,7 +45,7 @@ def acquisition_landscape(
             z_new = np.array([xv, yv])
             centers = np.vstack([existing_centers, z_new[None, :]])
             weights = np.concatenate([existing_weights, [1.0]])
-            I_new, _ = integrated_E_via_stencil(centers, weights, sigma=sigma)
+            I_new, _ = integrated_E_sobol(centers, weights, sigma=sigma)
             dI[j, i] = I_new - I_old
     return x, y, dI
 
@@ -148,7 +147,7 @@ def print_summary():
 
     existing = np.array([[0.30, 0.60], [0.70, 0.35]])
     e_weights = np.ones(2)
-    I_old, _ = integrated_E_via_stencil(existing, e_weights, sigma=0.12)
+    I_old, _ = integrated_E_sobol(existing, e_weights, sigma=0.12)
     print(f"∫E(existing)   = {I_old:.4f}")
     print()
 
@@ -162,7 +161,7 @@ def print_summary():
     for label, z_new in test_points:
         centers = np.vstack([existing, z_new[None, :]])
         weights = np.concatenate([e_weights, [1.0]])
-        I_new, _ = integrated_E_via_stencil(centers, weights, sigma=0.12)
+        I_new, _ = integrated_E_sobol(centers, weights, sigma=0.12)
         dI = I_new - I_old
         print(f"z_new = {label:<16s}  Δ∫E = {dI:+.4f}")
     print()

@@ -33,9 +33,10 @@ from _style import (
     apply_style, STEEL, EMERALD, ZINC, YELLOW, RED,
     evidence_cmap, save, strip_spines,
 )
-from kernel_field import KernelField
+from scipy.stats import qmc
+
 from concept_02_raw_density import raw_density, grid_2d
-from concept_05_integrated_objective import integrated_E_via_field
+from concept_05_integrated_objective import integrated_E_sobol
 
 
 # ---------- Helpers ----------
@@ -57,31 +58,16 @@ def E_peak(D_vals: np.ndarray, peak: float) -> np.ndarray:
 
 # ---------- Core estimator under each transform ----------
 
-def integrated_E_peak_via_field(
+def integrated_E_peak_sobol(
     centers: np.ndarray, weights: np.ndarray, sigma: float,
-    n_directions: int = 16,
-    radius_multipliers: tuple[float, ...] = (0.1, 0.2, 0.5, 1.0, 2.0),
+    n: int = 512, seed: int = 0,
 ) -> float:
-    """∫_[0,1]^D E_peak(D) dz via KernelField.
-
-    Integrand: D / (peak + D). Sum the per-kernel quadrature the same way as
-    mass-norm, since ∫ D/(p+D) dz = Σ_j ∫ ρ_j / (p + D) dz · 1.
-    """
+    """∫_[0,1]^D D(z)/(peak + D(z)) dz via scrambled Sobol QMC."""
     D_dim = centers.shape[1]
-    field = KernelField(D=D_dim, sigma=sigma,
-                        radius_multipliers=radius_multipliers,
-                        n_directions=n_directions)
     peak = gaussian_peak(sigma, D_dim)
-
-    probes_all = field.probes_for_batch(centers)
-    flat = probes_all.reshape(-1, D_dim)
-    in_domain = np.all((flat >= 0.0) & (flat <= 1.0), axis=1)
-    D_vals = raw_density(flat, centers, weights, sigma)
-    integrand = 1.0 / (peak + D_vals) * in_domain.astype(float)
-    M = probes_all.shape[1]
-    N = probes_all.shape[0]
-    per_k = (integrand.reshape(N, M) * field.weights[None, :]).sum(axis=1)
-    return float((weights * per_k).sum())
+    sobol = qmc.Sobol(d=D_dim, scramble=True, rng=seed).random(n=n)
+    D_vals = raw_density(sobol, centers, weights, sigma)
+    return float((D_vals / (peak + D_vals)).mean())
 
 
 # ---------- Figure 1: scalar transforms ----------
@@ -193,8 +179,8 @@ def figure_acquisition_comparison(sigma: float = 0.10):
     x = np.linspace(0.02, 0.98, res)
     y = np.linspace(0.02, 0.98, res)
 
-    I_m_old, _ = integrated_E_via_field(existing, e_w, sigma=sigma)
-    I_p_old = integrated_E_peak_via_field(existing, e_w, sigma=sigma)
+    I_m_old, _ = integrated_E_sobol(existing, e_w, sigma=sigma)
+    I_p_old = integrated_E_peak_sobol(existing, e_w, sigma=sigma)
 
     dI_m = np.zeros((res, res))
     dI_p = np.zeros((res, res))
@@ -203,8 +189,8 @@ def figure_acquisition_comparison(sigma: float = 0.10):
             z_new = np.array([xv, yv])
             c = np.vstack([existing, z_new[None, :]])
             w = np.concatenate([e_w, [1.0]])
-            I_m_new, _ = integrated_E_via_field(c, w, sigma=sigma)
-            I_p_new = integrated_E_peak_via_field(c, w, sigma=sigma)
+            I_m_new, _ = integrated_E_sobol(c, w, sigma=sigma)
+            I_p_new = integrated_E_peak_sobol(c, w, sigma=sigma)
             dI_m[j, i] = I_m_new - I_m_old
             dI_p[j, i] = I_p_new - I_p_old
 
@@ -261,8 +247,8 @@ def figure_ranking_table(sigma: float = 0.10):
         ])),
     ]
     labels = [c[0] for c in configs]
-    I_mass = [integrated_E_via_field(c[1], np.ones(len(c[1])), sigma=sigma)[0] for c in configs]
-    I_peak = [integrated_E_peak_via_field(c[1], np.ones(len(c[1])), sigma=sigma) for c in configs]
+    I_mass = [integrated_E_sobol(c[1], np.ones(len(c[1])), sigma=sigma)[0] for c in configs]
+    I_peak = [integrated_E_peak_sobol(c[1], np.ones(len(c[1])), sigma=sigma) for c in configs]
 
     fig, ax = plt.subplots(figsize=(8.5, 4.0), constrained_layout=True)
     xs = np.arange(len(labels))
@@ -315,8 +301,8 @@ def print_summary():
     ]
     for name, c in configs:
         w = np.ones(len(c))
-        I_m = integrated_E_via_field(c, w, sigma=0.10)[0]
-        I_p = integrated_E_peak_via_field(c, w, sigma=0.10)
+        I_m = integrated_E_sobol(c, w, sigma=0.10)[0]
+        I_p = integrated_E_peak_sobol(c, w, sigma=0.10)
         print(f"{name:<28s}{I_m:>14.4f}{I_p:>14.4f}")
     print()
 
