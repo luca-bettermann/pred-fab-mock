@@ -101,18 +101,31 @@ def run(args: argparse.Namespace) -> None:
     )
     show_plot(path_3d_params, inline=args.plot)
 
-    # Phase validation plot
+    # Phase validation plot — show uncertainty topology behind scatter points
     cal = agent.calibration_system
     path_val = os.path.join(plot_dir, "01_phase_validation.png")
     validation_panels: list[tuple] = []
+
+    # Compute uncertainty grid for process/schedule panels (what the optimizer sees)
+    unc_grid_data = None
+    if cal.last_process_points is not None:
+        unc_res = 30
+        unc_waters = np.linspace(0.30, 0.50, unc_res)
+        unc_speeds = np.linspace(20.0, 60.0, unc_res)
+        unc_grid = np.zeros((unc_res, unc_res))
+        for i_w, w in enumerate(unc_waters):
+            for j_s, spd in enumerate(unc_speeds):
+                p = {"water_ratio": w, "print_speed": spd, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
+                unc_grid[j_s, i_w] = agent.predict_uncertainty(p, dm)
+        unc_grid_data = (unc_waters, unc_speeds, unc_grid, "Blues")
+
     if cal.last_domain_values is not None:
         domain_x = AxisSpec("n_layers", "Layers", integer=True)
         domain_y = AxisSpec("n_segments", "Segments", integer=True)
         validation_panels.append(("Domain", domain_x, domain_y, cal.last_domain_values, None))
     if cal.last_process_points is not None:
-        validation_panels.append(("Process", X_AXIS, Y_AXIS, cal.last_process_points, None))
+        validation_panels.append(("Process", X_AXIS, Y_AXIS, cal.last_process_points, None, unc_grid_data))
     if cal.last_schedule_points is not None and cal.last_schedule_exp_ids is not None and cal.last_process_points is not None:
-        # Build full schedule points as dicts (water from process, speed from schedule)
         sched_pts_raw = cal.last_schedule_points
         sched_ids = cal.last_schedule_exp_ids
         sched_dicts: list[dict[str, Any]] = []
@@ -121,7 +134,7 @@ def run(args: argparse.Namespace) -> None:
             speed_norm = float(sched_pts_raw[j, 0])
             speed = Y_AXIS.bounds[0] + speed_norm * (Y_AXIS.bounds[1] - Y_AXIS.bounds[0])  # type: ignore[index]
             sched_dicts.append({"water_ratio": water, "print_speed": speed})
-        validation_panels.append(("Schedule", X_AXIS, Y_AXIS, sched_dicts, sched_ids))
+        validation_panels.append(("Schedule", X_AXIS, Y_AXIS, sched_dicts, sched_ids, unc_grid_data))
     if validation_panels:
         print(f"  {_D}Phase Validation{_R}")
         plot_phase_validation(path_val, validation_panels)
