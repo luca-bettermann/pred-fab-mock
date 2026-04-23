@@ -74,47 +74,34 @@ Quick start:
     p.set_defaults(func=init_physics.run)
 
     # configure
-    p = sub.add_parser("configure", help="Set agent configuration",
-                        formatter_class=argparse.RawDescriptionHelpFormatter,
-                        epilog="""
-Configuration groups:
-
-  Performance:
-    --weights JSON           Performance attribute weights
-                             Example: '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
-
-  Exploration:
-    --radius FLOAT           Evidence decay radius (default: 0.09)
-    --sigma FLOAT            Direct σ override (bypasses radius × √D scaling)
-    --mc-exp-offset FLOAT    Sobol MC samples exponent offset; M = round(2^(D + offset)), default 3.0
-
-  Optimizer:
-    --optimizer {de,lbfgsb}  Backend (default: de)
-    --de-maxiter INT         DE max generations (default: 1000)
-    --de-popsize INT         DE population size (default: 15)
-    --de-tol FLOAT           DE convergence tolerance (default: 0.0001)
-
-  Schedule:
-    --smoothing FLOAT        Smoothing penalty (default: 0.05)
-    --delta FLOAT            Default delta for scheduled params
-
-  Bounds:
-    --bounds JSON            Parameter search bounds override
-                             Example: '{"water_ratio":[0.35,0.45]}'
-""")
+    p = sub.add_parser("configure", help="Set agent configuration")
     p.add_argument("--show", action="store_true", help="Show all current configuration values")
-    p.add_argument("--bounds", type=str, help="JSON: parameter bounds override")
-    p.add_argument("--weights", type=str, help="JSON: performance attribute weights")
-    p.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None)
-    p.add_argument("--radius", type=float, default=None, help="Evidence decay radius (default: 0.09)")
-    p.add_argument("--sigma", type=float, default=None, help="Direct σ override (bypasses radius × √D scaling)")
-    p.add_argument("--mc-exp-offset", type=float, default=None, dest="mc_exp_offset",
-                   help="Sobol MC samples exponent offset; M = round(2^(D + offset)), default 3.0")
-    p.add_argument("--de-maxiter", type=int, default=None)
-    p.add_argument("--de-popsize", type=int, default=None)
-    p.add_argument("--de-tol", type=float, default=None, help="DE convergence tolerance")
-    p.add_argument("--smoothing", type=float, default=None, help="Smoothing penalty (default: 0.05)")
-    p.add_argument("--delta", type=float, default=None, help="Default delta for scheduled params")
+
+    g = p.add_argument_group("Performance")
+    g.add_argument("--weights", type=str, default=None,
+                   metavar="JSON", help='e.g. \'{"path_accuracy":2,"energy_efficiency":1}\'')
+
+    g = p.add_argument_group("Exploration")
+    g.add_argument("--radius", type=float, default=None,
+                   help="Evidence decay radius (default: 0.09). σ = radius · √n_active_dims")
+    g.add_argument("--sigma", type=float, default=None,
+                   help="Direct σ override (bypasses radius × √D scaling)")
+    g.add_argument("--mc-exp-offset", type=float, default=None, dest="mc_exp_offset",
+                   help="Sobol MC sample exponent; M = round(2^(D + offset)), default 3.0")
+
+    g = p.add_argument_group("Optimizer")
+    g.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None, help="Backend (default: de)")
+    g.add_argument("--de-maxiter", type=int, default=None, help="DE max generations (default: 1000)")
+    g.add_argument("--de-popsize", type=int, default=None, help="DE population size (default: 15)")
+    g.add_argument("--de-tol", type=float, default=None, help="DE convergence tolerance (default: 0.0001)")
+
+    g = p.add_argument_group("Schedule")
+    g.add_argument("--smoothing", type=float, default=None, help="Step-to-step smoothness penalty (default: 0.05)")
+    g.add_argument("--delta", type=float, default=None, help="Default delta for scheduled params")
+
+    g = p.add_argument_group("Bounds")
+    g.add_argument("--bounds", type=str, default=None,
+                   metavar="JSON", help='e.g. \'{"water_ratio":[0.35,0.45]}\'')
     p.set_defaults(func=configure.run)
 
     # baseline
