@@ -7,7 +7,7 @@ import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__)
 from pred_fab.plotting import plot_acquisition, plot_convergence
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
-    show_plot, with_dimensions, params_from_spec, get_performance,
+    show_plot_with_header, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, run_and_record, compute_acquisition_grid,
     X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
 )
@@ -21,7 +21,7 @@ def run(args: argparse.Namespace) -> None:
     if getattr(args, 'iterations', None) is not None:
         agent.calibration_system.de_maxiter = args.iterations
 
-    apply_schedule_args(agent, args)
+    apply_schedule_args(agent, args, config)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
     if design_intent:
@@ -58,13 +58,14 @@ def run(args: argparse.Namespace) -> None:
         if args.plot:
             w, s, p, u, c = acq_data
             path = os.path.join(plot_dir, f"03_explore_round_{round_num:02d}.png")
-            print(f"  \033[2mExploration: Round {round_num}\033[0m")
             plot_acquisition(path, X_AXIS, Y_AXIS, w, s, p, u, c,
                              points=state.all_params[:-1],
                              proposed=params,
                              schedules=state.schedules, codes=state.all_codes[:-1],
                              fixed_params=FIXED_DIMS)
-            show_plot(path, inline=True)
+            show_plot_with_header(
+                path, f"Exploration: Round {round_num} (κ={args.kappa})", inline=True
+            )
 
         # Collect convergence for this round
         conv = agent.calibration_system.convergence_history
@@ -78,7 +79,7 @@ def run(args: argparse.Namespace) -> None:
     if all_convergence:
         path_conv = os.path.join(plot_dir, "03_convergence.png")
         plot_convergence(path_conv, all_convergence)
-        show_plot(path_conv, inline=args.plot)
+        show_plot_with_header(path_conv, "Exploration: Convergence", inline=args.plot)
 
     save_session(config, state)
 

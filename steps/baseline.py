@@ -7,13 +7,13 @@ from typing import Any
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.plotting import plot_parameter_space, plot_dimensional_trajectories, plot_convergence, plot_phase_validation, AxisSpec
+from pred_fab.plotting import plot_parameter_space, plot_dimensional_trajectories, plot_convergence, plot_phase_proposals, AxisSpec
 from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
-    show_plot, with_dimensions, params_from_spec, get_performance,
+    show_plot_with_header, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, run_and_record, combined_score, N_LAYERS, N_SEGMENTS,
-    X_AXIS, Y_AXIS, Z_AXIS, FIXED_DIMS, apply_schedule_args,
+    X_AXIS, Y_AXIS, Z_AXIS, LAYER_AXIS, SEGMENT_AXIS, FIXED_DIMS, apply_schedule_args,
 )
 
 
@@ -25,7 +25,7 @@ def run(args: argparse.Namespace) -> None:
     if getattr(args, 'iterations', None) is not None:
         agent.calibration_system.de_maxiter = args.iterations
 
-    apply_schedule_args(agent, args)
+    apply_schedule_args(agent, args, config)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
     if design_intent:
@@ -81,25 +81,20 @@ def run(args: argparse.Namespace) -> None:
             except Exception:
                 pred_grid[j, i] = 0.0
 
-    _D = "\033[2m"
-    _R = "\033[0m"
-
     path = os.path.join(plot_dir, "01_baseline.png")
-    print(f"  {_D}Baseline: Ground Truth vs Initial Model{_R}")
     plot_parameter_space(path, X_AXIS, Y_AXIS, waters, speeds,
                          state.all_params, true_grid, pred_grid,
                          schedules=state.schedules, codes=state.all_codes,
                          fixed_params=FIXED_DIMS)
-    show_plot(path, inline=args.plot)
+    show_plot_with_header(path, "Baseline: Ground Truth vs Initial Model", inline=args.plot)
 
     path_3d_params = os.path.join(plot_dir, "01_baseline_3d.png")
-    print(f"  {_D}Baseline: Dimensional Trajectories{_R}")
     plot_dimensional_trajectories(
         path_3d_params, X_AXIS, Y_AXIS, "n_layers",
         state.all_params,
         schedules=state.schedules, codes=state.all_codes,
     )
-    show_plot(path_3d_params, inline=args.plot)
+    show_plot_with_header(path_3d_params, "Baseline: Dimensional Trajectories", inline=args.plot)
 
     # Phase validation plot — show uncertainty topology behind scatter points
     cal = agent.calibration_system
@@ -119,7 +114,10 @@ def run(args: argparse.Namespace) -> None:
                 unc_grid[j_s, i_w] = agent.predict_uncertainty(p, dm)
         unc_grid_data = (unc_waters, unc_speeds, unc_grid, "Blues")
 
-    # Domain axes are now optimized jointly in Process — no separate Domain panel
+    # Domain panel — only shown when split_domain_phase populated last_domain_values.
+    # No topology background: domain axes are different from Process axes.
+    if cal.last_domain_values is not None:
+        validation_panels.append(("Domain", LAYER_AXIS, SEGMENT_AXIS, cal.last_domain_values, None))
     if cal.last_process_points is not None:
         validation_panels.append(("Process", X_AXIS, Y_AXIS, cal.last_process_points, None, unc_grid_data))
     if cal.last_schedule_points is not None and cal.last_schedule_exp_ids is not None and cal.last_process_points is not None:
@@ -133,17 +131,15 @@ def run(args: argparse.Namespace) -> None:
             sched_dicts.append({"water_ratio": water, "print_speed": speed})
         validation_panels.append(("Schedule", X_AXIS, Y_AXIS, sched_dicts, sched_ids, unc_grid_data))
     if validation_panels:
-        print(f"  {_D}Phase Validation{_R}")
-        plot_phase_validation(path_val, validation_panels)
-        show_plot(path_val, inline=args.plot)
+        plot_phase_proposals(path_val, validation_panels)
+        show_plot_with_header(path_val, "Phase Validation", inline=args.plot)
 
     # Convergence plot
     conv_history = cal.convergence_history
     if conv_history:
         path_conv = os.path.join(plot_dir, "01_convergence.png")
-        print(f"  {_D}Baseline Convergence{_R}")
         plot_convergence(path_conv, conv_history)
-        show_plot(path_conv, inline=args.plot)
+        show_plot_with_header(path_conv, "Baseline: Convergence", inline=args.plot)
 
     save_session(config, state)
 

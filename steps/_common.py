@@ -28,6 +28,14 @@ SESSION_FILE = ".pfab_session.json"
 PLOT_DIR = "./plots"
 
 
+def show_plot_with_header(path: str, title: str, *, inline: bool = True) -> None:
+    """Print a dim-styled title line, then display the plot."""
+    _D = "\033[2m"
+    _R = "\033[0m"
+    print(f"\n  {_D}{title}{_R}")
+    show_plot(path, inline=inline)
+
+
 def to_native(obj: Any) -> Any:
     """Recursively convert numpy types to native Python for JSON."""
     if isinstance(obj, dict):
@@ -124,9 +132,19 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
         if config.get("schedule_smoothing") is not None:
             agent.calibration_system.schedule_smoothing = config["schedule_smoothing"]
 
+        if config.get("split_domain_phase") is not None:
+            agent.calibration_system.split_domain_phase = bool(config["split_domain_phase"])
+
         if config.get("bounds"):
             bounds = {k: tuple(v) for k, v in config["bounds"].items()}
             agent.calibration_system.configure_param_bounds(bounds)
+
+        # Trust regions are the default delta for both scheduled steps and
+        # online adaptation. Default = bounds_span / 10 per runtime param;
+        # configure --trust-regions JSON overrides per-key.
+        trust_regions = resolve_trust_regions(agent, config)
+        if trust_regions:
+            agent.calibration_system.configure_adaptation_delta(trust_regions, force=True)
 
         dataset = Dataset(schema=schema)
         dataset.populate()
@@ -187,6 +205,10 @@ def compute_acquisition_grid(agent, dm, kappa, res=30):
 X_AXIS = AxisSpec("water_ratio", "Water Ratio", bounds=(0.30, 0.50))
 Y_AXIS = AxisSpec("print_speed", "Print Speed", unit="mm/s", bounds=(20.0, 60.0))
 Z_AXIS = AxisSpec("n_layers", "Layers", integer=True)
+LAYER_AXIS = AxisSpec("n_layers", "Layers", integer=True, bounds=(4.0, 8.0))
+# n_segments is currently fixed at 4 in the schema; the padded bounds give the
+# plot a visible y-extent so domain points don't degenerate to a single line.
+SEGMENT_AXIS = AxisSpec("n_segments", "Segments", integer=True, bounds=(3.0, 5.0))
 FIXED_DIMS = {"n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
 
 
@@ -242,8 +264,12 @@ def print_config_show(config: dict[str, Any]) -> None:
             ("de_tol", "DE tolerance", 0.0001),
         ]),
         ("Schedule", [
+            ("default_schedule", "Default schedule", None),
+            ("trust_regions", "Trust regions", None),
             ("schedule_smoothing", "Smoothing", 0.05),
-            ("schedule_delta", "Default delta", None),
+        ]),
+        ("Baseline", [
+            ("split_domain_phase", "Split domain phase", False),
         ]),
     ]
 
@@ -272,22 +298,54 @@ def print_config_show(config: dict[str, Any]) -> None:
     print()
 
 
-def apply_schedule_args(agent: Any, args: Any) -> None:
-    """Parse --schedule PARAM:DIM[:DELTA] flags and configure the agent."""
-    schedules = getattr(args, "schedule", None)
+def default_trust_regions(agent: Any) -> dict[str, float]:
+    """Default trust region per runtime parameter: 1/10 of the bounds span.
+
+    Iterates the schema's runtime-flagged parameters and computes
+    `(max_val − min_val) / 10` for each. Non-runtime parameters are skipped
+    (they have no concept of mid-run adjustability). Schema params with
+    infinite/missing bounds are skipped.
+    """
+    regions: dict[str, float] = {}
+    for code, p in agent.schema.parameters.data_objects.items():
+        if not getattr(p, "runtime_adjustable", False):
+            continue
+        lo = getattr(p, "min_val", None)
+        hi = getattr(p, "max_val", None)
+        if lo is None or hi is None or not np.isfinite(lo) or not np.isfinite(hi):
+            continue
+        regions[code] = (float(hi) - float(lo)) / 10.0
+    return regions
+
+
+def resolve_trust_regions(agent: Any, config: dict[str, Any]) -> dict[str, float]:
+    """Merge default trust regions with any user override stored in `config`."""
+    regions = default_trust_regions(agent)
+    user = config.get("trust_regions") or {}
+    for k, v in user.items():
+        regions[k] = float(v)
+    return regions
+
+
+def apply_schedule_args(agent: Any, args: Any, config: dict[str, Any]) -> None:
+    """Parse --schedule PARAM:DIM flags (or fall back to the configured default)
+    and configure the agent. Per-step delta is the parameter's trust region."""
+    per_call = getattr(args, "schedule", None)
+    schedules = per_call if per_call else (config.get("default_schedule") or [])
     if not schedules:
         return
-    smoothing = getattr(args, "smoothing", None)
+    trust_regions = resolve_trust_regions(agent, config)
+    smoothing = config.get("schedule_smoothing")
     for spec in schedules:
         parts = spec.split(":")
         if len(parts) < 2:
             agent.logger.console_warning(
-                f"Ignoring malformed --schedule '{spec}' (expected PARAM:DIM[:DELTA])"
+                f"Ignoring malformed --schedule '{spec}' (expected PARAM:DIM)"
             )
             continue
         param = parts[0].strip()
         dim = parts[1].strip()
-        delta = float(parts[2]) if len(parts) >= 3 else None
+        delta = trust_regions.get(param)
         agent.configure_schedule(param, dim, delta=delta, smoothing=smoothing)
 
 
