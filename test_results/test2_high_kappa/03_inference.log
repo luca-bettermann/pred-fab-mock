@@ -1,27 +1,0 @@
-
-[1m[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
-[1m[36m  PHASE 3[0m[1m ▸ Inference[0m
-  [2mFirst-time-right[0m
-[1m[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
-  Design intent: n_layers=5
-  Training   [████░░░░░░░░] [2m1/3[0m  Training   [████████░░░░] [2m2/3[0m  Training   [████████████] [2m3/3[0m[32m✓[0m Training   [████████████] [2m3/3[0m   
-  Optimizing [░░░░░░░░░░░░] [2m1/1000[0m  Optimizing [░░░░░░░░░░░░] [2m2/1000[0m  Optimizing [░░░░░░░░░░░░] [2m3/1000[0m  Optimizing [░░░░░░░░░░░░] [2m4/1000[0m  Optimizing [░░░░░░░░░░░░] [2m5/1000[0m  Optimizing [░░░░░░░░░░░░] [2m6/1000[0m  Optimizing [░░░░░░░░░░░░] [2m7/1000[0m  Optimizing [░░░░░░░░░░░░] [2m8/1000[0m  Optimizing [░░░░░░░░░░░░] [2m9/1000[0m  Optimizing [░░░░░░░░░░░░] [2m10/1000[0m  Optimizing [░░░░░░░░░░░░] [2m11/1000[0m  Optimizing [░░░░░░░░░░░░] [2m12/1000[0m  Optimizing [░░░░░░░░░░░░] [2m13/1000[0m  Optimizing [░░░░░░░░░░░░] [2m14/1000[0m  Optimizing [░░░░░░░░░░░░] [2m15/1000[0m  Optimizing [░░░░░░░░░░░░] [2m16/1000[0m  Optimizing [░░░░░░░░░░░░] [2m17/1000[0m[32m✓[0m Optimizing [████████████] [2m17/1000 iter  nfev=543[0m   
-  [36m>[0m perf=[32m1.013[0m  unc=[32m0.857[0m  obj=[32m1.013[0m
-    [2m→ print_speed=32.6, water_ratio=0.47[0m
-
-
-  Proposed parameters:
-    water_ratio  = 0.470
-    print_speed  = 32.6 mm/s
-    n_layers      = 5  (design intent)
-
-  Performance:
-    path_accuracy        = 0.406
-    energy_efficiency    = 0.880
-    production_rate      = 0.541
-    combined             = 0.558
-
-  Physics optimum: combined=0.587 (gap=+0.028)
-
-  [2mInference: Predicted Topology[0m
-  Plot: ./plots/05_inference.png

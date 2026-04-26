@@ -1,12 +1,0 @@
-  Training   [████░░░░░░░░] [2m1/3[0m  Training   [████████░░░░] [2m2/3[0m  Training   [████████████] [2m3/3[0m[32m✓[0m Training   [████████████] [2m3/3[0m   
-
-  [2mAnalysis: Ground Truth vs Model Prediction[0m
-  Plot: ./plots/05_analysis_topology.png
-
-  [2mAnalysis: Experiment Coverage (3D)[0m
-  Plot: ./plots/05_analysis_parameter_space_3d.png
-
-  Local sensitivity at optimum:
-    water_ratio           0.0608
-    n_layers              0.0288
-    print_speed           0.0010
