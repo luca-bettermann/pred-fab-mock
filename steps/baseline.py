@@ -114,8 +114,6 @@ def run(args: argparse.Namespace) -> None:
                 unc_grid[j_s, i_w] = agent.predict_uncertainty(p, dm)
         unc_grid_data = (unc_waters, unc_speeds, unc_grid, "Blues")
 
-    # Domain panel — only shown when split_domain_phase populated last_domain_values.
-    # No topology background: domain axes are different from Process axes.
     if cal.last_domain_values is not None:
         validation_panels.append(("Domain", LAYER_AXIS, SEGMENT_AXIS, cal.last_domain_values, None))
     if cal.last_process_points is not None:

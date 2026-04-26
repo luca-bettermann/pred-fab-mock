@@ -52,10 +52,6 @@ def run(args: argparse.Namespace) -> None:
     if getattr(args, "smoothing", None) is not None:
         print_config_set("Smoothing", config.get("schedule_smoothing"), args.smoothing)
         config["schedule_smoothing"] = args.smoothing
-    if getattr(args, "split_domain_phase", None) is not None:
-        new_val = (args.split_domain_phase == "true")
-        print_config_set("Split domain phase", config.get("split_domain_phase"), new_val)
-        config["split_domain_phase"] = new_val
     print()
     save_session(config, state)
 

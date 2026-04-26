@@ -1,7 +1,7 @@
 """CLI for the PFAB mock — step-by-step predictive fabrication workflow.
 
 Each command delegates to a standalone step file in steps/.
-Steps can also be run directly: python steps/baseline.py --n 10
+Steps can also be run directly: python steps/baseline.py --n 5
 
 Quick start:
     # Setup
@@ -15,7 +15,7 @@ Quick start:
         --trust-regions '{"print_speed":5.0}'
 
     # System discovery
-    uv run cli.py baseline --n 10 --plot
+    uv run cli.py baseline --n 5 --plot
     uv run cli.py report baseline_01 --plot
     uv run cli.py explore --n 5 --kappa 0.5
     uv run cli.py analyse --plot --test-set 20
@@ -58,7 +58,7 @@ Quick start:
       --trust-regions '{"print_speed":5.0}'
 
   # System discovery
-  uv run cli.py baseline --n 10 --plot
+  uv run cli.py baseline --n 5 --plot
   uv run cli.py report baseline_01 --plot
   uv run cli.py explore --n 5 --kappa 0.5
   uv run cli.py analyse --plot --test-set 20
@@ -126,16 +126,12 @@ Quick start:
                    help="DE population size (default: 15)")
     p.add_argument("--de-tol", type=float, default=None,
                    help="DE convergence tolerance (default: 0.0001)")
-    p.add_argument("--split-domain-phase", dest="split_domain_phase",
-                   choices=["true", "false"], default=None,
-                   help="Baseline only: split into Domain → Process phases instead "
-                        "of one joint Process phase (default: false)")
     p.set_defaults(func=configure.run)
 
     # baseline
     p = sub.add_parser("baseline", help="Run baseline experiments (space-filling)",
                        formatter_class=_wide_formatter)
-    p.add_argument("--n", type=int, default=10, help="Number of experiments")
+    p.add_argument("--n", type=int, default=5, help="Number of experiments")
     p.add_argument("--plot", action="store_true", help="Show plots inline")
     p.add_argument("--schedule", action="append", metavar="PARAM:DIM",
                    help="Override the configured schedule (e.g. print_speed:n_layers). Repeatable.")

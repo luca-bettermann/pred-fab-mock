@@ -132,9 +132,6 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
         if config.get("schedule_smoothing") is not None:
             agent.calibration_system.schedule_smoothing = config["schedule_smoothing"]
 
-        if config.get("split_domain_phase") is not None:
-            agent.calibration_system.split_domain_phase = bool(config["split_domain_phase"])
-
         if config.get("bounds"):
             bounds = {k: tuple(v) for k, v in config["bounds"].items()}
             agent.calibration_system.configure_param_bounds(bounds)
@@ -267,9 +264,6 @@ def print_config_show(config: dict[str, Any]) -> None:
             ("default_schedule", "Default schedule", None),
             ("trust_regions", "Trust regions", None),
             ("schedule_smoothing", "Smoothing", 0.05),
-        ]),
-        ("Baseline", [
-            ("split_domain_phase", "Split domain phase", False),
         ]),
     ]
 

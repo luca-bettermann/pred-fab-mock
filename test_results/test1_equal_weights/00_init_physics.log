@@ -1,0 +1,19 @@
+
+[1m[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[1m[36m  PHASE 0.3[0m[1m ▸ Physics[0m
+  [2mRandomize ground truth (seed=42)[0m
+[1m[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+
+  Physics constants:
+    W_OPTIMAL                 = 0.437396
+    W_ENERGY_OPT              = 0.373888
+    DELTA                     = 0.000018
+    THETA                     = 0.014368
+    SAG                       = 1.141266
+    COMPLEXITY                = 1.478060
+    LAYER_SPD_SHIFT           = 0.656684
+    W_SLIP                    = 0.462885
+    SEGMENT_CURVATURE         = [1.093, 0.813, 1.145, 0.937]
+
+  [2mPhysics: Ground Truth Topology[0m
+  Plot: ./plots/00_physics_topology.png
