@@ -7,8 +7,12 @@ from typing import Any
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.plotting import plot_parameter_space, plot_dimensional_trajectories, plot_convergence, plot_phase_proposals, AxisSpec
+from pred_fab.plotting import (
+    plot_parameter_space, plot_parameter_space_per_cell,
+    plot_dimensional_trajectories, plot_convergence, plot_phase_proposals, AxisSpec,
+)
 from visualization.helpers import physics_combined_at
+from sensors.physics import path_deviation as physics_path_deviation
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot_with_header, with_dimensions, params_from_spec, get_performance,
@@ -108,6 +112,50 @@ def run(args: argparse.Namespace) -> None:
                          schedules=state.schedules, codes=state.all_codes,
                          fixed_params=FIXED_DIMS)
     show_plot_with_header(path, "Baseline: Ground Truth vs Initial Model", inline=args.plot)
+
+    # Per-cell variant: bypasses eval-aggregation so model bias at one
+    # specific (layer, segment) cell is directly visible. Default to the
+    # middle cell. The fourth panel shows mean |truth - pred| averaged
+    # across all cells, surfacing parameter regions where the model is
+    # systematically weak regardless of position.
+    mid_layer = N_LAYERS // 2
+    mid_seg = N_SEGMENTS // 2
+    true_cell_grid = np.array([
+        [physics_path_deviation(spd, mid_seg, w, mid_layer) for w in waters]
+        for spd in speeds
+    ])
+    pred_cell_grid = np.zeros_like(true_cell_grid)
+    mean_diff_grid = np.zeros_like(true_cell_grid)
+    for i, w in enumerate(waters):
+        for j, spd in enumerate(speeds):
+            try:
+                tensor = agent.pred_system._predict_from_params(  # type: ignore[attr-defined]
+                    params={"water_ratio": w, "print_speed": spd,
+                            "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
+                )
+                pred_dev = tensor["path_deviation"]
+                pred_cell_grid[j, i] = float(pred_dev[mid_layer, mid_seg])
+                # Truth tensor at this (w, spd) for all cells
+                true_dev = np.array([
+                    [physics_path_deviation(spd, s, w, k) for s in range(N_SEGMENTS)]
+                    for k in range(N_LAYERS)
+                ])
+                mean_diff_grid[j, i] = float(np.mean(np.abs(true_dev - pred_dev)))
+            except Exception:
+                pred_cell_grid[j, i] = 0.0
+                mean_diff_grid[j, i] = 0.0
+
+    cell_path = os.path.join(plot_dir, "01_baseline_per_cell.png")
+    cell_label = f"layer={mid_layer}, segment={mid_seg}  ·  path_deviation"
+    plot_parameter_space_per_cell(
+        cell_path, X_AXIS, Y_AXIS, waters, speeds,
+        state.all_params, true_cell_grid, pred_cell_grid,
+        cell_label=cell_label,
+        mean_diff_grid=mean_diff_grid,
+        schedules=state.schedules, codes=state.all_codes,
+        fixed_params=FIXED_DIMS,
+    )
+    show_plot_with_header(cell_path, "Baseline: Per-Cell Comparison", inline=args.plot)
 
     path_3d_params = os.path.join(plot_dir, "01_baseline_3d.png")
     plot_dimensional_trajectories(
