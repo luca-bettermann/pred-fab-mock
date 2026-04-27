@@ -10,15 +10,17 @@ Fabrication-specific model implementations for the extrusion printing simulation
 | `evaluation_models.py` | `PathAccuracy` | `IEvaluationModel` | Scores `path_deviation` against 0 target; MAX_DEVIATION = 0.003 m |
 | `evaluation_models.py` | `EnergyEfficiency` | `IEvaluationModel` | Scores `energy_per_segment` against 4.5 J target; MAX_ENERGY = 24 J |
 | `evaluation_models.py` | `ProductionRate` | `IEvaluationModel` | Scores `production_rate`; MAX_RATE = 60 mm/s |
-| `prediction_model.py` | `DevMLP` | `IPredictionModel` | sklearn MLP (48,24,12) for path_deviation |
-| `prediction_model.py` | `EnergyMLP` | `IPredictionModel` | sklearn MLP (24,12) for energy_per_segment |
-| `prediction_model.py` | `DevRF` | `IPredictionModel` | Random Forest alternative for path_deviation |
-| `prediction_model.py` | `EnergyRF` | `IPredictionModel` | Random Forest alternative for energy_per_segment |
+| `prediction_model.py` | `DevMLP` | `IPredictionModel` | PyTorch MLP (48,24,12) for path_deviation |
+| `prediction_model.py` | `EnergyMLP` | `IPredictionModel` | PyTorch MLP (24,12) for energy_per_segment |
+| `prediction_model.py` | `DevRF` | `IPredictionModel` | sklearn Random Forest alternative for path_deviation |
+| `prediction_model.py` | `EnergyRF` | `IPredictionModel` | sklearn Random Forest alternative for energy_per_segment |
 | `prediction_model.py` | `RateMLP` | `IDeterministicModel` | Calls `physics.production_rate()` directly; no training |
 
 ## Key Points
 
-- `DevMLP` takes recursive features: `prev_layer_deviation` and `prev_segment_deviation` at lag 1-2.
-- `EnergyMLP` takes only parameters (no lag features).
+- MLPs are PyTorch-based for low per-call inference latency (~200μs vs sklearn's ~1000μs); important for the autoregressive single-row inference loop. Trained with Adam + MSE; inputs already arrive normalised from `DataModule`, so no internal scaler.
+- RF variants stay on sklearn — tree traversal isn't bottlenecked by sklearn's per-call Python overhead, and there's no clean PyTorch RF analog.
+- `DevMLP` takes recursive features: `prev_layer_dev_1`, `prev_seg_dev_1`, plus `layer_idx_pos`, `segment_idx_pos` iterators.
+- `EnergyMLP` takes only iterator features (no recursive lag).
 - `RateMLP` is deterministic — no training, no KDE contribution.
 - RF variants (`DevRF`, `EnergyRF`) are for comparison in dev/03_prediction.py.
