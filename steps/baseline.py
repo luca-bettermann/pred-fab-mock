@@ -34,7 +34,7 @@ def run(args: argparse.Namespace) -> None:
     agent.console.print_phase_header(1, "Baseline", f"{args.n} experiments")
     specs = agent.baseline_step(n=args.n)
 
-    exp_results: list[tuple[str, dict[str, float], float]] = []
+    exp_results: list[tuple[str, dict[str, Any], list[dict[str, Any]] | None, dict[str, float], float]] = []
     pw = agent.calibration_system.performance_weights
 
     for spec in specs:
@@ -42,16 +42,36 @@ def run(args: argparse.Namespace) -> None:
         exp_data, params, sched_data = run_and_record(dataset, agent, fab, spec, exp_code)
         perf = get_performance(exp_data)
         state.record("baseline", exp_code, params, perf, schedule=sched_data)
-        exp_results.append((exp_code, perf, combined_score(perf, pw)))
+        exp_results.append((exp_code, params, sched_data, perf, combined_score(perf, pw)))
 
-    # Performance summary: attributes in grey, sys= in green spectrum (capped for readability)
+    # Per-experiment summary: process params (with scheduled ranges) + perf scores.
+    # Domain axes are skipped — they were already shown in the Domain console block.
     _D = "\033[2m"
     _R = "\033[0m"
     _N = "\033[38;2;39;39;42m"  # Zinc-800
-    scores = [s for _, _, s in exp_results]
+    scores = [s for *_, s in exp_results]
     s_min, s_max = min(scores), max(scores)
     s_range = max(s_max - s_min, 1e-6)
-    for exp_code, perf, sys_score in exp_results:
+    skip_codes = {"n_layers", "n_segments"}
+    for exp_code, params, sched_data, perf, sys_score in exp_results:
+        sched_codes: set[str] = set()
+        if sched_data:
+            for step in sched_data:
+                sched_codes.update(step.keys())
+
+        param_parts: list[str] = []
+        for code, val in params.items():
+            if code in skip_codes:
+                continue
+            short = code[:3]
+            if code in sched_codes and sched_data:
+                vals = [float(val)] + [float(step.get(code, val)) for step in sched_data]
+                param_parts.append(f"{short}=[{min(vals):.1f}, {max(vals):.1f}]")
+            elif isinstance(val, float):
+                param_parts.append(f"{short}={val:.3f}")
+            else:
+                param_parts.append(f"{short}={val}")
+        param_str = "  ".join(param_parts)
         perf_parts = "  ".join(f"{k[:3]}={v:.3f}" for k, v in perf.items())
         # Green spectrum: Emerald-100 (#D1FAE5) → Emerald-500 (#10B981), capped for readability
         t = (sys_score - s_min) / s_range
@@ -59,10 +79,11 @@ def run(args: argparse.Namespace) -> None:
         g = int(250 - t * 65)   # 250 → 185
         b = int(229 - t * 100)  # 229 → 129
         _C = f"\033[38;2;{r};{g};{b}m"
-        print(f"  {_N}{exp_code}{_R}  {_D}{perf_parts}{_R}  {_C}sys={sys_score:.3f}{_R}")
+        print(f"  {_N}{exp_code}{_R}  {_D}{param_str}  {perf_parts}{_R}  {_C}sys={sys_score:.3f}{_R}")
 
     state.prev_params = with_dimensions(params_from_spec(specs[-1]))
 
+    print()  # blank line before training output
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
