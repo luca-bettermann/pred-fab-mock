@@ -8,7 +8,7 @@ import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import (
-    plot_parameter_space, plot_parameter_space_per_cell,
+    plot_parameter_space, plot_parameter_space_per_cell, plot_mean_error_topology,
     plot_dimensional_trajectories, plot_convergence, plot_phase_proposals, AxisSpec,
 )
 from visualization.helpers import physics_combined_at
@@ -151,11 +151,20 @@ def run(args: argparse.Namespace) -> None:
         cell_path, X_AXIS, Y_AXIS, waters, speeds,
         state.all_params, true_cell_grid, pred_cell_grid,
         cell_label=cell_label,
-        mean_diff_grid=mean_diff_grid,
         schedules=state.schedules, codes=state.all_codes,
         fixed_params=FIXED_DIMS,
     )
     show_plot_with_header(cell_path, "Baseline: Per-Cell Comparison", inline=args.plot)
+
+    mean_path = os.path.join(plot_dir, "01_baseline_mean_error.png")
+    plot_mean_error_topology(
+        mean_path, X_AXIS, Y_AXIS, waters, speeds,
+        state.all_params, mean_diff_grid,
+        label="Mean |Truth − Pred|  ·  path_deviation (all cells)",
+        schedules=state.schedules, codes=state.all_codes,
+        fixed_params=FIXED_DIMS,
+    )
+    show_plot_with_header(mean_path, "Baseline: Mean Error Across Cells", inline=args.plot)
 
     path_3d_params = os.path.join(plot_dir, "01_baseline_3d.png")
     plot_dimensional_trajectories(
