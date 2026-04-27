@@ -14,7 +14,7 @@ from pred_fab.core import (
 )
 
 ROOT_FOLDER = "."
-SCHEMA_NAME = "extrusion_printing_v8"
+SCHEMA_NAME = "extrusion_printing_v9"
 SCHEMA_TITLE = "Extrusion-based Additive Manufacturing"
 
 
@@ -47,10 +47,12 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
         # Recursive: lag 1 along each dimension
         *Feature.recursive("prev_layer_dev",   source=path_dev, dimensions=(layer_dim,),   max_depth=1),
         *Feature.recursive("prev_seg_dev", source=path_dev, dimensions=(segment_dim,), max_depth=1),
-        # Iterator-derived: normalised layer position in [0, 1]. Auto-populated
-        # from row index; available as a prediction-model input but excluded
-        # from the KDE active mask (it's a Feature, not a Parameter).
+        # Iterator-derived: normalised position in [0, 1] along each domain axis.
+        # Auto-populated from row index; available as a prediction-model input
+        # but excluded from the KDE active mask (Features, not Parameters).
+        # These are the canonical way to give models row-position awareness.
         Feature.iterator(spatial, layer_dim),
+        Feature.iterator(spatial, segment_dim),
     ])
 
     performance = PerformanceAttributes([

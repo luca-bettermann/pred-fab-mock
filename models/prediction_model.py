@@ -49,6 +49,7 @@ class DevMLP(IPredictionModel):
             "prev_layer_dev_1",
             "prev_seg_dev_1",
             "layer_idx_pos",
+            "segment_idx_pos",
         ]
 
     @property
@@ -100,7 +101,7 @@ class EnergyMLP(IPredictionModel):
 
     @property
     def input_features(self) -> list[str]:
-        return []
+        return ["layer_idx_pos", "segment_idx_pos"]
 
     @property
     def outputs(self) -> list[str]:
@@ -180,6 +181,7 @@ class DevRF(IPredictionModel):
             "prev_layer_dev_1",
             "prev_seg_dev_1",
             "layer_idx_pos",
+            "segment_idx_pos",
         ]
 
     @property
@@ -228,7 +230,7 @@ class EnergyRF(IPredictionModel):
 
     @property
     def input_features(self) -> list[str]:
-        return []
+        return ["layer_idx_pos", "segment_idx_pos"]
 
     @property
     def outputs(self) -> list[str]:
