@@ -41,7 +41,7 @@ class DevMLP(IPredictionModel):
 
     @property
     def input_parameters(self) -> list[str]:
-        return ["print_speed", "water_ratio", "n_layers", "n_segments"]
+        return ["print_speed", "water_ratio"]
 
     @property
     def input_features(self) -> list[str]:
@@ -97,7 +97,7 @@ class EnergyMLP(IPredictionModel):
 
     @property
     def input_parameters(self) -> list[str]:
-        return ["print_speed", "water_ratio", "n_layers", "n_segments"]
+        return ["print_speed", "water_ratio"]
 
     @property
     def input_features(self) -> list[str]:
@@ -173,7 +173,7 @@ class DevRF(IPredictionModel):
 
     @property
     def input_parameters(self) -> list[str]:
-        return ["print_speed", "water_ratio", "n_layers", "n_segments"]
+        return ["print_speed", "water_ratio"]
 
     @property
     def input_features(self) -> list[str]:
@@ -226,7 +226,7 @@ class EnergyRF(IPredictionModel):
 
     @property
     def input_parameters(self) -> list[str]:
-        return ["print_speed", "water_ratio", "n_layers", "n_segments"]
+        return ["print_speed", "water_ratio"]
 
     @property
     def input_features(self) -> list[str]:
