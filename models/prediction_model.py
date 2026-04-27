@@ -48,6 +48,7 @@ class DevMLP(IPredictionModel):
         return [
             "prev_layer_dev_1",
             "prev_seg_dev_1",
+            "layer_idx_pos",
         ]
 
     @property
@@ -178,6 +179,7 @@ class DevRF(IPredictionModel):
         return [
             "prev_layer_dev_1",
             "prev_seg_dev_1",
+            "layer_idx_pos",
         ]
 
     @property

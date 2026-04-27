@@ -47,6 +47,10 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
         # Recursive: lag 1 along each dimension
         *Feature.recursive("prev_layer_dev",   source=path_dev, dimensions=(layer_dim,),   max_depth=1),
         *Feature.recursive("prev_seg_dev", source=path_dev, dimensions=(segment_dim,), max_depth=1),
+        # Iterator-derived: normalised layer position in [0, 1]. Auto-populated
+        # from row index; available as a prediction-model input but excluded
+        # from the KDE active mask (it's a Feature, not a Parameter).
+        Feature.iterator(spatial, layer_dim),
     ])
 
     performance = PerformanceAttributes([
