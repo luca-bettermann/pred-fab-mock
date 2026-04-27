@@ -137,18 +137,28 @@ def run(args: argparse.Namespace) -> None:
 
     if cal.last_domain_values is not None:
         validation_panels.append(("Domain", LAYER_AXIS, SEGMENT_AXIS, cal.last_domain_values, None))
-    if cal.last_process_points is not None:
-        validation_panels.append(("Process", X_AXIS, Y_AXIS, cal.last_process_points, None, unc_grid_data))
-    if cal.last_schedule_points is not None and cal.last_schedule_exp_ids is not None and cal.last_process_points is not None:
+
+    # Second panel: the final post-Schedule trajectory if scheduling ran,
+    # otherwise the static Process points. The pre-Schedule Process panel was
+    # removed because its points are stale once Schedule refines them.
+    has_schedule = (
+        cal.last_schedule_points is not None
+        and cal.last_schedule_exp_ids is not None
+        and cal.last_process_points is not None
+    )
+    if has_schedule:
         sched_pts_raw = cal.last_schedule_points
         sched_ids = cal.last_schedule_exp_ids
         sched_dicts: list[dict[str, Any]] = []
         for j, eid in enumerate(sched_ids):
-            water = cal.last_process_points[eid].get("water_ratio", 0.4)
-            speed_norm = float(sched_pts_raw[j, 0])
+            water = cal.last_process_points[eid].get("water_ratio", 0.4)  # type: ignore[index]
+            speed_norm = float(sched_pts_raw[j, 0])  # type: ignore[index]
             speed = Y_AXIS.bounds[0] + speed_norm * (Y_AXIS.bounds[1] - Y_AXIS.bounds[0])  # type: ignore[index]
             sched_dicts.append({"water_ratio": water, "print_speed": speed})
-        validation_panels.append(("Schedule", X_AXIS, Y_AXIS, sched_dicts, sched_ids, unc_grid_data))
+        validation_panels.append(("Process + Schedule", X_AXIS, Y_AXIS, sched_dicts, sched_ids, unc_grid_data))
+    elif cal.last_process_points is not None:
+        validation_panels.append(("Process", X_AXIS, Y_AXIS, cal.last_process_points, None, unc_grid_data))
+
     if validation_panels:
         plot_phase_proposals(path_val, validation_panels)
         show_plot_with_header(path_val, "Phase Validation", inline=args.plot)
