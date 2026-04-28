@@ -82,7 +82,7 @@ def _brute_force_acquisition(agent, dm, res=50):
 
 
 def main():
-    warnings.filterwarnings("ignore", category=RuntimeWarning, module="sklearn")
+    warnings.filterwarnings("ignore")
     plot_dir = ensure_plot_dir()
 
     # ── Setup: shared baseline ────────────────────────────────────────────────

@@ -7,14 +7,13 @@ from sensors.camera import CameraSystem
 from sensors.energy import EnergySensor
 from models.feature_models import DevFeature, EnergyFeature, RateFeature
 from models.evaluation_models import PathAccuracy, EnergyEfficiency, ProductionRate
-from models.prediction_model import DevMLP, EnergyMLP, RateMLP, DevRF, EnergyRF
+from models.prediction_model import DevMLP, EnergyMLP, RateMLP
 
 
 def build_agent(
     schema: DatasetSchema,
     camera: CameraSystem,
     energy_sensor: EnergySensor,
-    model_type: str = "mlp",
     verbose: bool = True,
 ) -> PfabAgent:
     """Register all models, initialize systems, and return a configured PfabAgent."""
@@ -27,12 +26,8 @@ def build_agent(
     agent.register_evaluation_model(EnergyEfficiency)
     agent.register_evaluation_model(ProductionRate)
 
-    if model_type == "rf":
-        agent.register_prediction_model(DevRF)
-        agent.register_prediction_model(EnergyRF)
-    else:
-        agent.register_prediction_model(DevMLP)
-        agent.register_prediction_model(EnergyMLP)
+    agent.register_prediction_model(DevMLP)
+    agent.register_prediction_model(EnergyMLP)
     agent.register_prediction_model(RateMLP)
 
     agent.initialize_systems(schema, verbose_flag=verbose)

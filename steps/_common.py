@@ -101,8 +101,7 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
     try:
         schema = build_schema()
         fab = FabricationSystem(CameraSystem(), EnergySensor())
-        model_type = config.get("model_type", "mlp")
-        agent = build_agent(schema, fab.camera, fab.energy, model_type=model_type, verbose=verbose)
+        agent = build_agent(schema, fab.camera, fab.energy, verbose=verbose)
 
         if config.get("performance_weights"):
             agent.configure_performance(weights=config["performance_weights"])

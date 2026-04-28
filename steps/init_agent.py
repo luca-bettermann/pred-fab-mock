@@ -7,13 +7,10 @@ from steps._common import load_session, save_session, rebuild
 
 def run(args: argparse.Namespace) -> None:
     config, state = load_session()
-    model_type = args.model
-    config["model_type"] = model_type
-    _B = "\033[1m"; _C = "\033[36m"; _R = "\033[0m"; _D = "\033[2m"
+    _B = "\033[1m"; _C = "\033[36m"; _R = "\033[0m"
     bar = "━" * 58
     print(f"\n{_B}{_C}{bar}{_R}")
     print(f"{_B}{_C}  PHASE 0.2{_R}{_B} ▸ Agent{_R}")
-    print(f"  {_D}model={model_type}{_R}")
     print(f"{_B}{_C}{bar}{_R}")
     agent, _, _ = rebuild(config)
     agent.state_report()
@@ -22,7 +19,6 @@ def run(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Initialize the agent")
-    parser.add_argument("--model", choices=["mlp", "rf"], default="mlp")
     return parser.parse_args()
 
 

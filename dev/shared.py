@@ -29,7 +29,6 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 def make_env(
     data_tag: str = "default",
-    model_type: str = "mlp",
     verbose: bool = True,
 ) -> tuple[PfabAgent, FabricationSystem, Dataset]:
     """Build a fresh agent + fabrication system + dataset.
@@ -41,7 +40,7 @@ def make_env(
         shutil.rmtree(root)
     schema = build_schema(root_folder=root)
     fab    = FabricationSystem(CameraSystem(), EnergySensor())
-    agent  = build_agent(schema, fab.camera, fab.energy, model_type=model_type, verbose=verbose)
+    agent  = build_agent(schema, fab.camera, fab.energy, verbose=verbose)
     dataset = Dataset(schema=schema)
     return agent, fab, dataset
 
