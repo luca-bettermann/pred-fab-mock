@@ -1,49 +1,16 @@
-from .plots import (
-    plot_path_comparison_3d,
-    plot_filament_volume,
-    plot_prediction_accuracy,
-    plot_parameter_space,
-    plot_performance_trajectory,
-    plot_adaptation,
-    plot_inference_convergence,
-    plot_acquisition_topology,
-    plot_physics_topology,
-    plot_baseline_scatter,
-)
-from .console import (
-    print_phase_header,
-    print_section,
-    print_experiment_row,
-    print_phase_summary,
-    print_training_summary,
-    print_adaptation_row,
-    print_run_summary,
-    print_done,
-    print_explore_row,
-    print_infer_row,
-    print_optimizer_row,
-)
+"""Domain-specific visualization helpers and 3D process plots.
+
+Generic PFAB plots live in ``pred_fab.plotting``. This module provides only:
+- Domain-specific data generation (physics grid evaluation)
+- 3D filament visualization (requires live CameraSystem)
+"""
+
+from .helpers import save_fig, physics_combined_at, evaluate_physics_grid
+from .process import plot_path_comparison_3d
 
 __all__ = [
+    "save_fig",
+    "physics_combined_at",
+    "evaluate_physics_grid",
     "plot_path_comparison_3d",
-    "plot_filament_volume",
-    "plot_prediction_accuracy",
-    "plot_parameter_space",
-    "plot_performance_trajectory",
-    "plot_adaptation",
-    "plot_inference_convergence",
-    "plot_acquisition_topology",
-    "plot_physics_topology",
-    "plot_baseline_scatter",
-    "print_phase_header",
-    "print_section",
-    "print_experiment_row",
-    "print_phase_summary",
-    "print_training_summary",
-    "print_adaptation_row",
-    "print_run_summary",
-    "print_done",
-    "print_explore_row",
-    "print_infer_row",
-    "print_optimizer_row",
 ]

@@ -1,11 +1,22 @@
 .venv/
-build
+build/
+*.egg-info/
 __pycache__/
 **/__pycache__/
 *.pyc
-pfab_data/
-plots/
+.pytest_cache/
+.DS_Store
+**/logs/
 
-# Ignore all local data
-logs/
+# Runtime data
 local/
+pfab_data/
+.pfab_session.json
+
+# Generated plots and data (main workflow + dev scripts)
+plots/
+dev/data/
+dev/plots/
+
+# Test artifacts from run_test.sh
+test_results/

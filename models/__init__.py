@@ -1,15 +1,9 @@
-from .feature_models import PrintingFeatureModel, EnergyFeatureModel, ProductionRateFeatureModel
-from .evaluation_models import PathAccuracyModel, EnergyConsumptionModel, ProductionRateModel
-from .prediction_model import DeviationPredictionModel, EnergyPredictionModel, ProductionRatePredictionModel
+from .feature_models import DevFeature, EnergyFeature, RateFeature
+from .evaluation_models import PathAccuracy, EnergyEfficiency, ProductionRate
+from .prediction_model import DevMLP, EnergyMLP, RateMLP
 
 __all__ = [
-    "PrintingFeatureModel",
-    "EnergyFeatureModel",
-    "ProductionRateFeatureModel",
-    "PathAccuracyModel",
-    "EnergyConsumptionModel",
-    "ProductionRateModel",
-    "DeviationPredictionModel",
-    "EnergyPredictionModel",
-    "ProductionRatePredictionModel",
+    "DevFeature", "EnergyFeature", "RateFeature",
+    "PathAccuracy", "EnergyEfficiency", "ProductionRate",
+    "DevMLP", "EnergyMLP", "RateMLP",
 ]
