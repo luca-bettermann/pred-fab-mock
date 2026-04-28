@@ -22,7 +22,7 @@ class DevMLP(TorchMLPModel):
     U-shaped response to print_speed with shear-thinning coupling in water_ratio.
     """
 
-    HIDDEN = (48, 24, 12)
+    HIDDEN = (24, 12)
 
     @property
     def input_parameters(self) -> list[str]:
