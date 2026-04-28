@@ -10,7 +10,7 @@ from pred_fab.plotting import plot_inference_result
 from visualization.helpers import physics_combined_at
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
-    show_plot, with_dimensions, params_from_spec, get_performance,
+    show_plot_with_header, with_dimensions, params_from_spec, get_performance,
     run_and_evaluate, run_and_record, combined_score, get_physics_optimum,
     N_LAYERS, N_SEGMENTS,
     X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
@@ -26,7 +26,7 @@ def run(args: argparse.Namespace) -> None:
     if getattr(args, 'iterations', None) is not None:
         agent.calibration_system.de_maxiter = args.iterations
 
-    apply_schedule_args(agent, args)
+    apply_schedule_args(agent, args, config)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
     n_layers = design_intent.get("n_layers", N_LAYERS)
@@ -95,7 +95,7 @@ def run(args: argparse.Namespace) -> None:
         points=state.all_params,
         fixed_params=FIXED_DIMS,
     )
-    show_plot(path, inline=args.plot)
+    show_plot_with_header(path, "Inference: Predicted Topology", inline=args.plot)
 
     save_session(config, state)
 

@@ -17,3 +17,6 @@ pfab_data/
 plots/
 dev/data/
 dev/plots/
+
+# Test artifacts from run_test.sh
+test_results/

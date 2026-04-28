@@ -10,6 +10,7 @@ class PathAccuracy(IEvaluationModel):
     """Scores path_deviation against a zero-deviation target."""
 
     MAX_DEVIATION = 0.003  # m — deviation at which score = 0
+    TARGETS_CONSTANT = True
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
@@ -43,6 +44,7 @@ class EnergyEfficiency(IEvaluationModel):
 
     TARGET_ENERGY = 4.5   # J  — minimum achievable (low speed, clay, simple design)
     MAX_ENERGY = 24.0     # J  — max physically reachable (~speed=60, concrete, B)
+    TARGETS_CONSTANT = True
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)
@@ -74,6 +76,7 @@ class ProductionRate(IEvaluationModel):
     """
 
     MAX_RATE = 60.0  # mm/s — max achievable (no slip, print_speed=60)
+    TARGETS_CONSTANT = True
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)

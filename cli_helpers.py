@@ -12,7 +12,6 @@ import numpy as np
 import sensors.physics as phys
 from sensors.physics import N_LAYERS, N_SEGMENTS
 from pred_fab import combined_score
-from pred_fab.plotting import plot_sensitivity as _pfab_plot_sensitivity
 
 
 # ── Inline plot display ───────────────────────────────────────────────────────
@@ -162,10 +161,3 @@ def compute_local_sensitivity(
     return sensitivities
 
 
-def plot_sensitivity(
-    save_path: str,
-    sensitivities: dict[str, float],
-    title: str = "Local Sensitivity Analysis",
-) -> None:
-    """Delegate to pred_fab.plotting.plot_sensitivity."""
-    _pfab_plot_sensitivity(save_path, sensitivities, title=title)

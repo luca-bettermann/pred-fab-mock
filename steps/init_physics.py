@@ -6,7 +6,7 @@ import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__)
 from pred_fab.plotting import plot_metric_topology
 from visualization.helpers import evaluate_physics_grid
 from steps._common import (
-    load_session, save_session, ensure_plot_dir, show_plot,
+    load_session, save_session, ensure_plot_dir, show_plot_with_header,
     randomize_physics, apply_physics_config, PHYSICS_CONFIG_KEY,
     X_AXIS, Y_AXIS, FIXED_DIMS,
 )
@@ -46,7 +46,7 @@ def run(args: argparse.Namespace) -> None:
                           combined_label=metric_names[-1],
                           weights=perf_weights,
                           fixed_params=FIXED_DIMS)
-    show_plot(path, inline=args.plot)
+    show_plot_with_header(path, "Physics: Ground Truth Topology", inline=args.plot)
     save_session(config, state)
 
 

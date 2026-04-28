@@ -21,16 +21,23 @@ def run(args: argparse.Namespace) -> None:
         new = json.loads(args.bounds)
         print_config_set("Bounds", config.get("bounds"), new)
         config["bounds"] = new
+    if getattr(args, "trust_regions", None):
+        new = json.loads(args.trust_regions)
+        print_config_set("Trust regions", config.get("trust_regions"), new)
+        config["trust_regions"] = new
+    if getattr(args, "schedule", None):
+        print_config_set("Default schedule", config.get("default_schedule"), args.schedule)
+        config["default_schedule"] = list(args.schedule)
     if args.optimizer:
         print_config_set("Optimizer", config.get("optimizer"), args.optimizer)
         config["optimizer"] = args.optimizer
     if args.radius is not None:
         print_config_set("Exploration radius", config.get("exploration_radius"), args.radius)
         config["exploration_radius"] = args.radius
-    if getattr(args, 'sigma', None) is not None:
+    if getattr(args, "sigma", None) is not None:
         print_config_set("Sigma override", config.get("sigma"), args.sigma)
         config["sigma"] = args.sigma
-    if getattr(args, 'mc_exp_offset', None) is not None:
+    if getattr(args, "mc_exp_offset", None) is not None:
         print_config_set("MC exponent offset", config.get("mc_exponent_offset"), args.mc_exp_offset)
         config["mc_exponent_offset"] = args.mc_exp_offset
     if args.de_maxiter is not None:
@@ -39,35 +46,15 @@ def run(args: argparse.Namespace) -> None:
     if args.de_popsize is not None:
         print_config_set("DE population size", config.get("de_popsize"), args.de_popsize)
         config["de_popsize"] = args.de_popsize
-    if getattr(args, 'de_tol', None) is not None:
+    if getattr(args, "de_tol", None) is not None:
         print_config_set("DE tolerance", config.get("de_tol"), args.de_tol)
         config["de_tol"] = args.de_tol
-    if getattr(args, 'smoothing', None) is not None:
+    if getattr(args, "smoothing", None) is not None:
         print_config_set("Smoothing", config.get("schedule_smoothing"), args.smoothing)
         config["schedule_smoothing"] = args.smoothing
-    if getattr(args, 'delta', None) is not None:
-        print_config_set("Delta", config.get("schedule_delta"), args.delta)
-        config["schedule_delta"] = args.delta
     print()
     save_session(config, state)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Set agent configuration")
-    parser.add_argument("--show", action="store_true", help="Show all current configuration values")
-    parser.add_argument("--bounds", type=str, default=None)
-    parser.add_argument("--weights", type=str, default=None)
-    parser.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None)
-    parser.add_argument("--radius", type=float, default=None,
-                        help="Exploration radius (sets σ = radius · √n_active_dims)")
-    parser.add_argument("--sigma", type=float, default=None,
-                        help="Direct σ override (bypasses radius × √D scaling)")
-    parser.add_argument("--mc-exp-offset", type=float, default=None,
-                        help="Sobol MC sample exponent offset; M = round(2^(n_active + offset)), default 3.0")
-    parser.add_argument("--de-maxiter", type=int, default=None)
-    parser.add_argument("--de-popsize", type=int, default=None)
-    return parser.parse_args()
-
-
 if __name__ == "__main__":
-    run(parse_args())
+    raise SystemExit("Run via cli.py: uv run cli.py configure ...")

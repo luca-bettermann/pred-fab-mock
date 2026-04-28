@@ -19,14 +19,14 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     perf_weights = agent.calibration_system.performance_weights
 
-    apply_schedule_args(agent, args)
+    apply_schedule_args(agent, args, config)
 
     # Derive scheduled params and dimension from what was just configured
     cal = agent.calibration_system
     sched_params = list(cal.schedule_configs.keys())
     sched_dims = list(cal.schedule_configs.values())
     if not sched_params:
-        print("  Error: --schedule PARAM:DIM is required for adapt.")
+        print("  Error: no schedule configured. Run 'configure --schedule PARAM:DIM' first.")
         return
     # Use the first dimension for the adaptation loop
     adapt_dim = sched_dims[0]
@@ -120,9 +120,6 @@ def run(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Online inference with layer-by-layer adaptation")
-    parser.add_argument("--schedule", action="append", metavar="PARAM:DIM[:DELTA]",
-                        help="Schedule a parameter per dimension step (e.g. print_speed:n_layers:5.0). Required.")
-    parser.add_argument("--smoothing", type=float, default=None)
     parser.add_argument("--design-intent", type=str, default=None)
     return parser.parse_args()
 

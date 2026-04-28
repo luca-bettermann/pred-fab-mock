@@ -86,7 +86,7 @@ def _run_exploration(optimizer, tag):
 
 
 def main():
-    warnings.filterwarnings("ignore", category=RuntimeWarning, module="sklearn")
+    warnings.filterwarnings("ignore")
     plot_dir = ensure_plot_dir()
 
     print(f"\n  Exploration: {N_BASELINE} baseline + {N_EXPLORE} rounds, kappa={KAPPA}")

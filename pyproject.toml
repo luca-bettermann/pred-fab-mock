@@ -3,14 +3,26 @@ name = "pred-fab-mock"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "pred-fab",
+    "pred-fab[torch]",
     "matplotlib>=3.9.4",
     "numpy>=1.24",
-    "scikit-learn>=1.3",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources.torch]
+index = "pytorch-cpu"
 
 [tool.setuptools.packages.find]
 include = ["models*", "sensors*", "visualization*"]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.409",
+]
 
 [tool.uv.sources]
 pred-fab = { path = "../pred-fab", editable = true }

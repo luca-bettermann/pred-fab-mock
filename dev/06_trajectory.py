@@ -57,7 +57,7 @@ def _extract_schedules(spec):
 
 
 def main():
-    warnings.filterwarnings("ignore", category=RuntimeWarning, module="sklearn")
+    warnings.filterwarnings("ignore")
     plot_dir = ensure_plot_dir()
 
     agent, fab, dataset = make_env("06_trajectory", verbose=False)
