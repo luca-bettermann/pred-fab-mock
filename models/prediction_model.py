@@ -23,6 +23,8 @@ class DevMLP(MLPModel):
     """
 
     HIDDEN = (24, 12)
+    WEIGHT_DECAY = 1e-2
+    DROPOUT = 0.15
 
     @property
     def input_parameters(self) -> list[str]:
@@ -44,6 +46,8 @@ class EnergyMLP(MLPModel):
     """Predicts energy_per_segment from process parameters."""
 
     HIDDEN = (24, 12)
+    WEIGHT_DECAY = 1e-2
+    DROPOUT = 0.15
 
     @property
     def input_parameters(self) -> list[str]:
