@@ -200,12 +200,12 @@ def run(args: argparse.Namespace) -> None:
     # removed because its points are stale once Schedule refines them.
     has_schedule = (
         cal.last_trajectory_points is not None
-        and cal.last_schedule_exp_ids is not None
+        and cal.last_trajectory_exp_ids is not None
         and cal.last_process_points is not None
     )
     if has_schedule:
         sched_pts_raw = cal.last_trajectory_points
-        sched_ids = cal.last_schedule_exp_ids
+        sched_ids = cal.last_trajectory_exp_ids
         sched_dicts: list[dict[str, Any]] = []
         for j, eid in enumerate(sched_ids):
             water = cal.last_process_points[eid].get("water_ratio", 0.4)  # type: ignore[index]
