@@ -28,9 +28,6 @@ def run(args: argparse.Namespace) -> None:
     if getattr(args, "schedule", None):
         print_config_set("Default schedule", config.get("default_schedule"), args.schedule)
         config["default_schedule"] = list(args.schedule)
-    if args.optimizer:
-        print_config_set("Optimizer", config.get("optimizer"), args.optimizer)
-        config["optimizer"] = args.optimizer
     if args.radius is not None:
         print_config_set("Exploration radius", config.get("exploration_radius"), args.radius)
         config["exploration_radius"] = args.radius
@@ -46,9 +43,6 @@ def run(args: argparse.Namespace) -> None:
     if args.de_popsize is not None:
         print_config_set("DE population size", config.get("de_popsize"), args.de_popsize)
         config["de_popsize"] = args.de_popsize
-    if getattr(args, "de_tol", None) is not None:
-        print_config_set("DE tolerance", config.get("de_tol"), args.de_tol)
-        config["de_tol"] = args.de_tol
     if getattr(args, "smoothing", None) is not None:
         print_config_set("Smoothing", config.get("schedule_smoothing"), args.smoothing)
         config["schedule_smoothing"] = args.smoothing

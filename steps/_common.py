@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 
-from pred_fab.orchestration import Optimizer
 from pred_fab.core import Dataset
 from pred_fab.utils.metrics import combined_score
 from pred_fab.plotting import AxisSpec
@@ -117,14 +116,10 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
             agent.configure_exploration(**explore_kwargs)
 
         opt_kwargs: dict[str, Any] = {}
-        if config.get("optimizer"):
-            opt_kwargs["backend"] = Optimizer(config["optimizer"])
         if config.get("de_maxiter") is not None:
             opt_kwargs["de_maxiter"] = config["de_maxiter"]
         if config.get("de_popsize") is not None:
             opt_kwargs["de_popsize"] = config["de_popsize"]
-        if config.get("de_tol") is not None:
-            opt_kwargs["de_tol"] = config["de_tol"]
         if opt_kwargs:
             agent.configure_optimizer(**opt_kwargs)
 

@@ -118,14 +118,10 @@ Quick start:
                    help="Direct σ override (bypasses radius × √D scaling)")
     p.add_argument("--mc-exp-offset", type=float, default=None, dest="mc_exp_offset",
                    help="Sobol MC exponent offset; M = round(2^(D + offset)), default 3.0")
-    p.add_argument("--optimizer", choices=["lbfgsb", "de"], default=None,
-                   help="Optimizer backend (default: de)")
     p.add_argument("--de-maxiter", type=int, default=None,
-                   help="DE max generations (default: 1000)")
+                   help="Phase 1 DE max generations (default: 30)")
     p.add_argument("--de-popsize", type=int, default=None,
-                   help="DE population size (default: 15)")
-    p.add_argument("--de-tol", type=float, default=None,
-                   help="DE convergence tolerance (default: 0.0001)")
+                   help="Phase 1 DE population size (default: 64)")
     p.set_defaults(func=configure.run)
 
     # baseline

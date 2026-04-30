@@ -1,22 +1,22 @@
 """Prediction models for the extrusion printing simulation.
 
-MLPs subclass `pred_fab.models.TorchMLPModel`. Each subclass declares
+MLPs subclass `pred_fab.models.MLPModel`. Each subclass declares
 HIDDEN topology and the IPredictionModel properties; the framework
 owns the training loop, forward path, and torch lifecycle.
 
 `RateMLP` is deterministic — it wraps the physics formula via
-`IDeterministicModel` (no training, identity encode).
+`DeterministicModel` (no training, identity encode).
 """
 
 import numpy as np
 
-from pred_fab import IDeterministicModel
-from pred_fab.models import TorchMLPModel
+from pred_fab import DeterministicModel
+from pred_fab.models import MLPModel
 
 from sensors.physics import production_rate as _physics_production_rate
 
 
-class DevMLP(TorchMLPModel):
+class DevMLP(MLPModel):
     """Predicts path_deviation from process parameters.
 
     U-shaped response to print_speed with shear-thinning coupling in water_ratio.
@@ -31,8 +31,6 @@ class DevMLP(TorchMLPModel):
     @property
     def input_features(self) -> list[str]:
         return [
-            "prev_layer_dev_1",
-            "prev_seg_dev_1",
             "layer_idx_pos",
             "segment_idx_pos",
         ]
@@ -42,7 +40,7 @@ class DevMLP(TorchMLPModel):
         return ["path_deviation"]
 
 
-class EnergyMLP(TorchMLPModel):
+class EnergyMLP(MLPModel):
     """Predicts energy_per_segment from process parameters."""
 
     HIDDEN = (24, 12)
@@ -60,7 +58,7 @@ class EnergyMLP(TorchMLPModel):
         return ["energy_per_segment"]
 
 
-class RateMLP(IDeterministicModel):
+class RateMLP(DeterministicModel):
     """Deterministic production_rate [mm/s] from physics formula."""
 
     @property

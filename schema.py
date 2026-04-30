@@ -44,13 +44,10 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
         path_dev,
         Feature.array("energy_per_segment", domain=spatial),
         Feature.array("production_rate"),
-        # Recursive: lag 1 along each dimension
-        *Feature.recursive("prev_layer_dev",   source=path_dev, dimensions=(layer_dim,),   max_depth=1),
-        *Feature.recursive("prev_seg_dev", source=path_dev, dimensions=(segment_dim,), max_depth=1),
         # Iterator-derived: normalised position in [0, 1] along each domain axis.
         # Auto-populated from row index; available as a prediction-model input
         # but excluded from the KDE active mask (Features, not Parameters).
-        # These are the canonical way to give models row-position awareness.
+        # The canonical way to give models row-position awareness.
         Feature.iterator(spatial, layer_dim),
         Feature.iterator(spatial, segment_dim),
     ])
