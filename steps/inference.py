@@ -55,7 +55,7 @@ def run(args: argparse.Namespace) -> None:
     # Re-apply design_intent on top of returned params (schedule may have overridden).
     params.update(design_intent)
     perf = get_performance(exp_data)
-    state.record("inference", exp_code, params, perf, schedule=sched_data)
+    state.record("inference", exp_code, params, perf, trajectory=sched_data)
 
     score = combined_score(perf, perf_weights)
     print(f"\n  Proposed parameters:")

@@ -2,6 +2,11 @@
   "pythonVersion": "3.12",
   "venvPath": ".",
   "venv": ".venv",
-  "include": ["*.py", "sensors", "models", "visualization"],
+  "include": ["*.py", "sensors", "models", "visualization", "steps", "dev"],
+  "exclude": [
+    "dev/05_exploration.py",
+    "dev/05b_optimizer_tuning.py",
+    "dev/_smoke_gradient.py"
+  ],
   "typeCheckingMode": "basic"
 }

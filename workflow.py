@@ -29,8 +29,8 @@ class JourneyState:
         self.all_codes: list[str] = []
         self.perf_history: list[tuple[dict[str, Any], dict[str, float]]] = []
         self.prev_params: dict[str, Any] = {}
-        # Per-experiment schedule data: code → list of per-step param dicts (or None)
-        self.schedules: dict[str, list[dict[str, Any]]] = {}
+        # Per-experiment trajectory data: code → list of per-step param dicts (or None)
+        self.trajectories: dict[str, list[dict[str, Any]]] = {}
 
     def record(
         self,
@@ -38,15 +38,15 @@ class JourneyState:
         code: str,
         params: dict[str, Any],
         perf: dict[str, float],
-        schedule: list[dict[str, Any]] | None = None,
+        trajectory: list[dict[str, Any]] | None = None,
     ) -> None:
         self.all_params.append(params)
         self.all_phases.append(phase)
         self.all_codes.append(code)
         self.perf_history.append((params, perf))
         self.prev_params = params
-        if schedule is not None:
-            self.schedules[code] = schedule
+        if trajectory is not None:
+            self.trajectories[code] = trajectory
 
 
 def clean_artifacts(plot_dirs: list[str]) -> None:

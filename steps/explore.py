@@ -53,7 +53,7 @@ def run(args: argparse.Namespace) -> None:
             dataset, agent, fab, spec, exp_code, extra_params=state.prev_params,
         )
         perf = get_performance(exp_data)
-        state.record("exploration", exp_code, params, perf, schedule=sched_data)
+        state.record("exploration", exp_code, params, perf, trajectory=sched_data)
 
         if args.plot:
             w, s, p, u, c = acq_data
@@ -61,7 +61,7 @@ def run(args: argparse.Namespace) -> None:
             plot_acquisition(path, X_AXIS, Y_AXIS, w, s, p, u, c,
                              points=state.all_params[:-1],
                              proposed=params,
-                             schedules=state.schedules, codes=state.all_codes[:-1],
+                             trajectories=state.trajectories, codes=state.all_codes[:-1],
                              fixed_params=FIXED_DIMS)
             show_plot_with_header(
                 path, f"Exploration: Round {round_num} (κ={args.kappa})", inline=True

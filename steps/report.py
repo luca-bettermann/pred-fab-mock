@@ -68,7 +68,7 @@ def run(args: argparse.Namespace) -> None:
     plot_dimensional_trajectories(
         path_traj, X_AXIS, Y_AXIS, "n_layers",
         state.all_params,
-        schedules=state.schedules, codes=state.all_codes,
+        trajectories=state.trajectories, codes=state.all_codes,
         highlight=exp_code,
     )
     show_plot_with_header(path_traj, f"Report ({exp_code}): Dimensional Trajectories", inline=args.plot)

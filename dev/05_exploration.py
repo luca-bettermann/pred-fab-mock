@@ -1,5 +1,10 @@
 """05 — Exploration Objective + Optimizer Validation.
 
+# OBSOLETE — this script compared the LBFGSB vs DE backends, which the 2-phase
+# optimisation migration removed. The framework no longer exposes a user-facing
+# backend choice. Excluded from pyright; needs rewrite to compare current pieces
+# (Phase 1 DE budget vs Phase 2 LBFGS convergence) before being put back in scope.
+
 Test the combined acquisition function and compare L-BFGS-B vs DE.
 """
 

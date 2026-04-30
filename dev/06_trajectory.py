@@ -13,7 +13,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pred_fab.orchestration import Optimizer
+
 from visualization import plot_trajectory_comparison
 from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
 from pred_fab import combined_score
@@ -63,7 +63,7 @@ def main():
     agent, fab, dataset = make_env("06_trajectory", verbose=False)
     agent.configure_performance(weights=PERF_WEIGHTS)
     agent.configure_exploration(radius=EXPLORATION_RADIUS)
-    agent.configure_optimizer(backend=Optimizer.DE)
+
     baseline_params = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
 

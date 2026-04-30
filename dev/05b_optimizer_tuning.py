@@ -1,5 +1,10 @@
 """05b — Optimizer Parameter Tuning.
 
+# OBSOLETE — this script compared the LBFGSB vs DE backends, which the 2-phase
+# optimisation migration removed. The framework no longer exposes a user-facing
+# backend choice. Excluded from pyright; needs rewrite to compare current pieces
+# (Phase 1 DE budget vs Phase 2 LBFGS convergence) before being put back in scope.
+
 Systematically test different optimizer configurations to find settings
 that produce better exploration proposals (not stuck at boundaries).
 

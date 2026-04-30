@@ -1,5 +1,10 @@
 """Strategy D commit 5+ smoke — gradient optimiser vs DE for baseline_step.
 
+# OBSOLETE — this script compared the LBFGSB vs DE backends, which the 2-phase
+# optimisation migration removed. The framework no longer exposes a user-facing
+# backend choice. Excluded from pyright; needs rewrite to compare current pieces
+# (Phase 1 DE budget vs Phase 2 LBFGS convergence) before being put back in scope.
+
 Runs the same N=3 baseline twice (DE then GRADIENT) on the mock, prints
 wall time + final acquisition score for each, plus the proposed params.
 

@@ -64,7 +64,7 @@ def save_session(config: dict[str, Any], journey: JourneyState) -> None:
             "all_codes": journey.all_codes,
             "perf_history": [(p, pf) for p, pf in journey.perf_history],
             "prev_params": journey.prev_params,
-            "schedules": journey.schedules,
+            "trajectories": journey.trajectories,
         },
     }
     with open(SESSION_FILE, "w") as f:
@@ -85,7 +85,7 @@ def load_session() -> tuple[dict[str, Any], JourneyState]:
     state.all_codes = j["all_codes"]
     state.perf_history = [(p, pf) for p, pf in j["perf_history"]]
     state.prev_params = j["prev_params"]
-    state.schedules = j.get("schedules", {})
+    state.trajectories = j.get("trajectories", j.get("schedules", {}))  # back-compat with pre-rename sessions
     return config, state
 
 
@@ -122,9 +122,6 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
             opt_kwargs["de_popsize"] = config["de_popsize"]
         if opt_kwargs:
             agent.configure_optimizer(**opt_kwargs)
-
-        if config.get("schedule_smoothing") is not None:
-            agent.calibration_system.schedule_smoothing = config["schedule_smoothing"]
 
         if config.get("bounds"):
             bounds = {k: tuple(v) for k, v in config["bounds"].items()}
@@ -249,15 +246,12 @@ def print_config_show(config: dict[str, Any]) -> None:
             ("mc_exponent_offset", "MC exp offset", 3.0),
         ]),
         ("Optimizer", [
-            ("optimizer", "Backend", "de"),
-            ("de_maxiter", "DE max iterations", 1000),
-            ("de_popsize", "DE population size", 15),
-            ("de_tol", "DE tolerance", 0.0001),
+            ("de_maxiter", "Phase 1 DE max iterations", 30),
+            ("de_popsize", "Phase 1 DE population size", 64),
         ]),
-        ("Schedule", [
+        ("Trajectory", [
             ("default_schedule", "Default schedule", None),
             ("trust_regions", "Trust regions", None),
-            ("schedule_smoothing", "Smoothing", 0.05),
         ]),
     ]
 
@@ -323,7 +317,6 @@ def apply_schedule_args(agent: Any, args: Any, config: dict[str, Any]) -> None:
     if not schedules:
         return
     trust_regions = resolve_trust_regions(agent, config)
-    smoothing = config.get("schedule_smoothing")
     for spec in schedules:
         parts = spec.split(":")
         if len(parts) < 2:
@@ -334,20 +327,20 @@ def apply_schedule_args(agent: Any, args: Any, config: dict[str, Any]) -> None:
         param = parts[0].strip()
         dim = parts[1].strip()
         delta = trust_regions.get(param)
-        agent.configure_schedule(param, dim, delta=delta, smoothing=smoothing)
+        agent.configure_trajectory(param, dim, delta=delta)
 
 
 def extract_schedule_steps(spec: Any, base_params: dict[str, Any]) -> list[dict[str, Any]]:
     """Build per-step param dicts from an ExperimentSpec's schedules."""
-    if not spec.schedules:
+    if not spec.trajectories:
         return [base_params]
     # Determine L from the first schedule's entries
-    first_sched = next(iter(spec.schedules.values()))
+    first_sched = next(iter(spec.trajectories.values()))
     L = max(idx for idx, _ in first_sched.entries) + 1 if first_sched.entries else 1
     steps: list[dict[str, Any]] = []
     for step_i in range(L):
         step_params = dict(base_params)
-        for _dim, sched in spec.schedules.items():
+        for _dim, sched in spec.trajectories.items():
             for idx, proposal in sched.entries:
                 if idx == step_i:
                     step_params.update(proposal.to_dict())
@@ -376,9 +369,9 @@ def run_and_record(
     merged.update(proposed)
     params = with_dimensions(merged)
     exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
-    if spec.schedules:
+    if spec.trajectories:
         spec.apply_schedules(exp_data)
         # run_and_evaluate saved pre-apply state; persist parameter_updates now.
         dataset.save_experiment(exp_code)
-    sched_data = extract_schedule_steps(spec, params) if spec.schedules else None
+    sched_data = extract_schedule_steps(spec, params) if spec.trajectories else None
     return exp_data, params, sched_data

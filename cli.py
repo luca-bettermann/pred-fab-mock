@@ -110,8 +110,6 @@ Quick start:
     p.add_argument("--schedule", action="append", metavar="PARAM:DIM",
                    help="Default schedule (e.g. print_speed:n_layers). Repeatable. "
                         "Per-command --schedule overrides.")
-    p.add_argument("--smoothing", type=float, default=None,
-                   help="Schedule smoothness penalty (default: 0.05)")
     p.add_argument("--radius", type=float, default=None,
                    help="Evidence decay radius (default: 0.09). σ = radius · √n_active_dims")
     p.add_argument("--sigma", type=float, default=None,

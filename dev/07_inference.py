@@ -11,7 +11,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pred_fab.orchestration import Optimizer
+
 from sensors.physics import DELTA, THETA, SAG, COMPLEXITY, W_OPTIMAL, N_LAYERS, N_SEGMENTS
 from visualization import plot_inference_convergence
 from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
@@ -36,7 +36,7 @@ def main():
     agent, fab, dataset = make_env("07_inference", verbose=False)
     agent.configure_performance(weights=PERF_WEIGHTS)
     agent.configure_exploration(radius=EXPLORATION_RADIUS)
-    agent.configure_optimizer(backend=Optimizer.DE)
+
     baseline_params = run_baseline(agent, fab, dataset, N_BASELINE)
     dm, _ = train_models(agent, dataset, val_size=0.0)
 

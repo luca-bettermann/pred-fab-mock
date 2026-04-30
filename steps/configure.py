@@ -43,9 +43,6 @@ def run(args: argparse.Namespace) -> None:
     if args.de_popsize is not None:
         print_config_set("DE population size", config.get("de_popsize"), args.de_popsize)
         config["de_popsize"] = args.de_popsize
-    if getattr(args, "smoothing", None) is not None:
-        print_config_set("Smoothing", config.get("schedule_smoothing"), args.smoothing)
-        config["schedule_smoothing"] = args.smoothing
     print()
     save_session(config, state)
 

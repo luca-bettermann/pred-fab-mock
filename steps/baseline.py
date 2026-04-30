@@ -45,7 +45,7 @@ def run(args: argparse.Namespace) -> None:
         exp_code = next_code(state, "baseline")
         exp_data, params, sched_data = run_and_record(dataset, agent, fab, spec, exp_code)
         perf = get_performance(exp_data)
-        state.record("baseline", exp_code, params, perf, schedule=sched_data)
+        state.record("baseline", exp_code, params, perf, trajectory=sched_data)
         exp_results.append((exp_code, params, sched_data, perf, combined_score(perf, pw)))
 
     # Per-experiment summary: process params (with scheduled ranges) + perf scores.
@@ -109,7 +109,7 @@ def run(args: argparse.Namespace) -> None:
     path = os.path.join(plot_dir, "01_baseline.png")
     plot_parameter_space(path, X_AXIS, Y_AXIS, waters, speeds,
                          state.all_params, true_grid, pred_grid,
-                         schedules=state.schedules, codes=state.all_codes,
+                         trajectories=state.trajectories, codes=state.all_codes,
                          fixed_params=FIXED_DIMS)
     show_plot_with_header(path, "Baseline: Ground Truth vs Initial Model", inline=args.plot)
 
@@ -151,7 +151,7 @@ def run(args: argparse.Namespace) -> None:
         cell_path, X_AXIS, Y_AXIS, waters, speeds,
         state.all_params, true_cell_grid, pred_cell_grid,
         cell_label=cell_label,
-        schedules=state.schedules, codes=state.all_codes,
+        trajectories=state.trajectories, codes=state.all_codes,
         fixed_params=FIXED_DIMS,
     )
     show_plot_with_header(cell_path, "Baseline: Per-Cell Comparison", inline=args.plot)
@@ -161,7 +161,7 @@ def run(args: argparse.Namespace) -> None:
         mean_path, X_AXIS, Y_AXIS, waters, speeds,
         state.all_params, mean_diff_grid,
         label="Mean |Truth − Pred|  ·  path_deviation (all cells)",
-        schedules=state.schedules, codes=state.all_codes,
+        trajectories=state.trajectories, codes=state.all_codes,
         fixed_params=FIXED_DIMS,
     )
     show_plot_with_header(mean_path, "Baseline: Mean Error Across Cells", inline=args.plot)
@@ -170,7 +170,7 @@ def run(args: argparse.Namespace) -> None:
     plot_dimensional_trajectories(
         path_3d_params, X_AXIS, Y_AXIS, "n_layers",
         state.all_params,
-        schedules=state.schedules, codes=state.all_codes,
+        trajectories=state.trajectories, codes=state.all_codes,
     )
     show_plot_with_header(path_3d_params, "Baseline: Dimensional Trajectories", inline=args.plot)
 
@@ -199,12 +199,12 @@ def run(args: argparse.Namespace) -> None:
     # otherwise the static Process points. The pre-Schedule Process panel was
     # removed because its points are stale once Schedule refines them.
     has_schedule = (
-        cal.last_schedule_points is not None
+        cal.last_trajectory_points is not None
         and cal.last_schedule_exp_ids is not None
         and cal.last_process_points is not None
     )
     if has_schedule:
-        sched_pts_raw = cal.last_schedule_points
+        sched_pts_raw = cal.last_trajectory_points
         sched_ids = cal.last_schedule_exp_ids
         sched_dicts: list[dict[str, Any]] = []
         for j, eid in enumerate(sched_ids):
