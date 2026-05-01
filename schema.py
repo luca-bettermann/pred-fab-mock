@@ -37,19 +37,13 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
     domains = Domains([spatial])
 
     # Features
-    path_dev = Feature.array("path_deviation", domain=spatial)
-    layer_dim, segment_dim = spatial.axes
-
+    # Iterator inputs (layer_idx_pos / segment_idx_pos) are implicit on every
+    # Dimension — models reference them in input_features by name; framework
+    # populates from row coord. No schema declaration needed.
     features = Features([
-        path_dev,
-        Feature.array("energy_per_segment", domain=spatial),
-        Feature.array("production_rate"),
-        # Iterator-derived: normalised position in [0, 1] along each domain axis.
-        # Auto-populated from row index; available as a prediction-model input
-        # but excluded from the KDE active mask (Features, not Parameters).
-        # The canonical way to give models row-position awareness.
-        Feature.iterator(spatial, layer_dim),
-        Feature.iterator(spatial, segment_dim),
+        Feature("path_deviation", domain=spatial),
+        Feature("energy_per_segment", domain=spatial),
+        Feature("production_rate"),
     ])
 
     performance = PerformanceAttributes([
