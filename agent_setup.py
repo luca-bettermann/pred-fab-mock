@@ -7,7 +7,7 @@ from sensors.camera import CameraSystem
 from sensors.energy import EnergySensor
 from models.feature_models import DevFeature, EnergyFeature, RateFeature
 from models.evaluation_models import PathAccuracy, EnergyEfficiency, ProductionRate
-from models.prediction_model import DevMLP, EnergyMLP, RateMLP
+from models.prediction_model import DevTransformer, EnergyMLP, RateMLP
 
 
 def build_agent(
@@ -26,7 +26,7 @@ def build_agent(
     agent.register_evaluation_model(EnergyEfficiency)
     agent.register_evaluation_model(ProductionRate)
 
-    agent.register_prediction_model(DevMLP)
+    agent.register_prediction_model(DevTransformer)
     agent.register_prediction_model(EnergyMLP)
     agent.register_prediction_model(RateMLP)
 

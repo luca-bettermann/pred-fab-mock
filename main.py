@@ -87,7 +87,9 @@ def main() -> None:
     dataset = Dataset(schema=schema)
 
     agent.configure_performance(weights=PERFORMANCE_WEIGHTS)
-    agent.configure_exploration(radius=EXPLORATION_RADIUS)
+    # Old `radius` knob (radius·√D σ scaling) was dropped; configure σ directly.
+    if EXPLORATION_RADIUS is not None:
+        agent.configure_exploration(sigma=EXPLORATION_RADIUS)
     agent.configure_optimizer(de_maxiter=DE_MAXITER, de_popsize=DE_POPSIZE)
 
     print()

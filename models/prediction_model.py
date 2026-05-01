@@ -1,41 +1,56 @@
 """Prediction models for the extrusion printing simulation.
 
-MLPs subclass `pred_fab.models.MLPModel`. Each subclass declares
-HIDDEN topology and the IPredictionModel properties; the framework
-owns the training loop, forward path, and torch lifecycle.
+`DevTransformer` (path_deviation) — sequence-aware along the layer axis;
+deviation at layer k attends causally to predicted deviations at layers
+0..k-1 (each layer-stack inherits substrate wobble from prior layers).
 
-`RateMLP` is deterministic — it wraps the physics formula via
+`EnergyMLP` (energy_per_segment) — flat per-(layer, segment) MLP.
+
+`RateMLP` — deterministic, wraps the physics formula via
 `DeterministicModel` (no training, identity encode).
 """
 
 import numpy as np
 
 from pred_fab import DeterministicModel
-from pred_fab.models import MLPModel
+from pred_fab.models import MLPModel, TransformerModel
 
 from sensors.physics import production_rate as _physics_production_rate
 
 
-class DevMLP(MLPModel):
-    """Predicts path_deviation from process parameters.
+class DevTransformer(TransformerModel):
+    """Predicts path_deviation per (layer, segment).
 
-    U-shaped response to print_speed with shear-thinning coupling in water_ratio.
+    Causal attention along the layer axis — each layer's predicted
+    deviation depends on prior layers' predictions, modelling
+    substrate-wobble propagation up the build. Segments at each layer
+    are parallel sequences over layers.
+
+    Sized for the small mock dataset: D_MODEL=16, N_LAYERS=1 — bigger
+    nets overfit visibly here.
     """
 
-    HIDDEN = (24, 12)
+    D_MODEL = 16
+    N_HEADS = 2
+    N_LAYERS = 1
+    DIM_FEEDFORWARD = 32
+    DROPOUT = 0.2
     WEIGHT_DECAY = 1e-2
-    DROPOUT = 0.15
+    EPOCHS = 200
+
+    @property
+    def sequence_axis_code(self) -> str:
+        return "n_layers"
 
     @property
     def input_parameters(self) -> list[str]:
-        return ["print_speed", "water_ratio"]
+        return ["print_speed", "water_ratio", "n_layers", "n_segments"]
 
     @property
     def input_features(self) -> list[str]:
-        return [
-            "layer_idx_pos",
-            "segment_idx_pos",
-        ]
+        # segment_idx_pos still useful — distinguishes parallel segment-sequences.
+        # layer_idx_pos handled by the transformer's position embedding (omit).
+        return ["segment_idx_pos"]
 
     @property
     def outputs(self) -> list[str]:

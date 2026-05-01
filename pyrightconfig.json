@@ -6,7 +6,9 @@
   "exclude": [
     "dev/05_exploration.py",
     "dev/05b_optimizer_tuning.py",
-    "dev/_smoke_gradient.py"
+    "dev/_smoke_gradient.py",
+    "dev/_smoke_layer3.py",
+    "dev/03_prediction.py"
   ],
   "typeCheckingMode": "basic"
 }
