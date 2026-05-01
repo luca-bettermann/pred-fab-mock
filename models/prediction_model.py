@@ -39,8 +39,8 @@ class DevTransformer(TransformerModel):
     EPOCHS = 200
 
     @property
-    def sequence_axis_code(self) -> str:
-        return "n_layers"
+    def sequence_axis_code(self) -> tuple[str, ...]:
+        return ("n_layers",)
 
     @property
     def input_parameters(self) -> list[str]:
