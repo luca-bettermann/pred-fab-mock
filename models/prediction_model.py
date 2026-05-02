@@ -48,9 +48,11 @@ class DevTransformer(TransformerModel):
 
     @property
     def input_features(self) -> list[str]:
-        # segment_idx_pos still useful — distinguishes parallel segment-sequences.
-        # layer_idx_pos handled by the transformer's position embedding (omit).
-        return ["segment_idx_pos"]
+        # No per-segment iterator features: under the new design (encoder over
+        # axis_depth, decoder expands to deeper axes), input depth must be
+        # ≤ axis_depth. layer_idx_pos is handled by the encoder's positional
+        # embedding; segment positions are handled by the depth decoder.
+        return []
 
     @property
     def outputs(self) -> list[str]:
