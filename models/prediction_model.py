@@ -43,6 +43,10 @@ class DevTransformer(TransformerModel):
         return ("n_layers",)
 
     @property
+    def domain_spec(self) -> tuple[str | None, int | list[int]]:
+        return "spatial_segment", 2
+
+    @property
     def input_parameters(self) -> list[str]:
         return ["print_speed", "water_ratio", "n_layers", "n_segments"]
 
@@ -67,6 +71,10 @@ class EnergyMLP(MLPModel):
     DROPOUT = 0.15
 
     @property
+    def domain_spec(self) -> tuple[str | None, int | list[int]]:
+        return "spatial_segment", 2
+
+    @property
     def input_parameters(self) -> list[str]:
         return ["print_speed", "water_ratio"]
 
@@ -83,6 +91,10 @@ class RateMLP(DeterministicModel):
     """Deterministic production_rate [mm/s] from physics formula."""
 
     @property
+    def domain_spec(self) -> tuple[str | None, int | list[int]]:
+        return None, 0
+
+    @property
     def input_parameters(self) -> list[str]:
         return ["print_speed", "water_ratio"]
 
@@ -94,11 +106,11 @@ class RateMLP(DeterministicModel):
     def outputs(self) -> list[str]:
         return ["production_rate"]
 
-    def formula(self, X: np.ndarray) -> np.ndarray:
+    def formula(self, X: np.ndarray) -> dict[str, np.ndarray]:
         """X columns: [print_speed, water_ratio]."""
         results = np.empty(X.shape[0])
         for i in range(X.shape[0]):
             ps = float(X[i, 0])
             wr = float(X[i, 1])
             results[i] = _physics_production_rate(ps, wr)
-        return results.reshape(-1, 1)
+        return {"production_rate": results}
