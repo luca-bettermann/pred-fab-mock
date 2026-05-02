@@ -31,7 +31,7 @@ def _evaluate_test_set(agent, dataset, fab, n: int, perf_weights) -> None:
         if dataset.has_experiment(code):
             continue
         params = with_dimensions(params)
-        run_and_evaluate(dataset, agent, fab, params, code)
+        run_and_evaluate(dataset, agent, fab, params, code, dataset_code="test")
 
     errors = []
     for code in sorted(test_codes):

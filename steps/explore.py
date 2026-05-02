@@ -50,7 +50,8 @@ def run(args: argparse.Namespace) -> None:
             acq_data = compute_acquisition_grid(agent, dm, args.kappa, res=30)
 
         exp_data, params, sched_data = run_and_record(
-            dataset, agent, fab, spec, exp_code, extra_params=state.prev_params,
+            dataset, agent, fab, spec, exp_code,
+            extra_params=state.prev_params, dataset_code="exploration",
         )
         perf = get_performance(exp_data)
         state.record("exploration", exp_code, params, perf, trajectory=sched_data)

@@ -50,7 +50,8 @@ def run(args: argparse.Namespace) -> None:
     extra = dict(state.prev_params) if state.prev_params else {}
     extra.update(design_intent)
     exp_data, params, sched_data = run_and_record(
-        dataset, agent, fab, spec, exp_code, extra_params=extra,
+        dataset, agent, fab, spec, exp_code,
+        extra_params=extra, dataset_code="inference",
     )
     # Re-apply design_intent on top of returned params (schedule may have overridden).
     params.update(design_intent)

@@ -56,9 +56,10 @@ def run_experiment(
     fab: FabricationSystem,
     params: dict[str, Any],
     exp_code: str,
+    dataset_code: str | None = None,
 ) -> Any:
     """Create experiment, fabricate, evaluate, save. Returns ExperimentData."""
-    exp_data = dataset.create_experiment(exp_code, parameters=params)
+    exp_data = dataset.create_experiment(exp_code, parameters=params, dataset_code=dataset_code)
     fab.run_experiment(params)
     agent.evaluate(exp_data)
     dataset.save_experiment(exp_code)

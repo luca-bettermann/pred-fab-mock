@@ -43,7 +43,9 @@ def run(args: argparse.Namespace) -> None:
 
     for spec in specs:
         exp_code = next_code(state, "baseline")
-        exp_data, params, sched_data = run_and_record(dataset, agent, fab, spec, exp_code)
+        exp_data, params, sched_data = run_and_record(
+            dataset, agent, fab, spec, exp_code, dataset_code="baseline",
+        )
         perf = get_performance(exp_data)
         state.record("baseline", exp_code, params, perf, trajectory=sched_data)
         exp_results.append((exp_code, params, sched_data, perf, combined_score(perf, pw)))

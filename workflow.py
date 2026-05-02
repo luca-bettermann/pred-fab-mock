@@ -74,9 +74,16 @@ def run_and_evaluate(
     fab: FabricationSystem,
     params: dict[str, Any],
     exp_code: str,
+    dataset_code: str | None = None,
 ) -> Any:
-    """Create experiment, run fabrication, evaluate features + performance, persist."""
-    exp_data = dataset.create_experiment(exp_code, parameters=params)
+    """Create experiment, run fabrication, evaluate features + performance, persist.
+
+    ``dataset_code`` tags the experiment as belonging to a named phase
+    (``baseline`` / ``exploration`` / ``inference`` / ``test`` / ``adapt``) so
+    callers can later use ``DataModule.set_split_dataset(dataset_code)`` to
+    assemble splits without code-prefix gymnastics.
+    """
+    exp_data = dataset.create_experiment(exp_code, parameters=params, dataset_code=dataset_code)
     fab.run_experiment(params)
     agent.evaluate(exp_data)
     dataset.save_experiment(exp_code)

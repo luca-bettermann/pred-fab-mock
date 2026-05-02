@@ -355,6 +355,7 @@ def run_and_record(
     spec: Any,
     exp_code: str,
     extra_params: dict[str, Any] | None = None,
+    dataset_code: str | None = None,
 ) -> tuple[Any, dict[str, Any], list[dict[str, Any]] | None]:
     """Run an experiment from a spec, apply schedules, persist parameter_updates to disk.
 
@@ -368,7 +369,7 @@ def run_and_record(
     merged = dict(extra_params) if extra_params else {}
     merged.update(proposed)
     params = with_dimensions(merged)
-    exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
+    exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code, dataset_code=dataset_code)
     if spec.trajectories:
         spec.apply_schedules(exp_data)
         # run_and_evaluate saved pre-apply state; persist parameter_updates now.

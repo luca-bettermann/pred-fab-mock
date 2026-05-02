@@ -54,7 +54,7 @@ def run(args: argparse.Namespace) -> None:
     print(f"    Starting params: {sched_summary}")
 
     exp_code = next_code(state, "adapt")
-    exp_data = dataset.create_experiment(exp_code, parameters=params)
+    exp_data = dataset.create_experiment(exp_code, parameters=params, dataset_code="adapt")
 
     # Build table header from scheduled param names
     hdr_params = "  ".join(f"{p:>10s}" for p in sched_params)
