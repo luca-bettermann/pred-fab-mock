@@ -1,9 +1,30 @@
-from .feature_models import DevFeature, EnergyFeature, RateFeature
-from .evaluation_models import PathAccuracy, EnergyEfficiency, ProductionRate
-from .prediction_model import DevTransformer, EnergyMLP, RateMLP
+from .feature_models import (
+    NodeVisionFeature,
+    LoadcellConsistencyFeature,
+    ExtruderEnergyFeature,
+    DurationFeature,
+    EnvironmentFeature,
+)
+from .evaluation_models import (
+    StructuralIntegrityEval,
+    MaterialDepositionEval,
+    ExtrusionStabilityEval,
+    EnergyFootprintEval,
+    FabricationTimeEval,
+)
+from .prediction_model import StructuralTransformer, DeterministicDuration
 
 __all__ = [
-    "DevFeature", "EnergyFeature", "RateFeature",
-    "PathAccuracy", "EnergyEfficiency", "ProductionRate",
-    "DevTransformer", "EnergyMLP", "RateMLP",
+    "NodeVisionFeature",
+    "LoadcellConsistencyFeature",
+    "ExtruderEnergyFeature",
+    "DurationFeature",
+    "EnvironmentFeature",
+    "StructuralIntegrityEval",
+    "MaterialDepositionEval",
+    "ExtrusionStabilityEval",
+    "EnergyFootprintEval",
+    "FabricationTimeEval",
+    "StructuralTransformer",
+    "DeterministicDuration",
 ]

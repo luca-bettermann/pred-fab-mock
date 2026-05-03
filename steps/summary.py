@@ -2,13 +2,15 @@
 import argparse
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from steps._common import load_session, combined_score
+from pred_fab.utils.metrics import combined_score
+from steps._common import load_session
 
 
 def run(args: argparse.Namespace) -> None:
     config, state = load_session()
     perf_weights = config.get("performance_weights") or {
-        "path_accuracy": 1, "energy_efficiency": 1, "production_rate": 1,
+        "structural_integrity": 1, "material_deposition": 1, "extrusion_stability": 1,
+        "energy_footprint": 1, "fabrication_time": 1,
     }
 
     print(f"\n  Run Summary:")
@@ -16,7 +18,7 @@ def run(args: argparse.Namespace) -> None:
     print(f"  {'Phase':<15s}  {'Experiments':>11s}  {'Best Combined':>14s}")
     print(f"  {'─' * 60}")
 
-    for phase in ["baseline", "exploration", "schedule", "inference", "adaptation"]:
+    for phase in ["baseline", "grid", "exploration", "test", "inference"]:
         indices = [i for i, p in enumerate(state.all_phases) if p == phase]
         if not indices:
             continue

@@ -1,102 +1,102 @@
-"""Prediction models for the extrusion printing simulation.
+"""Prediction models for the ADVEI 2026 mock.
 
-`DevTransformer` (path_deviation) — sequence-aware along the layer axis;
-deviation at layer k attends causally to predicted deviations at layers
-0..k-1 (each layer-stack inherits substrate wobble from prior layers).
+Two models cover the structural domain:
 
-`EnergyMLP` (energy_per_segment) — flat per-(layer, segment) MLP.
+- ``StructuralTransformer`` — multi-depth ``TransformerModel`` predicting
+  five learned features (depth-1: ``extrusion_consistency``,
+  ``current_mean_feeder``, ``current_mean_nozzle``; depth-2:
+  ``node_overlap``, ``filament_width``). Encoder sequences over the layer
+  axis; depth-2 outputs expand over the node axis via the default
+  ``PerNodeMLPDecoder``.
+- ``DeterministicDuration`` — closed-form ``DeterministicModel`` for
+  ``printing_duration``: ``L / (speed · (1 − 0.45 · slowdown))``. Mirrors
+  the simulator's formula in ``sensors.physics.feature_printing_duration``.
 
-`RateMLP` — deterministic, wraps the physics formula via
-`DeterministicModel` (no training, identity encode).
+This mirrors the architecture in
+``learning-by-printing/models/predictions/`` so the mock's predictor stack
+is structurally identical to real-fab.
 """
+
+from __future__ import annotations
+
+from typing import Optional
 
 import numpy as np
 
 from pred_fab import DeterministicModel
-from pred_fab.models import MLPModel, TransformerModel
+from pred_fab.models import TransformerModel
+from pred_fab.utils import PfabLogger
 
-from sensors.physics import production_rate as _physics_production_rate
+from sensors.physics import PATH_LENGTH_PER_LAYER_M
 
 
-class DevTransformer(TransformerModel):
-    """Predicts path_deviation per (layer, segment).
+class StructuralTransformer(TransformerModel):
+    """Multi-depth transformer predicting all five structural target features.
 
-    Causal attention along the layer axis — each layer's predicted
-    deviation depends on prior layers' predictions, modelling
-    substrate-wobble propagation up the build. Segments at each layer
-    are parallel sequences over layers.
-
-    Sized for the small mock dataset: D_MODEL=16, N_LAYERS=1 — bigger
-    nets overfit visibly here.
+    Depth-1 outputs (per layer): extrusion_consistency, current_mean_feeder,
+    current_mean_nozzle.
+    Depth-2 outputs (per layer × node): node_overlap, filament_width.
     """
 
-    D_MODEL = 16
+    # Smoke-test sized — bump for real runs.
+    D_MODEL = 8
     N_HEADS = 2
     N_LAYERS = 1
-    DIM_FEEDFORWARD = 32
-    DROPOUT = 0.2
+    DIM_FEEDFORWARD = 16
+    DROPOUT = 0.15
     WEIGHT_DECAY = 1e-2
-    EPOCHS = 200
+    EPOCHS = 10
+
+    def __init__(self, logger: Optional[PfabLogger] = None) -> None:
+        super().__init__(logger or PfabLogger())
+
+    @property
+    def domain_spec(self) -> tuple[str | None, int | list[int]]:
+        return "structural", [1, 2]
 
     @property
     def sequence_axis_code(self) -> tuple[str, ...]:
         return ("n_layers",)
 
     @property
-    def domain_spec(self) -> tuple[str | None, int | list[int]]:
-        return "spatial_segment", 2
-
-    @property
     def input_parameters(self) -> list[str]:
-        return ["print_speed", "water_ratio", "n_layers", "n_segments"]
+        return [
+            "path_offset", "layer_height", "calibration_factor",
+            "print_speed", "slowdown_factor",
+            "n_layers", "n_nodes",
+        ]
 
     @property
     def input_features(self) -> list[str]:
-        # No per-segment iterator features: under the new design (encoder over
-        # axis_depth, decoder expands to deeper axes), input depth must be
-        # ≤ axis_depth. layer_idx_pos is handled by the encoder's positional
-        # embedding; segment positions are handled by the depth decoder.
-        return []
+        return ["temperature", "humidity"]
 
     @property
     def outputs(self) -> list[str]:
-        return ["path_deviation"]
+        return [
+            # depth 1
+            "extrusion_consistency",
+            "current_mean_feeder",
+            "current_mean_nozzle",
+            # depth 2
+            "node_overlap",
+            "filament_width",
+        ]
 
 
-class EnergyMLP(MLPModel):
-    """Predicts energy_per_segment from process parameters."""
+class DeterministicDuration(DeterministicModel):
+    """Closed-form ``printing_duration`` from ``print_speed`` + ``slowdown_factor``.
 
-    HIDDEN = (24, 12)
-    WEIGHT_DECAY = 1e-2
-    DROPOUT = 0.15
-
-    @property
-    def domain_spec(self) -> tuple[str | None, int | list[int]]:
-        return "spatial_segment", 2
-
-    @property
-    def input_parameters(self) -> list[str]:
-        return ["print_speed", "water_ratio"]
-
-    @property
-    def input_features(self) -> list[str]:
-        return ["layer_idx_pos", "segment_idx_pos"]
-
-    @property
-    def outputs(self) -> list[str]:
-        return ["energy_per_segment"]
-
-
-class RateMLP(DeterministicModel):
-    """Deterministic production_rate [mm/s] from physics formula."""
+    Mirrors :func:`sensors.physics.feature_printing_duration` so the offline
+    predictor agrees with the fab-side simulator on the planning layer.
+    """
 
     @property
     def domain_spec(self) -> tuple[str | None, int | list[int]]:
-        return None, 0
+        return "structural", 1
 
     @property
     def input_parameters(self) -> list[str]:
-        return ["print_speed", "water_ratio"]
+        return ["print_speed", "slowdown_factor"]
 
     @property
     def input_features(self) -> list[str]:
@@ -104,13 +104,13 @@ class RateMLP(DeterministicModel):
 
     @property
     def outputs(self) -> list[str]:
-        return ["production_rate"]
+        return ["printing_duration"]
 
     def formula(self, X: np.ndarray) -> dict[str, np.ndarray]:
-        """X columns: [print_speed, water_ratio]."""
-        results = np.empty(X.shape[0])
-        for i in range(X.shape[0]):
-            ps = float(X[i, 0])
-            wr = float(X[i, 1])
-            results[i] = _physics_production_rate(ps, wr)
-        return {"production_rate": results}
+        """X columns: [print_speed, slowdown_factor]."""
+        speed = X[:, 0]
+        slowdown = X[:, 1]
+        effective = speed * (1.0 - 0.45 * slowdown)
+        # Avoid divide-by-zero for very low speeds.
+        effective = np.where(effective < 1e-6, 1e-6, effective)
+        return {"printing_duration": PATH_LENGTH_PER_LAYER_M / effective}

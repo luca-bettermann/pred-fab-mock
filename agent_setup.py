@@ -1,34 +1,51 @@
-"""Build and configure the PfabAgent for the extrusion printing showcase."""
+"""Build and configure the PfabAgent for the ADVEI 2026 mock."""
 
 from pred_fab import PfabAgent
 from pred_fab.core import DatasetSchema
 
-from sensors.camera import CameraSystem
-from sensors.energy import EnergySensor
-from models.feature_models import DevFeature, EnergyFeature, RateFeature
-from models.evaluation_models import PathAccuracy, EnergyEfficiency, ProductionRate
-from models.prediction_model import DevTransformer, EnergyMLP, RateMLP
+from sensors.fabrication import FabricationSystem
+from models.feature_models import (
+    NodeVisionFeature,
+    LoadcellConsistencyFeature,
+    ExtruderEnergyFeature,
+    DurationFeature,
+    EnvironmentFeature,
+)
+from models.evaluation_models import (
+    StructuralIntegrityEval,
+    MaterialDepositionEval,
+    ExtrusionStabilityEval,
+    EnergyFootprintEval,
+    FabricationTimeEval,
+)
+from models.prediction_model import StructuralTransformer, DeterministicDuration
 
 
 def build_agent(
     schema: DatasetSchema,
-    camera: CameraSystem,
-    energy_sensor: EnergySensor,
+    fab: FabricationSystem,
     verbose: bool = True,
 ) -> PfabAgent:
     """Register all models, initialize systems, and return a configured PfabAgent."""
     agent = PfabAgent(root_folder=".")
 
-    agent.register_feature_model(DevFeature, camera=camera)
-    agent.register_feature_model(EnergyFeature, energy_sensor=energy_sensor)
-    agent.register_feature_model(RateFeature)
-    agent.register_evaluation_model(PathAccuracy)
-    agent.register_evaluation_model(EnergyEfficiency)
-    agent.register_evaluation_model(ProductionRate)
+    # Feature models (one per modality, mirroring learning-by-printing layout)
+    agent.register_feature_model(NodeVisionFeature, fab=fab)
+    agent.register_feature_model(LoadcellConsistencyFeature, fab=fab)
+    agent.register_feature_model(ExtruderEnergyFeature, fab=fab)
+    agent.register_feature_model(DurationFeature, fab=fab)
+    agent.register_feature_model(EnvironmentFeature, fab=fab)
 
-    agent.register_prediction_model(DevTransformer)
-    agent.register_prediction_model(EnergyMLP)
-    agent.register_prediction_model(RateMLP)
+    # Evaluation models — one per performance attribute
+    agent.register_evaluation_model(StructuralIntegrityEval)
+    agent.register_evaluation_model(MaterialDepositionEval)
+    agent.register_evaluation_model(ExtrusionStabilityEval)
+    agent.register_evaluation_model(EnergyFootprintEval)
+    agent.register_evaluation_model(FabricationTimeEval)
+
+    # Prediction models — multi-depth transformer + deterministic duration
+    agent.register_prediction_model(StructuralTransformer)
+    agent.register_prediction_model(DeterministicDuration)
 
     agent.initialize_systems(schema, verbose_flag=verbose)
 

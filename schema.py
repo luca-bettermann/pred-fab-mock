@@ -1,4 +1,20 @@
-"""Build the DatasetSchema for the extrusion printing mock."""
+"""Build the DatasetSchema for the ADVEI 2026 mock fabrication simulation.
+
+ADVEI study — curved-wall clay extrusion. Five process parameters split
+into per-print (static) and per-layer (trajectory) groups; one structural
+domain (n_layers, n_nodes); five quality/cost performance attributes; six
+target features at mixed depths plus two context features.
+
+The mock simulates fabrication-time signals at the *feature* level rather
+than at the raw-sensor level: ``sensors/physics.py`` produces synthetic
+node_overlap, filament_width, extrusion_consistency, current_*, and
+printing_duration values directly. The real-fabrication counterpart in
+``learning-by-printing`` extracts the same features from real sensors.
+
+Constants for the simulation (component height, supply voltage, etc.) are
+hardcoded in ``sensors/physics.py``; only optimisable parameters live in
+the schema.
+"""
 
 from pred_fab.core import (
     DatasetSchema,
@@ -13,43 +29,69 @@ from pred_fab.core import (
     PerformanceAttribute,
 )
 
+
 ROOT_FOLDER = "."
-SCHEMA_NAME = "extrusion_printing_v9"
-SCHEMA_TITLE = "Extrusion-based Additive Manufacturing"
+SCHEMA_NAME = "advei_2026_mock"
+SCHEMA_TITLE = "ADVEI 2026 — clay extrusion (mock)"
+
+
+# --- Parameter bounds (also exported for the CCF grid builder) ---------------
+# (code, low, high) tuples. Order is the factor labelling for grid-design
+# generation; mirrors the canonical PARAM_BOUNDS in
+# learning-by-printing/models/schema.py.
+PARAM_BOUNDS: tuple[tuple[str, float, float], ...] = (
+    ("path_offset",        0.0,   3.0),     # mm; per-print
+    ("layer_height",       2.0,   3.0),     # mm; per-print → derives n_layers
+    ("calibration_factor", 1.6,   2.2),     # dimensionless; per-print
+    ("print_speed",        0.004, 0.008),   # m/s; per-layer (runtime)
+    ("slowdown_factor",    0.0,   1.0),     # dimensionless; per-layer (runtime)
+)
+
+STATIC_PARAMS = ("path_offset", "layer_height", "calibration_factor")
+TRAJECTORY_PARAMS = ("print_speed", "slowdown_factor")
 
 
 def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
-    """Construct and return the DatasetSchema for the extrusion printing simulation.
-
-    Two continuous parameters (water_ratio, print_speed) over a fixed
-    spatial domain (5 layers x 4 segments). Recursive features at lag 1 and 2.
-    """
+    """Construct the ADVEI 2026 mock schema."""
     params = Parameters([
-        Parameter.real("water_ratio", min_val=0.30, max_val=0.50),
-        Parameter.real("print_speed", min_val=20.0, max_val=60.0, runtime=True),
+        # Static (per-print)
+        Parameter.real("path_offset",        min_val=0.0,   max_val=3.0),
+        Parameter.real("layer_height",       min_val=2.0,   max_val=3.0),
+        Parameter.real("calibration_factor", min_val=1.6,   max_val=2.2),
+        # Trajectory (per-layer, runtime-schedulable)
+        Parameter.real("print_speed",        min_val=0.004, max_val=0.008, runtime=True),
+        Parameter.real("slowdown_factor",    min_val=0.0,   max_val=1.0,   runtime=True),
     ])
 
-    # Spatial domain: n_layers is a design intent variable [3..8], n_segments fixed at 4
-    spatial = Domain("spatial_segment", [
-        Dimension("n_layers",   "layer_idx",   min_val=4, max_val=8),
-        Dimension("n_segments", "segment_idx", min_val=4, max_val=4),
+    # Component height 30 mm at layer_height ∈ [2, 3] mm → n_layers ∈ [10, 15].
+    # n_nodes is fixed at 7 (canonical curved-wall sample-point count).
+    structural = Domain("structural", [
+        Dimension("n_layers", "layer_idx", min_val=10, max_val=15),
+        Dimension("n_nodes",  "node_idx",  min_val=7,  max_val=7),
     ])
-    domains = Domains([spatial])
+    domains = Domains([structural])
 
-    # Features
-    # Iterator inputs (layer_idx_pos / segment_idx_pos) are implicit on every
-    # Dimension — models reference them in input_features by name; framework
-    # populates from row coord. No schema declaration needed.
     features = Features([
-        Feature("path_deviation", domain=spatial),
-        Feature("energy_per_segment", domain=spatial),
-        Feature("production_rate"),
+        # Quality targets — depth 2 (per layer × node)
+        Feature("node_overlap",         domain=structural, depth=2),
+        Feature("filament_width",       domain=structural, depth=2),
+        # Quality target — depth 1 (per layer)
+        Feature("extrusion_consistency", domain=structural, depth=1),
+        # Cost-driving targets — depth 1 (per layer)
+        Feature("current_mean_feeder",  domain=structural, depth=1),
+        Feature("current_mean_nozzle",  domain=structural, depth=1),
+        Feature("printing_duration",    domain=structural, depth=1),
+        # Context (uncontrollable, BME280) — depth 1
+        Feature("temperature",          domain=structural, depth=1, context=True),
+        Feature("humidity",             domain=structural, depth=1, context=True),
     ])
 
     performance = PerformanceAttributes([
-        PerformanceAttribute.score("path_accuracy"),
-        PerformanceAttribute.score("energy_efficiency"),
-        PerformanceAttribute.score("production_rate"),
+        PerformanceAttribute.score("structural_integrity"),
+        PerformanceAttribute.score("material_deposition"),
+        PerformanceAttribute.score("extrusion_stability"),
+        PerformanceAttribute.score("energy_footprint"),
+        PerformanceAttribute.score("fabrication_time"),
     ])
 
     return DatasetSchema(

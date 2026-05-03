@@ -1,4 +1,13 @@
-"""Shared infrastructure for workflow steps: session, rebuild, helpers."""
+"""Shared helpers across CLI steps for the ADVEI 2026 mock journey.
+
+Stripped down for ADVEI: drops physics randomisation, visualisation, and
+the (water_ratio, print_speed) 2-axis grid helpers from the legacy mock.
+The remaining helpers are session persistence, agent rebuild, and the
+``run_and_record`` wrapper that applies trajectory schedules atop a
+single fabrication call.
+"""
+
+from __future__ import annotations
 
 import json
 import os
@@ -8,35 +17,22 @@ from typing import Any
 import numpy as np
 
 from pred_fab.core import Dataset
-from pred_fab.utils.metrics import combined_score
-from pred_fab.plotting import AxisSpec
 
 from schema import build_schema
 from agent_setup import build_agent
-from sensors import CameraSystem, EnergySensor, FabricationSystem
-from sensors.physics import N_LAYERS, N_SEGMENTS
-from utils import params_from_spec, get_performance
+from sensors import FabricationSystem
+from utils import params_from_spec
 from workflow import JourneyState, with_dimensions, run_and_evaluate
-from cli_helpers import (
-    show_plot, randomize_physics, apply_physics_config, load_physics_from_session,
-    PHYSICS_CONFIG_KEY, generate_test_params, compute_local_sensitivity,
-)
 
 
 SESSION_FILE = ".pfab_session.json"
 PLOT_DIR = "./plots"
 
 
-def show_plot_with_header(path: str, title: str, *, inline: bool = True) -> None:
-    """Print a dim-styled title line, then display the plot."""
-    _D = "\033[2m"
-    _R = "\033[0m"
-    print(f"\n  {_D}{title}{_R}")
-    show_plot(path, inline=inline)
-
+# === Session persistence ====================================================
 
 def to_native(obj: Any) -> Any:
-    """Recursively convert numpy types to native Python for JSON."""
+    """Recursively convert numpy types to native Python for JSON serialisation."""
     if isinstance(obj, dict):
         return {k: to_native(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
@@ -73,7 +69,7 @@ def save_session(config: dict[str, Any], journey: JourneyState) -> None:
 
 def load_session() -> tuple[dict[str, Any], JourneyState]:
     if not os.path.exists(SESSION_FILE):
-        print("No session found. Run 'uv run main.py init-schema' first.")
+        print("No session found. Run 'uv run cli.py init-schema' first.")
         sys.exit(1)
     with open(SESSION_FILE) as f:
         data = json.load(f)
@@ -85,22 +81,22 @@ def load_session() -> tuple[dict[str, Any], JourneyState]:
     state.all_codes = j["all_codes"]
     state.perf_history = [(p, pf) for p, pf in j["perf_history"]]
     state.prev_params = j["prev_params"]
-    state.trajectories = j.get("trajectories", j.get("schedules", {}))  # back-compat with pre-rename sessions
+    state.trajectories = j.get("trajectories", {})
     return config, state
 
 
+# === Agent / fab reconstruction =============================================
+
 def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset, FabricationSystem]:
     """Reconstruct agent + dataset + fab from session config."""
-    load_physics_from_session(config)
-
     if not verbose:
         _real_stdout = sys.stdout
         sys.stdout = open(os.devnull, "w")
 
     try:
         schema = build_schema()
-        fab = FabricationSystem(CameraSystem(), EnergySensor())
-        agent = build_agent(schema, fab.camera, fab.energy, verbose=verbose)
+        fab = FabricationSystem()
+        agent = build_agent(schema, fab=fab, verbose=verbose)
 
         if config.get("performance_weights"):
             agent.configure_performance(weights=config["performance_weights"])
@@ -127,9 +123,6 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
             bounds = {k: tuple(v) for k, v in config["bounds"].items()}
             agent.calibration_system.configure_param_bounds(bounds)
 
-        # Trust regions are the default delta for both scheduled steps and
-        # online adaptation. Default = bounds_span / 10 per runtime param;
-        # configure --trust-regions JSON overrides per-key.
         trust_regions = resolve_trust_regions(agent, config)
         if trust_regions:
             agent.calibration_system.configure_adaptation_delta(trust_regions, force=True)
@@ -138,7 +131,7 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
         dataset.populate()
     finally:
         if not verbose:
-            sys.stdout.close()
+            sys.stdout.close()  # type: ignore[union-attr]
             sys.stdout = _real_stdout
 
     return agent, dataset, fab
@@ -149,145 +142,10 @@ def ensure_plot_dir() -> str:
     return PLOT_DIR
 
 
-def get_physics_optimum(perf_weights=None, n_layers=N_LAYERS):
-    """Find the physics optimum location."""
-    from visualization.helpers import evaluate_physics_grid
-    _, _, phys_metrics = evaluate_physics_grid(50, perf_weights, n_layers=n_layers)
-    combined = list(phys_metrics.values())[-1]
-    opt_idx = np.unravel_index(np.argmax(combined), combined.shape)
-    phys_waters = np.linspace(0.30, 0.50, 50)
-    phys_speeds = np.linspace(20.0, 60.0, 50)
-    return (phys_waters[opt_idx[1]], phys_speeds[opt_idx[0]])
-
-
-def compute_acquisition_grid(agent, dm, kappa, res=30):
-    """Compute normalized performance, uncertainty, and combined grids."""
-    waters = np.linspace(0.30, 0.50, res)
-    speeds = np.linspace(20.0, 60.0, res)
-    perf_grid = np.zeros((res, res))
-    unc_grid = np.zeros((res, res))
-    for i, w in enumerate(waters):
-        for j, spd in enumerate(speeds):
-            p = {"water_ratio": w, "print_speed": spd, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
-            try:
-                perf = agent.predict_performance(p)
-                pw = agent.calibration_system.performance_weights
-                perf_grid[j, i] = combined_score(perf, pw)
-            except Exception:
-                perf_grid[j, i] = 0.0
-            unc_grid[j, i] = agent.predict_uncertainty(p, dm)
-
-    cal = agent.calibration_system
-    if cal._perf_range_min is not None and cal._perf_range_max is not None:
-        p_min, p_max = cal._perf_range_min, cal._perf_range_max
-    else:
-        p_min, p_max = perf_grid.min(), perf_grid.max()
-    span = max(p_max - p_min, 1e-10)
-    p_norm = np.clip((perf_grid - p_min) / span, 0, 1)
-
-    combined_grid = (1 - kappa) * p_norm + kappa * unc_grid
-    return waters, speeds, p_norm, unc_grid, combined_grid
-
-
-# Schema-specific axis definitions used across all steps
-X_AXIS = AxisSpec("water_ratio", "Water Ratio", bounds=(0.30, 0.50))
-Y_AXIS = AxisSpec("print_speed", "Print Speed", unit="mm/s", bounds=(20.0, 60.0))
-Z_AXIS = AxisSpec("n_layers", "Layers", integer=True)
-LAYER_AXIS = AxisSpec("n_layers", "Layers", integer=True, bounds=(4.0, 8.0))
-# n_segments is currently fixed at 4 in the schema; the padded bounds give the
-# plot a visible y-extent so domain points don't degenerate to a single line.
-SEGMENT_AXIS = AxisSpec("n_segments", "Segments", integer=True, bounds=(3.0, 5.0))
-FIXED_DIMS = {"n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
-
-
-def print_config_set(label: str, old: Any, new: Any) -> None:
-    """Print a configuration change line showing old → new."""
-    _G = "\033[32m"
-    _D = "\033[2m"
-    _R = "\033[0m"
-    if isinstance(new, dict):
-        print(f"\n  {_D}{label}{_R}")
-        old_d = old if isinstance(old, dict) else {}
-        for k, v in new.items():
-            prev = old_d.get(k)
-            if prev is not None and prev != v:
-                print(f"  {_G}\u2713{_R} {k} = {prev} \u2192 {v}")
-            else:
-                print(f"  {_G}\u2713{_R} {k} = {v}")
-    else:
-        if old is not None and old != new:
-            print(f"  {_G}\u2713{_R} {label} = {old} \u2192 {new}")
-        else:
-            print(f"  {_G}\u2713{_R} {label} = {new}")
-
-
-def print_config_show(config: dict[str, Any]) -> None:
-    """Print all current configuration values, including defaults and schema bounds."""
-    _D = "\033[2m"
-    _R = "\033[0m"
-    _B = "\033[1m"
-
-    # Bounds from schema (stored at init) + user overrides
-    all_bounds: dict[str, tuple[float, float]] = {}
-    for k, v in (config.get("schema_bounds", {}) or {}).items():
-        all_bounds[k] = (v[0], v[1])
-    user_bounds = config.get("bounds", {}) or {}
-    for k, v in user_bounds.items():
-        all_bounds[k] = (v[0], v[1])
-
-    # Config groups
-    groups: list[tuple[str, list[tuple[str, str, Any]]]] = [
-        ("Performance", [
-            ("performance_weights", "Weights", {"path_accuracy": 1, "energy_efficiency": 1, "production_rate": 1}),
-        ]),
-        ("Exploration", [
-            ("exploration_radius", "Radius", 0.09),
-            ("sigma", "Sigma override", None),
-            ("mc_exponent_offset", "MC exp offset", 3.0),
-        ]),
-        ("Optimizer", [
-            ("de_maxiter", "Phase 1 DE max iterations", 30),
-            ("de_popsize", "Phase 1 DE population size", 64),
-        ]),
-        ("Trajectory", [
-            ("default_schedule", "Default schedule", None),
-            ("trust_regions", "Trust regions", None),
-        ]),
-    ]
-
-    print(f"\n  {_B}Current Configuration{_R}")
-    for group_name, keys in groups:
-        print(f"\n  {_D}{group_name}{_R}")
-        for config_key, label, default in keys:
-            val = config.get(config_key, default)
-            if val is None:
-                continue
-            if isinstance(val, dict):
-                for k, v in val.items():
-                    print(f"    {k:<20s} = {v}")
-            else:
-                is_default = config_key not in config or config[config_key] is None
-                suffix = f" {_D}(default){_R}" if is_default else ""
-                print(f"    {label:<20s} = {val}{suffix}")
-
-    # Bounds section — always show from schema + user overrides
-    print(f"\n  {_D}Bounds{_R}")
-    for code, (lo, hi) in sorted(all_bounds.items()):
-        is_overridden = code in user_bounds
-        suffix = "" if is_overridden else f" {_D}(schema){_R}"
-        print(f"    {code:<20s} = [{lo}, {hi}]{suffix}")
-
-    print()
-
+# === Trust-region helpers (per-trajectory delta defaults) ===================
 
 def default_trust_regions(agent: Any) -> dict[str, float]:
-    """Default trust region per runtime parameter: 1/10 of the bounds span.
-
-    Iterates the schema's runtime-flagged parameters and computes
-    `(max_val − min_val) / 10` for each. Non-runtime parameters are skipped
-    (they have no concept of mid-run adjustability). Schema params with
-    infinite/missing bounds are skipped.
-    """
+    """Default trust region per runtime parameter: ``(max - min) / 10``."""
     regions: dict[str, float] = {}
     for code, p in agent.schema.parameters.data_objects.items():
         if not getattr(p, "runtime_adjustable", False):
@@ -301,7 +159,6 @@ def default_trust_regions(agent: Any) -> dict[str, float]:
 
 
 def resolve_trust_regions(agent: Any, config: dict[str, Any]) -> dict[str, float]:
-    """Merge default trust regions with any user override stored in `config`."""
     regions = default_trust_regions(agent)
     user = config.get("trust_regions") or {}
     for k, v in user.items():
@@ -310,8 +167,7 @@ def resolve_trust_regions(agent: Any, config: dict[str, Any]) -> dict[str, float
 
 
 def apply_schedule_args(agent: Any, args: Any, config: dict[str, Any]) -> None:
-    """Parse --schedule PARAM:DIM flags (or fall back to the configured default)
-    and configure the agent. Per-step delta is the parameter's trust region."""
+    """Parse --schedule PARAM:DIM flags and configure the agent."""
     per_call = getattr(args, "schedule", None)
     schedules = per_call if per_call else (config.get("default_schedule") or [])
     if not schedules:
@@ -330,11 +186,12 @@ def apply_schedule_args(agent: Any, args: Any, config: dict[str, Any]) -> None:
         agent.configure_trajectory(param, dim, delta=delta)
 
 
+# === Schedule extraction + run wrapper ======================================
+
 def extract_schedule_steps(spec: Any, base_params: dict[str, Any]) -> list[dict[str, Any]]:
-    """Build per-step param dicts from an ExperimentSpec's schedules."""
+    """Build per-step param dicts from an ExperimentSpec's trajectories."""
     if not spec.trajectories:
         return [base_params]
-    # Determine L from the first schedule's entries
     first_sched = next(iter(spec.trajectories.values()))
     L = max(idx for idx, _ in first_sched.entries) + 1 if first_sched.entries else 1
     steps: list[dict[str, Any]] = []
@@ -357,13 +214,11 @@ def run_and_record(
     extra_params: dict[str, Any] | None = None,
     dataset_code: str | None = None,
 ) -> tuple[Any, dict[str, Any], list[dict[str, Any]] | None]:
-    """Run an experiment from a spec, apply schedules, persist parameter_updates to disk.
+    """Run an experiment from a spec, apply schedules, persist parameter_updates.
 
-    run_and_evaluate() saves the experiment before apply_schedules can populate
-    parameter_updates, so a second save_experiment is required after apply_schedules to
-    persist the schedule across sessions. Without this, reload-from-disk strips the
-    parameter_updates and the KDE never sees trajectory segments. Returns (exp_data,
-    params, sched_data).
+    ``run_and_evaluate`` saves the experiment before ``apply_schedules`` can
+    populate ``parameter_updates``, so a second save_experiment call follows
+    when a trajectory is present (so reload-from-disk includes the updates).
     """
     proposed = params_from_spec(spec)
     merged = dict(extra_params) if extra_params else {}
@@ -372,7 +227,6 @@ def run_and_record(
     exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code, dataset_code=dataset_code)
     if spec.trajectories:
         spec.apply_schedules(exp_data)
-        # run_and_evaluate saved pre-apply state; persist parameter_updates now.
         dataset.save_experiment(exp_code)
     sched_data = extract_schedule_steps(spec, params) if spec.trajectories else None
     return exp_data, params, sched_data

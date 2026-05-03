@@ -1,23 +1,27 @@
-"""Workflow helpers for the PFAB mock journey.
+"""Workflow helpers for the ADVEI 2026 mock journey.
 
 Encapsulates the experiment → evaluate → retrain loop and history tracking
-so that main.py stays focused on the high-level agent operations.
+so each ``steps/<phase>.py`` script stays focused on its high-level concern.
 """
+
+from __future__ import annotations
 
 import os
 import shutil
 from typing import Any
 
-import numpy as np
-
 from pred_fab.core import Dataset
 from pred_fab.orchestration import PfabAgent
 
 from sensors import FabricationSystem
-from sensors.physics import DELTA, THETA, SAG, COMPLEXITY, W_OPTIMAL, N_LAYERS, N_SEGMENTS
+from sensors.physics import COMPONENT_HEIGHT_MM, n_layers_for_height
 
 
 ExperimentLog = list[tuple[str, dict[str, Any], dict[str, float]]]
+
+
+# Canonical curved-wall sample-point count.
+N_NODES = 7
 
 
 class JourneyState:
@@ -59,12 +63,17 @@ def clean_artifacts(plot_dirs: list[str]) -> None:
 
 
 def with_dimensions(params: dict[str, Any]) -> dict[str, Any]:
-    """Return params with n_layers and n_segments, preserving existing values."""
+    """Return params with derived ``n_layers`` and fixed ``n_nodes``.
+
+    ``n_layers = round(COMPONENT_HEIGHT_MM / layer_height)`` per the ADVEI
+    curved-wall geometry. Existing keys are preserved so trajectory updates
+    can override individual values.
+    """
     result = {**params}
-    if "n_layers" not in result:
-        result["n_layers"] = N_LAYERS
-    if "n_segments" not in result:
-        result["n_segments"] = N_SEGMENTS
+    if "n_layers" not in result and "layer_height" in result:
+        result["n_layers"] = n_layers_for_height(float(result["layer_height"]))
+    if "n_nodes" not in result:
+        result["n_nodes"] = N_NODES
     return result
 
 
@@ -76,21 +85,13 @@ def run_and_evaluate(
     exp_code: str,
     dataset_code: str | None = None,
 ) -> Any:
-    """Create experiment, run fabrication, evaluate features + performance, persist.
+    """Create experiment, run fab, evaluate features + performance, persist.
 
     ``dataset_code`` tags the experiment as belonging to a named phase
-    (``baseline`` / ``exploration`` / ``inference`` / ``test`` / ``adapt``) so
-    callers can later use ``DataModule.set_split_dataset(dataset_code)`` to
-    assemble splits without code-prefix gymnastics.
+    (``baseline`` / ``exploration`` / ``inference`` / ``test`` / ``grid``).
     """
     exp_data = dataset.create_experiment(exp_code, parameters=params, dataset_code=dataset_code)
     fab.run_experiment(params)
     agent.evaluate(exp_data)
     dataset.save_experiment(exp_code)
     return exp_data
-
-
-def get_physics_optimum() -> tuple[float, float]:
-    """Return (optimal_speed, optimal_water) for the single design configuration."""
-    spd_opt = float(np.clip(np.sqrt(THETA * SAG / (DELTA * COMPLEXITY)), 20.0, 60.0))
-    return spd_opt, W_OPTIMAL
