@@ -29,8 +29,8 @@ Quick start:
 import argparse
 
 from steps import (
-    baseline, configure, explore, grid, inference,
-    init_agent, init_schema, reset, summary, test_set,
+    analyse, baseline, configure, explore, grid, inference,
+    init_agent, init_physics, init_schema, report, reset, summary, test_set,
 )
 
 
@@ -53,6 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("init-agent", help="Initialise the agent", formatter_class=_wide_formatter)
     p.set_defaults(func=init_agent.run)
+
+    p = sub.add_parser("init-physics", help="Randomize physics constants and show topology",
+                       formatter_class=_wide_formatter)
+    p.add_argument("--seed", type=int, default=None)
+    p.add_argument("--plot", action="store_true")
+    p.set_defaults(func=init_physics.run)
 
     p = sub.add_parser("configure", help="Set weights / exploration / optimiser / schedule",
                        formatter_class=_wide_formatter)
@@ -99,9 +105,22 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--schedule", action="append", default=[])
     p.set_defaults(func=inference.run)
 
+    p = sub.add_parser("analyse",
+                       help="Compare ground truth vs. prediction; optional MAE on inline test set",
+                       formatter_class=_wide_formatter)
+    p.add_argument("--plot", action="store_true")
+    p.add_argument("--test-set", type=int, default=0, dest="test_set")
+    p.set_defaults(func=analyse.run)
+
     p = sub.add_parser("summary", help="Print run summary across all phases",
                        formatter_class=_wide_formatter)
     p.set_defaults(func=summary.run)
+
+    p = sub.add_parser("report", help="Generate visual report for an experiment",
+                       formatter_class=_wide_formatter)
+    p.add_argument("exp_code", type=str)
+    p.add_argument("--plot", action="store_true")
+    p.set_defaults(func=report.run)
 
     return parser
 
