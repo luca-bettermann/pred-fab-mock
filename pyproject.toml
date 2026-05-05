@@ -6,6 +6,7 @@ dependencies = [
     "pred-fab[torch]",
     "matplotlib>=3.9.4",
     "numpy>=1.24",
+    "scikit-learn>=1.4",
 ]
 
 [[tool.uv.index]]
@@ -17,7 +18,7 @@ explicit = true
 index = "pytorch-cpu"
 
 [tool.setuptools.packages.find]
-include = ["models*", "sensors*", "visualization*"]
+include = ["models*", "sensors*", "steps*", "visualization*"]
 
 [dependency-groups]
 dev = [

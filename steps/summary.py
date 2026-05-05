@@ -2,36 +2,29 @@
 import argparse
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.utils.metrics import combined_score
-from steps._common import load_session
+from steps._common import load_session, ensure_plot_dir
+from visualization import (
+    print_run_summary, print_done,
+    plot_performance_trajectory,
+)
 
 
 def run(args: argparse.Namespace) -> None:
     config, state = load_session()
-    perf_weights = config.get("performance_weights") or {
-        "structural_integrity": 1, "material_deposition": 1, "extrusion_stability": 1,
-        "energy_footprint": 1, "fabrication_time": 1,
-    }
+    perf_weights = config.get("performance_weights")
+    plot_dir = ensure_plot_dir()
 
-    print(f"\n  Run Summary:")
-    print(f"  {'─' * 60}")
-    print(f"  {'Phase':<15s}  {'Experiments':>11s}  {'Best Combined':>14s}")
-    print(f"  {'─' * 60}")
+    print_run_summary(
+        state.perf_history, state.all_phases, state.all_codes, perf_weights,
+    )
 
-    for phase in ["baseline", "grid", "exploration", "test", "inference"]:
-        indices = [i for i, p in enumerate(state.all_phases) if p == phase]
-        if not indices:
-            continue
-        scores = [combined_score(state.perf_history[i][1], perf_weights)
-                  for i in indices]
-        best = max(scores)
-        print(f"  {phase:<15s}  {len(indices):>11d}  {best:>14.3f}")
+    if state.perf_history:
+        plot_performance_trajectory(
+            state.perf_history, state.all_phases, state.all_codes,
+            perf_weights, save_dir=plot_dir,
+        )
 
-    print(f"  {'─' * 60}")
-    total = len(state.all_params)
-    test_n = config.get("test_set_n", 0)
-    print(f"  Total: {total} training experiments + {test_n} test experiments")
-    print()
+    print_done()
 
 
 def parse_args() -> argparse.Namespace:

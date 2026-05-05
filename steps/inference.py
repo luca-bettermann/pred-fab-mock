@@ -12,19 +12,28 @@ from steps._common import (
 )
 from utils import get_performance
 from workflow import with_dimensions
+from visualization import (
+    print_phase_header, print_infer_row,
+    plot_acquisition_topology, plot_performance_trajectory,
+)
 
 
 def run(args: argparse.Namespace) -> None:
     config, state = load_session()
     agent, dataset, fab = rebuild(config)
     apply_schedule_args(agent, args, config)
-    ensure_plot_dir()
+    plot_dir = ensure_plot_dir()
+    perf_weights = config.get("performance_weights")
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
 
-    print("\n  Running inference (kappa=0; performance-only optimisation)...")
-    agent.train_step(dataset)
-    dm = agent.predict_system.datamodule
+    print_phase_header("4", "Inference",
+                       "κ=0 (performance-only optimisation)"
+                       + (f"  ·  intent: {design_intent}" if design_intent else ""))
+
+    dm = agent.create_datamodule(dataset)
+    dm.prepare(val_size=0.25)
+    agent.train(dm, validate=False)
     current = with_dimensions(state.prev_params) if state.prev_params else None
     spec = agent.acquisition_step(dm, kappa=0.0, current_params=current)
 
@@ -38,7 +47,16 @@ def run(args: argparse.Namespace) -> None:
     params.update(design_intent)
     perf = get_performance(exp_data)
     state.record("inference", code, params, perf)
-    print(f"  {code}: " + ", ".join(f"{k}={v:.3f}" for k, v in perf.items()))
+    print_infer_row(code, params, perf, perf_weights)
+
+    plot_acquisition_topology(
+        agent, 0.0, params, state.all_params,
+        label=code, save_dir=plot_dir,
+    )
+    plot_performance_trajectory(
+        state.perf_history, state.all_phases, state.all_codes,
+        perf_weights, save_dir=plot_dir,
+    )
 
     save_session(config, state)
 

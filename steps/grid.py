@@ -25,6 +25,7 @@ from steps._common import load_session, rebuild, save_session, ensure_plot_dir
 from utils import get_performance
 from workflow import with_dimensions, run_and_evaluate
 from schema import PARAM_BOUNDS
+from visualization import print_phase_header, print_experiment_row, print_phase_summary
 
 
 # ─── CCF design generator (port of learning-by-printing.studies.grid_designs) ─
@@ -117,6 +118,7 @@ def run(args: argparse.Namespace) -> None:
     config, state = load_session()
     agent, dataset, fab = rebuild(config)
     ensure_plot_dir()
+    perf_weights = config.get("performance_weights")
 
     runs = generate_ccf_design(
         bounds=PARAM_BOUNDS,
@@ -127,10 +129,12 @@ def run(args: argparse.Namespace) -> None:
         n_center=args.n_center,
     )
 
-    print(f"\n  Generating {len(runs)}-point {args.dataset_code} CCF design "
-          f"(low={args.low_pct}, high={args.high_pct}, fractional_x={args.fractional_x}, "
-          f"half_face_centers={args.half_face_centers}, n_center={args.n_center})...")
+    print_phase_header("G", f"Grid — {args.dataset_code}",
+                       f"{len(runs)}-point CCF design "
+                       f"(low={args.low_pct}, high={args.high_pct}, "
+                       f"fractional_x={args.fractional_x}, n_center={args.n_center})")
 
+    log: list[tuple[str, dict, dict]] = []
     for i, run_params in enumerate(runs):
         code = f"{args.dataset_code}_{i + 1:02d}"
         params = with_dimensions(run_params)
@@ -142,8 +146,10 @@ def run(args: argparse.Namespace) -> None:
         )
         perf = get_performance(exp_data)
         state.record(args.dataset_code, code, params, perf)
-        print(f"  {code}: " + ", ".join(f"{k}={v:.3f}" for k, v in perf.items()))
+        log.append((code, params, perf))
+        print_experiment_row(code, params, perf, perf_weights)
 
+    print_phase_summary(log, perf_weights)
     save_session(config, state)
 
 
