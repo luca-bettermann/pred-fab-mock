@@ -63,10 +63,10 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
         Parameter.real("slowdown_factor",    min_val=0.0,   max_val=1.0,   runtime=True),
     ])
 
-    # Tensor shape is fixed at max: 15 layers × 7 nodes. Experiments with
-    # layer_height > 2.0 have fewer actual layers; padded positions are zero.
+    # Tensor shape is fixed at max: 13 layers × 7 nodes (ceil(25mm / 2mm)).
+    # All layers are simulated; layer_height affects per-layer physics.
     structural = Domain("structural", [
-        Dimension("n_layers", "layer_idx", min_val=15, max_val=15),
+        Dimension("n_layers", "layer_idx", min_val=13, max_val=13),
         Dimension("n_nodes",  "node_idx",  min_val=7,  max_val=7),
     ])
     domains = Domains([structural])
