@@ -21,11 +21,11 @@ from typing import Sequence
 
 _sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from steps._common import load_session, rebuild, save_session, ensure_plot_dir
-from utils import get_performance
+from pred_fab.utils.metrics import combined_score
+
+from steps._common import load_session, rebuild, save_session, ensure_plot_dir, get_performance, effective_weights
 from workflow import with_dimensions, run_and_evaluate
 from schema import PARAM_BOUNDS
-from visualization import print_phase_header, print_experiment_row, print_phase_summary
 
 
 # ─── CCF design generator (port of learning-by-printing.studies.grid_designs) ─
@@ -118,7 +118,7 @@ def run(args: argparse.Namespace) -> None:
     config, state = load_session()
     agent, dataset, fab = rebuild(config)
     ensure_plot_dir()
-    perf_weights = config.get("performance_weights")
+    perf_weights = effective_weights(config)
 
     runs = generate_ccf_design(
         bounds=PARAM_BOUNDS,
@@ -129,10 +129,12 @@ def run(args: argparse.Namespace) -> None:
         n_center=args.n_center,
     )
 
-    print_phase_header("G", f"Grid — {args.dataset_code}",
-                       f"{len(runs)}-point CCF design "
-                       f"(low={args.low_pct}, high={args.high_pct}, "
-                       f"fractional_x={args.fractional_x}, n_center={args.n_center})")
+    _B = "\033[1m"; _C = "\033[36m"; _R = "\033[0m"; _D = "\033[2m"
+    bar = "━" * 58
+    print(f"\n{_B}{_C}{bar}{_R}")
+    print(f"{_B}{_C}  GRID{_R}{_B} ▸ {args.dataset_code}{_R}")
+    print(f"  {_D}{len(runs)}-point CCF (low={args.low_pct}, high={args.high_pct}){_R}")
+    print(f"{_B}{_C}{bar}{_R}\n")
 
     log: list[tuple[str, dict, dict]] = []
     for i, run_params in enumerate(runs):
@@ -147,9 +149,14 @@ def run(args: argparse.Namespace) -> None:
         perf = get_performance(exp_data)
         state.record(args.dataset_code, code, params, perf)
         log.append((code, params, perf))
-        print_experiment_row(code, params, perf, perf_weights)
+        score = combined_score(perf, perf_weights or {})
+        print(f"  {code:<14s}  combined={score:.3f}")
 
-    print_phase_summary(log, perf_weights)
+    if log:
+        scores = [combined_score(p, perf_weights or {}) for _, _, p in log]
+        print(f"\n  {_D}{'─' * 40}{_R}")
+        print(f"  {len(log)} runs  best={max(scores):.3f}  mean={sum(scores)/len(scores):.3f}")
+
     save_session(config, state)
 
 

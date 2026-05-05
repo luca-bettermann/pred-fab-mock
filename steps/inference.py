@@ -1,4 +1,5 @@
 """First-time-right inference call: kappa=0 acquisition → one fabrication."""
+
 import argparse
 import json
 import sys as _sys
@@ -6,16 +7,14 @@ from pathlib import Path
 
 _sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from pred_fab.utils.metrics import combined_score
+
 from steps._common import (
     apply_schedule_args, ensure_plot_dir, load_session, next_code,
-    rebuild, run_and_record, save_session,
+    rebuild, run_and_record, save_session, show_plot_with_header,
+    get_performance, effective_weights,
 )
-from utils import get_performance
 from workflow import with_dimensions
-from visualization import (
-    print_phase_header, print_infer_row,
-    plot_acquisition_topology, plot_performance_trajectory,
-)
 
 
 def run(args: argparse.Namespace) -> None:
@@ -23,13 +22,17 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     apply_schedule_args(agent, args, config)
     plot_dir = ensure_plot_dir()
-    perf_weights = config.get("performance_weights")
+    perf_weights = effective_weights(config)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
 
-    print_phase_header("4", "Inference",
-                       "κ=0 (performance-only optimisation)"
-                       + (f"  ·  intent: {design_intent}" if design_intent else ""))
+    _B = "\033[1m"; _C = "\033[36m"; _R = "\033[0m"; _D = "\033[2m"
+    bar = "━" * 58
+    print(f"\n{_B}{_C}{bar}{_R}")
+    print(f"{_B}{_C}  PHASE 4{_R}{_B} ▸ Inference{_R}")
+    intent_str = f"  ·  intent: {design_intent}" if design_intent else ""
+    print(f"  {_D}κ=0 (performance-only){intent_str}{_R}")
+    print(f"{_B}{_C}{bar}{_R}\n")
 
     dm = agent.create_datamodule(dataset)
     dm.prepare(val_size=0.25)
@@ -47,24 +50,30 @@ def run(args: argparse.Namespace) -> None:
     params.update(design_intent)
     perf = get_performance(exp_data)
     state.record("inference", code, params, perf)
-    print_infer_row(code, params, perf, perf_weights)
 
-    plot_acquisition_topology(
-        agent, 0.0, params, state.all_params,
-        label=code, save_dir=plot_dir,
-    )
-    plot_performance_trajectory(
-        state.perf_history, state.all_phases, state.all_codes,
-        perf_weights, save_dir=plot_dir,
-    )
+    score = combined_score(perf, perf_weights or {})
+    print(f"  {code:<14s}  combined={score:.3f}")
+    for k, v in perf.items():
+        print(f"    {k:<24s} {v:.3f}")
+
+    if getattr(args, "plot", False):
+        import os
+        from pred_fab.plotting import plot_inference_result
+
+        path = os.path.join(plot_dir, "04_inference.png")
+        plot_inference_result(
+            path, perf, perf_weights or {},
+            combined=score, exp_code=code,
+        )
+        show_plot_with_header(path, "Inference: Result", inline=args.plot)
 
     save_session(config, state)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="First-time-right inference")
-    parser.add_argument("--design-intent", type=str, default=None,
-                        help='JSON-encoded fixed parameters, e.g. \'{"layer_height":2.5}\'')
+    parser.add_argument("--design-intent", type=str, default=None)
+    parser.add_argument("--plot", action="store_true")
     parser.add_argument("--schedule", action="append", default=[])
     return parser.parse_args()
 

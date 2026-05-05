@@ -1,11 +1,4 @@
-"""Shared helpers across CLI steps for the ADVEI 2026 mock journey.
-
-Stripped down for ADVEI: drops physics randomisation, visualisation, and
-the (water_ratio, print_speed) 2-axis grid helpers from the legacy mock.
-The remaining helpers are session persistence, agent rebuild, and the
-``run_and_record`` wrapper that applies trajectory schedules atop a
-single fabrication call.
-"""
+"""Shared helpers across CLI steps for the ADVEI 2026 mock journey."""
 
 from __future__ import annotations
 
@@ -17,16 +10,49 @@ from typing import Any
 import numpy as np
 
 from pred_fab.core import Dataset
+from pred_fab.plotting import AxisSpec
+from pred_fab.utils.metrics import combined_score
 
 from schema import build_schema
 from agent_setup import build_agent
 from sensors import FabricationSystem
-from utils import params_from_spec
+from utils import params_from_spec, get_performance
 from workflow import JourneyState, with_dimensions, run_and_evaluate
+from cli_helpers import show_plot, show_plot_with_header, ensure_plot_dir
 
 
 SESSION_FILE = ".pfab_session.json"
 PLOT_DIR = "./plots"
+
+# ADVEI schema axis definitions for plotting
+SPEED_AXIS = AxisSpec("print_speed", "Print Speed", unit="m/s", bounds=(0.004, 0.008))
+CALIB_AXIS = AxisSpec("calibration_factor", "Calibration Factor", bounds=(1.6, 2.2))
+OFFSET_AXIS = AxisSpec("path_offset", "Path Offset", unit="mm", bounds=(0.0, 3.0))
+HEIGHT_AXIS = AxisSpec("layer_height", "Layer Height", unit="mm", bounds=(2.0, 3.0))
+SLOWDOWN_AXIS = AxisSpec("slowdown_factor", "Slowdown Factor", bounds=(0.0, 1.0))
+
+# Default fixed params for 2D topology slices
+DEFAULT_FIXED = {
+    "path_offset": 1.5,
+    "layer_height": 2.5,
+    "calibration_factor": 1.9,
+    "print_speed": 0.006,
+    "slowdown_factor": 0.3,
+}
+
+# Default equal weights when user hasn't configured any
+DEFAULT_WEIGHTS: dict[str, float] = {
+    "structural_integrity": 1.0,
+    "material_deposition": 1.0,
+    "extrusion_stability": 1.0,
+    "energy_footprint": 1.0,
+    "fabrication_time": 1.0,
+}
+
+
+def effective_weights(config: dict[str, Any]) -> dict[str, float]:
+    """Return performance weights from config, or equal weights if unconfigured."""
+    return config.get("performance_weights") or DEFAULT_WEIGHTS
 
 
 # === Session persistence ====================================================
@@ -137,9 +163,6 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
     return agent, dataset, fab
 
 
-def ensure_plot_dir() -> str:
-    os.makedirs(PLOT_DIR, exist_ok=True)
-    return PLOT_DIR
 
 
 # === Trust-region helpers (per-trajectory delta defaults) ===================
