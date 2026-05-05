@@ -47,12 +47,8 @@ class FabricationSystem:
 
     @staticmethod
     def get_dimensions(params: dict[str, Any]) -> tuple[int, int]:
-        """Return ``(n_layers, n_nodes)`` for ``params``.
-
-        ``n_layers`` is derived from ``layer_height`` and the fixed component
-        height; ``n_nodes`` is read from ``params`` (typically the canonical 7).
-        """
-        n_layers = physics.n_layers_for_height(float(params["layer_height"]))
+        """Return ``(n_layers, n_nodes)`` — always the fixed tensor shape."""
+        n_layers = int(params.get("n_layers", physics.MAX_N_LAYERS))
         n_nodes = int(params.get("n_nodes", 7))
         return n_layers, n_nodes
 
@@ -61,10 +57,8 @@ class FabricationSystem:
     def run_experiment(self, params: dict[str, Any]) -> None:
         """Populate the cache for every (layer, node) cell of one experiment.
 
-        Static params are read directly from ``params``. Trajectory params
-        (``print_speed``, ``slowdown_factor``) are also read directly here —
-        per-layer overrides at the workflow layer are applied by passing
-        already-effective param dicts into :meth:`run_layer` instead.
+        All MAX_N_LAYERS layers are simulated — ``layer_height`` affects the
+        per-layer physics but doesn't truncate the sequence.
         """
         n_layers, n_nodes = self.get_dimensions(params)
         for layer_idx in range(n_layers):

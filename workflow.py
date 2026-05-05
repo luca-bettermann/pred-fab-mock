@@ -63,15 +63,15 @@ def clean_artifacts(plot_dirs: list[str]) -> None:
 
 
 def with_dimensions(params: dict[str, Any]) -> dict[str, Any]:
-    """Return params with derived ``n_layers`` and fixed ``n_nodes``.
+    """Return params with fixed tensor dimensions.
 
-    ``n_layers = round(COMPONENT_HEIGHT_MM / layer_height)`` per the ADVEI
-    curved-wall geometry. Existing keys are preserved so trajectory updates
-    can override individual values.
+    ``n_layers`` is always MAX_N_LAYERS (15) — the fixed tensor dimension.
+    All layers are simulated (no padding); ``layer_height`` affects the
+    per-layer physics but doesn't truncate the sequence.
     """
+    from sensors.physics import MAX_N_LAYERS
     result = {**params}
-    if "n_layers" not in result and "layer_height" in result:
-        result["n_layers"] = n_layers_for_height(float(result["layer_height"]))
+    result["n_layers"] = MAX_N_LAYERS
     if "n_nodes" not in result:
         result["n_nodes"] = N_NODES
     return result

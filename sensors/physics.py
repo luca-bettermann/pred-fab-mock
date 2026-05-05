@@ -29,6 +29,7 @@ import math
 # === Hardware / geometric constants ==========================================
 
 COMPONENT_HEIGHT_MM = 30.0       # curved-wall height (mm). n_layers = round(height / layer_height)
+MAX_N_LAYERS = 15                # fixed tensor size — layer_height=2.0 → 15 real layers (the max)
 PATH_LENGTH_PER_LAYER_M = 0.50   # nominal toolpath length per layer (m)
 TARGET_FILAMENT_WIDTH_MM = 11.0  # target deposition width (mm) — drives material_deposition
 TARGET_NODE_OVERLAP_MM = 1.5     # target overlap at the corner nodes (mm)
