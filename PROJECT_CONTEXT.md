@@ -1,27 +1,28 @@
 # pred-fab-mock — Project Context
 
 ## Purpose
-Self-contained showcase of the full PFAB journey (baseline → exploration → inference) using a simulated extrusion printing process. Built against the local `pred-fab` package.
+Self-contained ADVEI 2026 showcase of the full PFAB journey (baseline → exploration → inference) using a simulated curved-wall clay extrusion process. Built against the local `pred-fab` package.
 
 ## Structure
 
 | File / Folder | Description |
 |---|---|
-| `main.py` | End-to-end workflow: baseline → training → exploration → single-shot inference |
 | `cli.py` | Step-by-step CLI with JSON session persistence |
-| `workflow.py` | Workflow helpers: `JourneyState`, `run_and_evaluate`, `with_dimensions` |
-| `schema.py` | `build_schema()` → DatasetSchema (water_ratio + print_speed) |
+| `cli_helpers.py` | Inline plot display (iTerm2 protocol) |
+| `schema.py` | `build_schema()` → DatasetSchema (5 params, 7 features, 5 perf attributes) |
 | `agent_setup.py` | `build_agent()` → configured PfabAgent |
+| `workflow.py` | `JourneyState`, `run_and_evaluate`, `with_dimensions` |
 | `utils.py` | Small helpers: `params_from_spec`, `get_performance` |
-| `sensors/` | Simulated sensor systems (camera, energy) and physics engine |
-| `models/` | Feature, evaluation, and prediction model implementations (MLP + RF) |
-| `visualization/` | Shared plot functions split by category (physics, prediction, exploration, inference, trajectory) |
+| `sensors/` | Feature-level physics engine + FabricationSystem |
+| `models/` | Feature, evaluation, and prediction model implementations |
+| `steps/` | CLI step modules (14 subcommands) |
+| `visualization/` | Thin ADVEI-specific helpers (physics grid evaluation) |
 | `dev/` | Progressive validation scripts: 01_physics → 07_inference |
 
 ## Key Points
-- Schema v7: single design (non-linear curvature) × single material (clay). 2 continuous parameters (water_ratio [0.30-0.50], print_speed [20-60 mm/s]). Spatial domain: 5 layers × 4 segments.
-- Physics optimum: speed ≈ 40 mm/s, water ≈ 0.42. Pareto conflict between path_accuracy, energy_efficiency, and production_rate.
-- Calibration weights: path_accuracy=2, energy_efficiency=1, production_rate=1.
-- Default optimizer: DE (global, with L-BFGS-B polish) for offline; L-BFGS-B for online adaptation.
-- Trajectory mode: virtual KDE points for within-trajectory spacing + smoothing penalty for monotonic trajectories.
-- Inference is single-shot (first-time-right manufacturing), not iterative.
+- Schema: single design (curved wall, 25mm height) × single material (clay). 5 continuous parameters (3 static, 2 trajectory). Structural domain: 13 layers × 7 nodes.
+- Physics: deterministic feature-level simulation (no raw sensors). Pareto-rich across 5 performance attributes.
+- Features: node_overlap, filament_width (depth-2); extrusion_consistency, robot_energy, printing_duration (depth-1); temperature, humidity (context).
+- Prediction: StructuralTransformer (causal attention, multi-depth) + DeterministicDuration (closed-form).
+- All generic plots imported from `pred_fab.plotting`; visualization/ only has domain-specific helpers.
+- CLI mirrors the main branch pattern: quick-start epilog, --plot flags, RawDescriptionHelpFormatter.

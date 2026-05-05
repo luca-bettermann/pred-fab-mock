@@ -1,6 +1,6 @@
-# pred-fab-mock
+# pred-fab-mock (ADVEI 2026)
 
-A self-contained showcase of the [PFAB](https://github.com/luca-bettermann/pred-fab) predictive fabrication framework using a simulated robotic extrusion printing process.
+A self-contained showcase of the [PFAB](https://github.com/luca-bettermann/pred-fab) predictive fabrication framework using a simulated curved-wall clay extrusion process.
 
 ## Quick start
 
@@ -12,22 +12,28 @@ uv venv && uv pip install -e ".[dev]"
 uv run cli.py reset
 uv run cli.py init-schema
 uv run cli.py init-agent
-uv run cli.py configure --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}'
-uv run cli.py init-physics --seed 42 --plot
+uv run cli.py init-physics --plot
+uv run cli.py configure \
+    --weights '{"structural_integrity":2,"material_deposition":1,"extrusion_stability":1,"energy_footprint":1,"fabrication_time":1}' \
+    --schedule print_speed:n_layers --schedule slowdown_factor:n_layers
+
+# Static grids (reference + test)
+uv run cli.py grid --dataset-code reference --low-pct 0.25 --high-pct 0.75 \
+    --fractional-x 1 --half-face-centers --n-center 1
+uv run cli.py test-set --n-center 3
 
 # Phase 1: Baseline (space-filling, no model)
-uv run cli.py baseline --n 10 --plot
+uv run cli.py baseline --n 5 --plot
 
 # Phase 2: Exploration (model-guided active learning)
-uv run cli.py explore --n 1 --kappa 0.5 --plot    # one round, inspect
-uv run cli.py explore --n 9 --kappa 0.5            # continue to 10 total
+uv run cli.py explore --n 5 --kappa 0.5 --plot
 
 # Evaluate model quality
-uv run cli.py test-set --n 20
-uv run cli.py analyse --plot
+uv run cli.py analyse --plot --test-set 20
 
 # Phase 3: Inference (first-time-right manufacturing)
-uv run cli.py inference --design-intent '{"n_layers":5}' --plot
+uv run cli.py inference --design-intent '{"layer_height":2.5}' --plot
+uv run cli.py report infer_01 --plot
 
 # Summary
 uv run cli.py summary
@@ -39,81 +45,73 @@ uv run cli.py summary
 |---|---|
 | `reset` | Clear all session state, data, and plots |
 | `init-schema` | Show the problem schema (parameters, features, performance) |
-| `init-agent [--model {mlp,rf}]` | Initialize the agent and show its state |
-| `init-physics [--seed N] [--plot]` | Randomize physics constants and show topology |
-| `configure [--weights JSON] [--radius F] [--optimizer {de,lbfgsb}]` | Set agent configuration |
+| `init-agent` | Initialize the agent and show its state |
+| `init-physics [--seed N] [--plot]` | Show physics constants and ground truth topology |
+| `configure [--weights JSON] [--schedule P:D] [--trust-regions JSON]` | Set agent configuration |
 | `baseline --n N [--plot]` | Run N space-filling baseline experiments |
-| `explore --n N [--kappa F] [--plot] [--validate]` | Run N exploration rounds (incremental) |
-| `test-set --n N` | Create held-out test experiments for model evaluation |
-| `analyse [--plot]` | Evaluate model on test set + sensitivity analysis |
+| `grid [--dataset-code S] [--low-pct F] [--high-pct F]` | Run a CCF static-grid dataset |
+| `test-set [--n-center N]` | Run ADVEI test dataset (full CCF, 0.15/0.85) |
+| `explore --n N [--kappa F] [--plot]` | Run N exploration rounds (incremental) |
+| `analyse [--plot] [--test-set N]` | Compare ground truth vs. prediction + optional MAE |
 | `inference [--design-intent JSON] [--plot]` | Single-shot first-time-right proposal |
+| `report EXP_CODE [--plot]` | Generate visual report for an experiment |
 | `summary` | Print run summary across all phases |
-
-All commands support `--plot` to display plots. Plots are always saved to `./plots/`.
-
-> **Inline plots** require [iTerm2](https://iterm2.com/) (`brew install --cask iterm2`). In other terminals, `--plot` saves the plot to disk without displaying it.
-
-### Advanced commands
-
-| Command | Description |
-|---|---|
-| `explore-trajectory --n N [--delta F] [--smoothing F] [--lookahead N]` | Per-layer speed optimization with MPC |
-| `adapt [--delta F] [--design-intent JSON]` | Inference + layer-by-layer online adaptation |
-
-```bash
-# Trajectory exploration: optimize print_speed per layer
-uv run cli.py explore-trajectory --n 3 --kappa 0.5 --delta 5.0 --smoothing 0.25
-
-# Online adaptation: inference + real-time layer-by-layer tuning
-uv run cli.py adapt --delta 5.0 --design-intent '{"n_layers":5}'
-```
 
 ## Simulated process
 
-Each experiment = one print run with variable layers (3-8) and 4 segments per layer.
+Each experiment = one print run on a curved-wall clay component (25 mm height, 13 layers, 7 nodes per layer).
 
-**Parameters:** `water_ratio` [0.30, 0.50], `print_speed` [20, 60] mm/s, `n_layers` [3, 8]
+**Parameters (5):**
 
-**Three-way Pareto conflict:**
-- `path_accuracy` — U-shaped speed response (sag vs inertia)
-- `energy_efficiency` — different optimum than path accuracy
-- `production_rate` — favors high speed, penalized by nozzle slip
+| Parameter | Range | Type |
+|---|---|---|
+| `path_offset` | 0–3 mm | Static (per-print) |
+| `layer_height` | 2–3 mm | Static (per-print) |
+| `calibration_factor` | 1.6–2.2 | Static (per-print) |
+| `print_speed` | 0.004–0.008 m/s | Trajectory (per-layer) |
+| `slowdown_factor` | 0–1 | Trajectory (per-layer) |
 
-Combined score: `(2 * path_accuracy + energy_efficiency + production_rate) / 4`
+**Five-way Pareto conflict (3 quality + 2 cost):**
+- `structural_integrity` — node overlap at corners
+- `material_deposition` — filament width accuracy
+- `extrusion_stability` — deposition consistency (R²)
+- `energy_footprint` — robot energy per layer
+- `fabrication_time` — printing duration per layer
 
 ## Models
 
 | Type | Class | Outputs |
 |---|---|---|
-| Feature | `DevFeature` | path_deviation |
-| Feature | `EnergyFeature` | energy_per_segment |
-| Feature | `RateFeature` | production_rate |
-| Evaluation | `PathAccuracy` | path_accuracy [0,1] |
-| Evaluation | `EnergyEfficiency` | energy_efficiency [0,1] |
-| Evaluation | `ProductionRate` | production_rate [0,1] |
-| Prediction | `DevMLP` | path_deviation (sklearn MLP) |
-| Prediction | `EnergyMLP` | energy_per_segment (sklearn MLP) |
-| Prediction | `RateMLP` | production_rate (deterministic) |
+| Feature | `NodeVisionFeature` | node_overlap, filament_width (depth-2) |
+| Feature | `LoadcellConsistencyFeature` | extrusion_consistency |
+| Feature | `RobotEnergyFeature` | robot_energy |
+| Feature | `DurationFeature` | printing_duration |
+| Feature | `EnvironmentFeature` | temperature, humidity (context) |
+| Evaluation | `StructuralIntegrityEval` | structural_integrity [0,1] |
+| Evaluation | `MaterialDepositionEval` | material_deposition [0,1] |
+| Evaluation | `ExtrusionStabilityEval` | extrusion_stability [0,1] |
+| Evaluation | `EnergyFootprintEval` | energy_footprint [0,1] |
+| Evaluation | `FabricationTimeEval` | fabrication_time [0,1] |
+| Prediction | `StructuralTransformer` | 4 features (causal attention over layers) |
+| Prediction | `DeterministicDuration` | printing_duration (closed-form) |
 
 ## Repository structure
 
 ```
 pred-fab-mock/
 ├── cli.py                # Step-by-step CLI (main entry point)
-├── cli_helpers.py        # Plot display, physics randomization, sensitivity analysis
-├── main.py               # Legacy full journey script
-├── schema.py             # Schema definition
-├── agent_setup.py        # Agent construction
+├── cli_helpers.py        # Inline plot display
+├── schema.py             # ADVEI 2026 schema definition
+├── agent_setup.py        # Agent construction + model registration
 ├── workflow.py           # Session state, experiment helpers
 ├── sensors/
-│   ├── physics.py        # Deterministic physics simulation
-│   ├── camera.py         # Simulated camera system
-│   ├── energy.py         # Simulated energy sensor
-│   └── fabrication.py    # Coordinates sensors per experiment
+│   ├── physics.py        # Deterministic feature-level physics
+│   └── fabrication.py    # Coordinates simulation per experiment
 ├── models/
-│   ├── feature_models.py     # DevFeature, EnergyFeature, RateFeature
-│   ├── evaluation_models.py  # PathAccuracy, EnergyEfficiency, ProductionRate
-│   └── prediction_model.py   # DevMLP, EnergyMLP, RateMLP (+ RF variants)
-├── visualization/            # Plot functions (topology, scatter, acquisition, sensitivity)
-└── dev/                      # Diagnostic scripts for individual pipeline stages
+│   ├── feature_models.py     # 5 feature models (vision, loadcell, energy, duration, env)
+│   ├── evaluation_models.py  # 5 evaluators (one per performance attribute)
+│   └── prediction_model.py   # StructuralTransformer + DeterministicDuration
+├── steps/                # CLI step implementations
+├── visualization/        # ADVEI-specific helpers (physics grid evaluation)
+└── dev/                  # Diagnostic scripts (01-07)
 ```
