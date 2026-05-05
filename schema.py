@@ -2,18 +2,12 @@
 
 ADVEI study — curved-wall clay extrusion. Five process parameters split
 into per-print (static) and per-layer (trajectory) groups; one structural
-domain (n_layers, n_nodes); five quality/cost performance attributes; six
+domain (n_layers, n_nodes); five quality/cost performance attributes; five
 target features at mixed depths plus two context features.
 
-The mock simulates fabrication-time signals at the *feature* level rather
-than at the raw-sensor level: ``sensors/physics.py`` produces synthetic
-node_overlap, filament_width, extrusion_consistency, current_*, and
-printing_duration values directly. The real-fabrication counterpart in
+The mock simulates fabrication at the *feature level*: ``sensors/physics.py``
+produces synthetic values directly. The real-fabrication counterpart in
 ``learning-by-printing`` extracts the same features from real sensors.
-
-Constants for the simulation (component height, supply voltage, etc.) are
-hardcoded in ``sensors/physics.py``; only optimisable parameters live in
-the schema.
 """
 
 from pred_fab.core import (
@@ -73,17 +67,16 @@ def build_schema(root_folder: str = ROOT_FOLDER) -> DatasetSchema:
 
     features = Features([
         # Quality targets — depth 2 (per layer × node)
-        Feature("node_overlap",         domain=structural, depth=2),
-        Feature("filament_width",       domain=structural, depth=2),
+        Feature("node_overlap",          domain=structural, depth=2),
+        Feature("filament_width",        domain=structural, depth=2),
         # Quality target — depth 1 (per layer)
         Feature("extrusion_consistency", domain=structural, depth=1),
         # Cost-driving targets — depth 1 (per layer)
-        Feature("current_mean_feeder",  domain=structural, depth=1),
-        Feature("current_mean_nozzle",  domain=structural, depth=1),
-        Feature("printing_duration",    domain=structural, depth=1),
+        Feature("robot_energy",          domain=structural, depth=1),
+        Feature("printing_duration",     domain=structural, depth=1),
         # Context (uncontrollable, BME280) — depth 1
-        Feature("temperature",          domain=structural, depth=1, context=True),
-        Feature("humidity",             domain=structural, depth=1, context=True),
+        Feature("temperature",           domain=structural, depth=1, context=True),
+        Feature("humidity",              domain=structural, depth=1, context=True),
     ])
 
     performance = PerformanceAttributes([

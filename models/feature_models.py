@@ -6,7 +6,7 @@ the per-(layer, node) and per-layer values; these models simply route the
 right scalar to the right feature code.
 
 Two-feature models (vision-style, depth-2) and single-feature models
-(per-layer, depth-1 or context) cover all eight ADVEI features.
+(per-layer, depth-1 or context) cover all seven ADVEI features.
 """
 
 from __future__ import annotations
@@ -87,8 +87,8 @@ class LoadcellConsistencyFeature(IFeatureModel):
         }
 
 
-class ExtruderEnergyFeature(IFeatureModel):
-    """Per-layer extruder-motor currents: ``current_mean_feeder`` and ``current_mean_nozzle``."""
+class RobotEnergyFeature(IFeatureModel):
+    """Per-layer ``robot_energy`` — energy consumption from robot joint currents."""
 
     def __init__(self, logger: PfabLogger, fab: FabricationSystem) -> None:
         self.fab = fab
@@ -96,14 +96,11 @@ class ExtruderEnergyFeature(IFeatureModel):
 
     @property
     def input_parameters(self) -> list[str]:
-        return [
-            "calibration_factor", "layer_height",
-            "print_speed", "slowdown_factor",
-        ]
+        return ["print_speed", "slowdown_factor", "layer_height"]
 
     @property
     def outputs(self) -> list[str]:
-        return ["current_mean_feeder", "current_mean_nozzle"]
+        return ["robot_energy"]
 
     def _load_data(self, params: dict, **dimensions: Any) -> dict:
         return {"layer_idx": int(dimensions["layer_idx"]), "params": params}
@@ -111,10 +108,10 @@ class ExtruderEnergyFeature(IFeatureModel):
     def _compute_feature_logic(
         self, data: dict, params: dict, visualize: bool = False, **dimensions: Any
     ) -> dict[str, float]:
-        l = data["layer_idx"]
         return {
-            "current_mean_feeder": self.fab.get_layer_feature(params, "current_mean_feeder", l),
-            "current_mean_nozzle": self.fab.get_layer_feature(params, "current_mean_nozzle", l),
+            "robot_energy": self.fab.get_layer_feature(
+                params, "robot_energy", data["layer_idx"],
+            ),
         }
 
 

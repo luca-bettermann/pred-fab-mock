@@ -1,16 +1,10 @@
 """Evaluation models for the ADVEI 2026 mock.
 
-Five evaluators map the schema's eight features to five performance
+Five evaluators map the schema's seven features to five performance
 attributes (three quality + two cost). Each scores a single feature
 against a fixed target with a fixed scaling tolerance — the framework's
 ``compute_performance`` returns ``max(0, 1 - |feat - target| / scaling)``,
 clipped to ``[0, 1]`` and averaged across all cells of the feature.
-
-For multi-feature performance attributes (e.g. ADVEI's true
-``energy_footprint = V · sum(I_motors) · duration`` formula), the mock
-substitutes a single-feature proxy: scoring against the dominant motor
-current. learning-by-printing's real evaluator is free to override
-``compute_performance`` for the multi-feature derivation.
 """
 
 from __future__ import annotations
@@ -20,10 +14,7 @@ from typing import Any
 from pred_fab import IEvaluationModel
 from pred_fab.utils import PfabLogger
 
-from sensors.physics import (
-    TARGET_FILAMENT_WIDTH_MM,
-    TARGET_NODE_OVERLAP_MM,
-)
+from sensors.physics import TARGET_FILAMENT_WIDTH_MM, TARGET_NODE_OVERLAP_MM
 
 
 class StructuralIntegrityEval(IEvaluationModel):
@@ -97,12 +88,10 @@ class ExtrusionStabilityEval(IEvaluationModel):
 
 
 class EnergyFootprintEval(IEvaluationModel):
-    """Per-layer feeder-motor current as a proxy for energy footprint.
+    """Per-layer robot energy scored against an efficient operating point.
 
-    A real implementation in learning-by-printing combines feeder + nozzle
-    currents and printing_duration into total ampere-seconds; the mock uses
-    feeder current alone since the framework's evaluator interface is
-    single-feature. Trade-off direction is preserved (lower is better).
+    Lower energy = better score. The target represents the energy-optimal
+    speed/slowdown combination; the tolerance covers the full realistic range.
     """
     TARGETS_CONSTANT = True
 
@@ -112,15 +101,15 @@ class EnergyFootprintEval(IEvaluationModel):
     @property
     def input_parameters(self) -> list[str]: return []
     @property
-    def input_feature(self) -> str: return "current_mean_feeder"
+    def input_feature(self) -> str: return "robot_energy"
     @property
     def output_performance(self) -> str: return "energy_footprint"
 
     def _compute_target_value(self, params: dict, **dims: Any) -> float:
-        return 0.6   # A — low-current ideal
+        return 5.0   # Wh — energy-efficient operating point
 
     def _compute_scaling_factor(self, params: dict, **dims: Any) -> float | None:
-        return 1.5   # A — falloff window
+        return 15.0  # Wh — falloff window
 
 
 class FabricationTimeEval(IEvaluationModel):

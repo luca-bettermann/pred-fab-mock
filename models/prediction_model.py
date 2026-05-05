@@ -3,18 +3,13 @@
 Two models cover the structural domain:
 
 - ``StructuralTransformer`` — multi-depth ``TransformerModel`` predicting
-  five learned features (depth-1: ``extrusion_consistency``,
-  ``current_mean_feeder``, ``current_mean_nozzle``; depth-2:
-  ``node_overlap``, ``filament_width``). Encoder sequences over the layer
-  axis; depth-2 outputs expand over the node axis via the default
-  ``PerNodeMLPDecoder``.
+  four learned features (depth-1: ``extrusion_consistency``,
+  ``robot_energy``; depth-2: ``node_overlap``, ``filament_width``). Encoder
+  sequences over the layer axis; depth-2 outputs expand over the node axis
+  via the default ``PerNodeMLPDecoder``.
 - ``DeterministicDuration`` — closed-form ``DeterministicModel`` for
   ``printing_duration``: ``L / (speed · (1 − 0.45 · slowdown))``. Mirrors
   the simulator's formula in ``sensors.physics.feature_printing_duration``.
-
-This mirrors the architecture in
-``learning-by-printing/models/predictions/`` so the mock's predictor stack
-is structurally identical to real-fab.
 """
 
 from __future__ import annotations
@@ -31,10 +26,9 @@ from sensors.physics import PATH_LENGTH_PER_LAYER_M
 
 
 class StructuralTransformer(TransformerModel):
-    """Multi-depth transformer predicting all five structural target features.
+    """Multi-depth transformer predicting four structural target features.
 
-    Depth-1 outputs (per layer): extrusion_consistency, current_mean_feeder,
-    current_mean_nozzle.
+    Depth-1 outputs (per layer): extrusion_consistency, robot_energy.
     Depth-2 outputs (per layer × node): node_overlap, filament_width.
     """
 
@@ -75,8 +69,7 @@ class StructuralTransformer(TransformerModel):
         return [
             # depth 1
             "extrusion_consistency",
-            "current_mean_feeder",
-            "current_mean_nozzle",
+            "robot_energy",
             # depth 2
             "node_overlap",
             "filament_width",

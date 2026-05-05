@@ -1,7 +1,7 @@
 from .feature_models import (
     NodeVisionFeature,
     LoadcellConsistencyFeature,
-    ExtruderEnergyFeature,
+    RobotEnergyFeature,
     DurationFeature,
     EnvironmentFeature,
 )
@@ -17,7 +17,7 @@ from .prediction_model import StructuralTransformer, DeterministicDuration
 __all__ = [
     "NodeVisionFeature",
     "LoadcellConsistencyFeature",
-    "ExtruderEnergyFeature",
+    "RobotEnergyFeature",
     "DurationFeature",
     "EnvironmentFeature",
     "StructuralIntegrityEval",

@@ -129,17 +129,10 @@ class FabricationSystem:
                 calibration_factor=float(params["calibration_factor"]),
                 layer_idx=layer_idx,
             ),
-            "current_mean_feeder": physics.feature_current_mean_feeder(
-                calibration_factor=float(params["calibration_factor"]),
+            "robot_energy": physics.feature_robot_energy(
+                print_speed_mps=float(params["print_speed"]),
+                slowdown_factor=float(params["slowdown_factor"]),
                 layer_height_mm=float(params["layer_height"]),
-                print_speed_mps=float(params["print_speed"]),
-                slowdown_factor=float(params["slowdown_factor"]),
-                layer_idx=layer_idx,
-            ),
-            "current_mean_nozzle": physics.feature_current_mean_nozzle(
-                calibration_factor=float(params["calibration_factor"]),
-                print_speed_mps=float(params["print_speed"]),
-                slowdown_factor=float(params["slowdown_factor"]),
                 layer_idx=layer_idx,
             ),
             "printing_duration": physics.feature_printing_duration(

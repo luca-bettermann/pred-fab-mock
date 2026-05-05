@@ -7,7 +7,7 @@ from sensors.fabrication import FabricationSystem
 from models.feature_models import (
     NodeVisionFeature,
     LoadcellConsistencyFeature,
-    ExtruderEnergyFeature,
+    RobotEnergyFeature,
     DurationFeature,
     EnvironmentFeature,
 )
@@ -32,7 +32,7 @@ def build_agent(
     # Feature models (one per modality, mirroring learning-by-printing layout)
     agent.register_feature_model(NodeVisionFeature, fab=fab)
     agent.register_feature_model(LoadcellConsistencyFeature, fab=fab)
-    agent.register_feature_model(ExtruderEnergyFeature, fab=fab)
+    agent.register_feature_model(RobotEnergyFeature, fab=fab)
     agent.register_feature_model(DurationFeature, fab=fab)
     agent.register_feature_model(EnvironmentFeature, fab=fab)
 

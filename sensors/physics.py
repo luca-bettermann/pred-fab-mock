@@ -33,7 +33,7 @@ MAX_N_LAYERS = 13                # fixed tensor size — ceil(25 / 2.0) = 13 (ma
 PATH_LENGTH_PER_LAYER_M = 0.50   # nominal toolpath length per layer (m)
 TARGET_FILAMENT_WIDTH_MM = 11.0  # target deposition width (mm) — drives material_deposition
 TARGET_NODE_OVERLAP_MM = 1.5     # target overlap at the corner nodes (mm)
-SUPPLY_VOLTAGE_V = 3.0           # extruder motor supply voltage (V) — used by energy footprint
+ROBOT_NOMINAL_POWER_W = 350.0    # nominal robot power at mid-speed, mid-load (W)
 
 # Per-axis ambient noise terms (deterministic, seeded by coordinates)
 TEMP_AMBIENT_C = 22.0
@@ -164,53 +164,39 @@ def feature_extrusion_consistency(
     return max(0.30, min(1.0, raw))
 
 
-def feature_current_mean_feeder(
+def feature_robot_energy(
     *,
-    calibration_factor: float,
-    layer_height_mm: float,
     print_speed_mps: float,
     slowdown_factor: float,
+    layer_height_mm: float,
     layer_idx: int,
 ) -> float:
-    """Per-layer mean feeder-motor current [A].
+    """Per-layer robot energy consumption [Wh].
+
+    E_robot = P_robot · t_layer, where power scales with speed² (kinetic)
+    and slowdown introduces acceleration costs.
 
     Drivers:
-      - ``calibration_factor``: higher flow demand → higher current (dominant).
-      - ``layer_height_mm``: thicker layer → more material per unit time.
-      - ``print_speed_mps``: faster → faster pump → higher current.
-      - ``slowdown_factor``: slowdown reduces effective speed → small dip.
+      - ``print_speed_mps``: power ∝ speed² but duration ∝ 1/speed, net
+        effect is energy ∝ speed at high speeds, ∝ 1/speed at low speeds.
+      - ``slowdown_factor``: aggressive deceleration/acceleration at corners
+        adds energy (jerk costs).
+      - ``layer_height_mm``: heavier deposited mass → higher joint loads.
+      - ``layer_idx``: slight thermal efficiency gain over time.
     """
     effective_speed = print_speed_mps * (1.0 - 0.45 * slowdown_factor)
-    current = (
-        0.55
-        + 0.40 * (calibration_factor - 1.6) / 0.6        # 0–0.4 A via calibration
-        + 0.30 * (layer_height_mm - 2.0)                  # 0–0.3 A via layer height
-        + 90.0 * effective_speed                          # 0.36–0.72 A via speed
-    )
-    # Small thermal drift up over height.
-    current += 0.01 * layer_idx
-    return max(0.20, current)
+    if effective_speed < 1e-6:
+        return 100.0
 
+    duration_s = PATH_LENGTH_PER_LAYER_M / effective_speed
+    speed_norm = print_speed_mps / 0.006
+    power = ROBOT_NOMINAL_POWER_W * (0.6 + 0.4 * speed_norm ** 1.3)
+    accel_cost = 1.0 + 0.35 * slowdown_factor ** 1.5
+    mass_cost = 1.0 + 0.15 * (layer_height_mm - 2.0)
+    warmup = 1.0 - 0.005 * layer_idx
 
-def feature_current_mean_nozzle(
-    *,
-    calibration_factor: float,
-    print_speed_mps: float,
-    slowdown_factor: float,
-    layer_idx: int,
-) -> float:
-    """Per-layer mean nozzle-screw-motor current [A]. Smaller than feeder,
-    more sensitive to slowdown (corner deceleration unloads the screw).
-    """
-    effective_speed = print_speed_mps * (1.0 - 0.45 * slowdown_factor)
-    current = (
-        0.40
-        + 0.30 * (calibration_factor - 1.6) / 0.6
-        + 75.0 * effective_speed
-        - 0.06 * slowdown_factor                          # screw unloads on slowdown
-    )
-    current += 0.008 * layer_idx
-    return max(0.15, current)
+    energy_j = power * accel_cost * mass_cost * warmup * duration_s
+    return energy_j / 3600.0
 
 
 def feature_printing_duration(
