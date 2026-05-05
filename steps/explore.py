@@ -66,7 +66,7 @@ def run(args: argparse.Namespace) -> None:
         import os
         conv_history = [combined_score(p, perf_weights or {}) for _, _, p in log]
         path_conv = os.path.join(plot_dir, "03_exploration_convergence.png")
-        plot_convergence(path_conv, conv_history)
+        plot_convergence(path_conv, {"exploration": conv_history})
         show_plot_with_header(path_conv, "Exploration: Convergence", inline=args.plot)
 
     save_session(config, state)

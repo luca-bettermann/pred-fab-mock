@@ -58,14 +58,23 @@ def run(args: argparse.Namespace) -> None:
 
     if getattr(args, "plot", False):
         import os
-        from pred_fab.plotting import plot_inference_result
+        from pred_fab.plotting import plot_performance_radar
+
+        all_perfs = [p for _, p in state.perf_history]
+        dataset_scores = [combined_score(p, perf_weights) for _, p in state.perf_history]
+        dataset_avg = float(sum(dataset_scores) / len(dataset_scores))
 
         path = os.path.join(plot_dir, "04_inference.png")
-        plot_inference_result(
-            path, perf, perf_weights or {},
-            combined=score, exp_code=code,
+        plot_performance_radar(
+            path,
+            performance=perf,
+            dataset_performances=all_perfs,
+            weights=perf_weights,
+            combined_score=score,
+            dataset_combined=dataset_avg,
+            exp_code=code,
         )
-        show_plot_with_header(path, "Inference: Result", inline=args.plot)
+        show_plot_with_header(path, "Inference: Performance Radar", inline=args.plot)
 
     save_session(config, state)
 

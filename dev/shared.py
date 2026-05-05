@@ -11,17 +11,18 @@ from typing import Any
 
 import numpy as np
 
-# Make repo root importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from pred_fab.core import Dataset
 from pred_fab.orchestration import PfabAgent
+from pred_fab.utils.metrics import combined_score
 
-from schema import build_schema
+from schema import build_schema, PARAM_BOUNDS
 from agent_setup import build_agent
-from sensors import CameraSystem, EnergySensor, FabricationSystem
-from sensors.physics import N_LAYERS, N_SEGMENTS
+from sensors import FabricationSystem
+from sensors.physics import MAX_N_LAYERS
 from utils import params_from_spec
+from workflow import N_NODES
 
 PLOT_DIR = os.path.join(os.path.dirname(__file__), "plots")
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
@@ -31,23 +32,20 @@ def make_env(
     data_tag: str = "default",
     verbose: bool = True,
 ) -> tuple[PfabAgent, FabricationSystem, Dataset]:
-    """Build a fresh agent + fabrication system + dataset.
-
-    Each call creates a clean data directory under dev/data/{data_tag}.
-    """
+    """Build a fresh agent + fabrication system + dataset."""
     root = os.path.join(DATA_DIR, data_tag)
     if os.path.exists(root):
         shutil.rmtree(root)
     schema = build_schema(root_folder=root)
-    fab    = FabricationSystem(CameraSystem(), EnergySensor())
-    agent  = build_agent(schema, fab.camera, fab.energy, verbose=verbose)
+    fab = FabricationSystem()
+    agent = build_agent(schema, fab, verbose=verbose)
     dataset = Dataset(schema=schema)
     return agent, fab, dataset
 
 
 def with_dims(params: dict[str, Any]) -> dict[str, Any]:
-    """Add fixed n_layers and n_segments to params."""
-    return {**params, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
+    """Add fixed tensor dimensions to params."""
+    return {**params, "n_layers": MAX_N_LAYERS, "n_nodes": N_NODES}
 
 
 def run_experiment(
@@ -90,22 +88,14 @@ def train_models(agent: PfabAgent, dataset: Dataset, val_size: float = 0.25):
     return dm, results
 
 
-def build_test_grid(
-    n_water: int = 16,
-    n_speed: int = 16,
-    water_range: tuple[float, float] = (0.31, 0.49),
-    speed_range: tuple[float, float] = (21.0, 59.0),
-) -> list[dict[str, Any]]:
-    """Build a proper 2D grid of test parameters (independent axes)."""
-    waters = np.linspace(water_range[0], water_range[1], n_water)
-    speeds = np.linspace(speed_range[0], speed_range[1], n_speed)
+def build_test_grid(resolution: int = 10) -> list[dict[str, Any]]:
+    """Build a grid of test parameters across the ADVEI space."""
+    bounds = {code: (lo, hi) for code, lo, hi in PARAM_BOUNDS}
+    rng = np.random.default_rng(seed=42)
     test_params = []
-    for w in waters:
-        for spd in speeds:
-            test_params.append(with_dims({
-                "water_ratio": float(w),
-                "print_speed": float(spd),
-            }))
+    for _ in range(resolution * resolution):
+        p = {code: float(rng.uniform(lo, hi)) for code, (lo, hi) in bounds.items()}
+        test_params.append(with_dims(p))
     return test_params
 
 

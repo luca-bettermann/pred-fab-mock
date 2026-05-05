@@ -3,47 +3,54 @@
 Visualize the ground truth performance landscape to confirm:
   - The combined score has a clear, findable optimum
   - The topology is non-trivial (Pareto trade-offs between metrics)
-  - The landscape is smooth enough for an MLP to learn
+  - The landscape is smooth enough for a model to learn
 """
 
 import os
-import sys
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from sensors.physics import DELTA, THETA, SAG, COMPLEXITY, W_OPTIMAL
-from visualization import plot_physics_topology, plot_cross_sections, evaluate_physics_grid
 from shared import ensure_plot_dir
 
-PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from visualization.helpers import evaluate_physics_grid
+from pred_fab.plotting import plot_metric_topology, AxisSpec
+
+PERF_WEIGHTS = {
+    "structural_integrity": 1.0,
+    "material_deposition": 1.0,
+    "extrusion_stability": 1.0,
+    "energy_footprint": 1.0,
+    "fabrication_time": 1.0,
+}
+
+SPEED_AXIS = AxisSpec("print_speed", "Print Speed", unit="m/s", bounds=(0.004, 0.008))
+CALIB_AXIS = AxisSpec("calibration_factor", "Calibration Factor", bounds=(1.6, 2.2))
 
 
 def main():
     plot_dir = ensure_plot_dir()
-    spd_opt = float(np.clip(np.sqrt(THETA * SAG / (DELTA * COMPLEXITY)), 20.0, 60.0))
-    w_opt = W_OPTIMAL
 
-    print(f"  Physics optimum: speed={spd_opt:.1f} mm/s, water={w_opt:.2f}")
-
-    waters, speeds, metrics = evaluate_physics_grid(50, PERF_WEIGHTS)
-    combined = list(metrics.values())[-1]
+    speeds, calibs, metrics = evaluate_physics_grid(30, PERF_WEIGHTS)
+    combined = metrics["combined"]
     best_idx = np.unravel_index(np.argmax(combined), combined.shape)
-    print(f"  Grid maximum:    speed={speeds[best_idx[0]]:.1f} mm/s, "
-          f"water={waters[best_idx[1]]:.2f}, combined={combined[best_idx]:.3f}")
+    print(f"  Grid maximum: speed={speeds[best_idx[0]]:.4f} m/s, "
+          f"cal={calibs[best_idx[1]]:.2f}, combined={combined[best_idx]:.3f}")
 
     for name, data in metrics.items():
-        w_idx = np.argmin(np.abs(waters - w_opt))
-        s_idx = np.argmin(np.abs(speeds - spd_opt))
-        print(f"  {name:25s} at optimum: {data[s_idx, w_idx]:.3f}")
+        if name == "combined":
+            continue
+        print(f"  {name:25s} at optimum: {data[best_idx]:.3f}")
 
+    individual = {k: v for k, v in metrics.items() if k != "combined"}
     topo_path = os.path.join(plot_dir, "01_topology.png")
-    plot_physics_topology(topo_path, perf_weights=PERF_WEIGHTS)
+    plot_metric_topology(
+        topo_path, SPEED_AXIS, CALIB_AXIS, speeds, calibs,
+        individual, combined,
+        combined_label="combined",
+        weights=PERF_WEIGHTS,
+    )
     print(f"\n  Saved: {topo_path}")
-
-    cross_path = os.path.join(plot_dir, "01_cross_sections.png")
-    plot_cross_sections(cross_path, spd_opt, w_opt, perf_weights=PERF_WEIGHTS)
-    print(f"  Saved: {cross_path}")
 
 
 if __name__ == "__main__":
