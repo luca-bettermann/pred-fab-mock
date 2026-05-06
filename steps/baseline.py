@@ -51,8 +51,12 @@ def run(args: argparse.Namespace) -> None:
           f"best={max(scores):.3f}  mean={sum(scores)/len(scores):.3f}")
 
     if getattr(args, "plot", False) and log:
-        from visualization.helpers import evaluate_physics_grid
-        from pred_fab.plotting import plot_metric_topology, plot_phase_proposals
+        import numpy as np
+        from visualization.helpers import evaluate_physics_grid, physics_combined_at
+        from pred_fab.plotting import (
+            plot_metric_topology, plot_phase_proposals, plot_convergence,
+            plot_dimensional_trajectories, plot_parameter_space,
+        )
 
         speeds, calibs, metrics = evaluate_physics_grid(25, perf_weights)
         individual = {k: v for k, v in metrics.items() if k != "combined"}
@@ -67,6 +71,65 @@ def run(args: argparse.Namespace) -> None:
                           if k not in ("print_speed", "calibration_factor")},
         )
         show_plot_with_header(path, "Baseline: Ground Truth Topology", inline=args.plot)
+
+        # True vs model topology
+        dm = agent.create_datamodule(dataset)
+        dm.prepare(val_size=0.0)
+        agent.train(dm, validate=False)
+
+        topo_res = 40
+        topo_speeds = np.linspace(*SPEED_AXIS.bounds, topo_res)  # type: ignore[arg-type]
+        topo_calibs = np.linspace(*CALIB_AXIS.bounds, topo_res)  # type: ignore[arg-type]
+        true_grid = np.array([
+            [physics_combined_at(spd, cal, perf_weights) for cal in topo_calibs]
+            for spd in topo_speeds
+        ])
+        pred_grid = np.zeros_like(true_grid)
+        for i, cal in enumerate(topo_calibs):
+            for j, spd in enumerate(topo_speeds):
+                try:
+                    p = agent.predict_performance(
+                        {**DEFAULT_FIXED, "print_speed": spd, "calibration_factor": cal}
+                    )
+                    pred_grid[j, i] = combined_score(p, perf_weights or {})
+                except Exception:
+                    pred_grid[j, i] = 0.0
+
+        path_ps = os.path.join(plot_dir, "01_baseline_parameter_space.png")
+        plot_parameter_space(
+            path_ps, SPEED_AXIS, CALIB_AXIS, topo_calibs, topo_speeds,
+            state.all_params, true_grid, pred_grid,
+            trajectories=state.trajectories, codes=state.all_codes,
+            fixed_params={k: v for k, v in DEFAULT_FIXED.items()
+                          if k not in ("print_speed", "calibration_factor")},
+        )
+        show_plot_with_header(path_ps, "Baseline: True vs Model Topology", inline=args.plot)
+
+        # Dimensional trajectories
+        path_3d = os.path.join(plot_dir, "01_baseline_trajectories.png")
+        plot_dimensional_trajectories(
+            path_3d, SPEED_AXIS, CALIB_AXIS, "n_layers",
+            state.all_params,
+            trajectories=state.trajectories, codes=state.all_codes,
+        )
+        show_plot_with_header(path_3d, "Baseline: Dimensional Trajectories", inline=args.plot)
+
+        # Phase validation scatter
+        cal = agent.calibration_system
+        path_val = os.path.join(plot_dir, "01_phase_validation.png")
+        validation_panels: list[tuple] = []
+        if cal.last_process_points is not None:
+            validation_panels.append(("Process", SPEED_AXIS, CALIB_AXIS, cal.last_process_points, None))
+        if validation_panels:
+            plot_phase_proposals(path_val, validation_panels)
+            show_plot_with_header(path_val, "Phase Validation", inline=args.plot)
+
+        # Convergence
+        conv_history = cal.convergence_history
+        if conv_history:
+            path_conv = os.path.join(plot_dir, "01_convergence.png")
+            plot_convergence(path_conv, conv_history)
+            show_plot_with_header(path_conv, "Baseline: Convergence", inline=args.plot)
 
     save_session(config, state)
 

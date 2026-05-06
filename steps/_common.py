@@ -209,6 +209,38 @@ def apply_schedule_args(agent: Any, args: Any, config: dict[str, Any]) -> None:
         agent.configure_trajectory(param, dim, delta=delta)
 
 
+# === Acquisition grid (for plot_acquisition) ================================
+
+def compute_acquisition_grid(
+    agent: Any, dm: Any, kappa: float, res: int = 30,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Compute normalised performance, uncertainty, and combined grids over (speed, calib)."""
+    speeds = np.linspace(*SPEED_AXIS.bounds, res)  # type: ignore[arg-type]
+    calibs = np.linspace(*CALIB_AXIS.bounds, res)  # type: ignore[arg-type]
+    perf_grid = np.zeros((res, res))
+    unc_grid = np.zeros((res, res))
+    pw = agent.calibration_system.performance_weights
+    for i, cal in enumerate(calibs):
+        for j, spd in enumerate(speeds):
+            p = {**DEFAULT_FIXED, "print_speed": spd, "calibration_factor": cal}
+            try:
+                perf = agent.predict_performance(p)
+                perf_grid[j, i] = combined_score(perf, pw)
+            except Exception:
+                perf_grid[j, i] = 0.0
+            unc_grid[j, i] = agent.predict_uncertainty(p, dm)
+
+    cal_sys = agent.calibration_system
+    if cal_sys._perf_range_min is not None and cal_sys._perf_range_max is not None:
+        p_min, p_max = cal_sys._perf_range_min, cal_sys._perf_range_max
+    else:
+        p_min, p_max = float(perf_grid.min()), float(perf_grid.max())
+    span = max(p_max - p_min, 1e-10)
+    p_norm = np.clip((perf_grid - p_min) / span, 0, 1)
+    combined_grid = (1 - kappa) * p_norm + kappa * unc_grid
+    return calibs, speeds, p_norm, unc_grid, combined_grid
+
+
 # === Schedule extraction + run wrapper ======================================
 
 def extract_schedule_steps(spec: Any, base_params: dict[str, Any]) -> list[dict[str, Any]]:

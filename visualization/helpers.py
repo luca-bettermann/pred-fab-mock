@@ -90,6 +90,23 @@ def evaluate_physics_grid(
     return xs, ys, grids
 
 
+def physics_combined_at(
+    print_speed: float,
+    calibration_factor: float,
+    perf_weights: dict[str, float] | None = None,
+    **overrides: float,
+) -> float:
+    """Evaluate combined physics score at a single (speed, calib) point."""
+    params = {**_DEFAULT_FIXED, "print_speed": print_speed,
+              "calibration_factor": calibration_factor, **overrides}
+    fab = FabricationSystem()
+    fab.run_experiment(params)
+    n_layers = int(params["n_layers"])
+    n_nodes = int(params["n_nodes"])
+    perf = _evaluate_at(fab, params, n_layers, n_nodes)
+    return combined_score(perf, perf_weights or {})
+
+
 def _evaluate_at(
     fab: FabricationSystem,
     params: dict,

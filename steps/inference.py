@@ -13,6 +13,7 @@ from steps._common import (
     apply_schedule_args, ensure_plot_dir, load_session, next_code,
     rebuild, run_and_record, save_session, show_plot_with_header,
     get_performance, effective_weights,
+    SPEED_AXIS, CALIB_AXIS, DEFAULT_FIXED,
 )
 from workflow import with_dimensions
 
@@ -58,13 +59,15 @@ def run(args: argparse.Namespace) -> None:
 
     if getattr(args, "plot", False):
         import os
-        from pred_fab.plotting import plot_performance_radar
+        import numpy as np
+        from pred_fab.plotting import plot_performance_radar, plot_inference_result
+        from visualization.helpers import physics_combined_at
 
         all_perfs = [p for _, p in state.perf_history]
         dataset_scores = [combined_score(p, perf_weights) for _, p in state.perf_history]
         dataset_avg = float(sum(dataset_scores) / len(dataset_scores))
 
-        path = os.path.join(plot_dir, "04_inference.png")
+        path = os.path.join(plot_dir, "04_inference_radar.png")
         plot_performance_radar(
             path,
             performance=perf,
@@ -75,6 +78,47 @@ def run(args: argparse.Namespace) -> None:
             exp_code=code,
         )
         show_plot_with_header(path, "Inference: Performance Radar", inline=args.plot)
+
+        # Predicted topology with proposed optimum
+        topo_res = 40
+        topo_calibs = np.linspace(*CALIB_AXIS.bounds, topo_res)  # type: ignore[arg-type]
+        topo_speeds = np.linspace(*SPEED_AXIS.bounds, topo_res)  # type: ignore[arg-type]
+        pred_grid = np.zeros((topo_res, topo_res))
+        for i, cal in enumerate(topo_calibs):
+            for j, spd in enumerate(topo_speeds):
+                try:
+                    p = agent.predict_performance(
+                        {**DEFAULT_FIXED, "print_speed": spd, "calibration_factor": cal}
+                    )
+                    pred_grid[j, i] = combined_score(p, perf_weights or {})
+                except Exception:
+                    pred_grid[j, i] = 0.0
+
+        # Physics optimum for reference
+        opt_grid_res = 20
+        opt_calibs = np.linspace(*CALIB_AXIS.bounds, opt_grid_res)  # type: ignore[arg-type]
+        opt_speeds = np.linspace(*SPEED_AXIS.bounds, opt_grid_res)  # type: ignore[arg-type]
+        best_opt_score = -1.0
+        opt_spd, opt_cal = SPEED_AXIS.bounds[0], CALIB_AXIS.bounds[0]  # type: ignore[index]
+        for s in opt_speeds:
+            for c in opt_calibs:
+                sc = physics_combined_at(s, c, perf_weights)
+                if sc > best_opt_score:
+                    best_opt_score, opt_spd, opt_cal = sc, s, c
+
+        path_topo = os.path.join(plot_dir, "04_inference_topology.png")
+        plot_inference_result(
+            path_topo, SPEED_AXIS, CALIB_AXIS, topo_calibs, topo_speeds, pred_grid,
+            proposed={"print_speed": params["print_speed"],
+                      "calibration_factor": params["calibration_factor"]},
+            proposed_score=score,
+            optimum={"print_speed": opt_spd, "calibration_factor": opt_cal},
+            optimum_score=best_opt_score,
+            points=state.all_params,
+            fixed_params={k: v for k, v in DEFAULT_FIXED.items()
+                          if k not in ("print_speed", "calibration_factor")},
+        )
+        show_plot_with_header(path_topo, "Inference: Predicted Topology", inline=args.plot)
 
     save_session(config, state)
 
