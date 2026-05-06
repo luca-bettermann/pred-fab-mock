@@ -12,7 +12,7 @@ from pred_fab.utils.metrics import combined_score
 from steps._common import (
     apply_schedule_args, ensure_plot_dir, load_session, next_code,
     rebuild, run_and_record, save_session, show_plot_with_header,
-    get_performance, effective_weights, SPEED_AXIS, CALIB_AXIS, DEFAULT_FIXED,
+    get_performance, effective_weights, SPEED_AXIS, CALIB_AXIS, SLOWDOWN_AXIS, DEFAULT_FIXED,
 )
 
 
@@ -108,7 +108,7 @@ def run(args: argparse.Namespace) -> None:
         # Dimensional trajectories
         path_3d = os.path.join(plot_dir, "01_baseline_trajectories.png")
         plot_dimensional_trajectories(
-            path_3d, SPEED_AXIS, CALIB_AXIS, "n_layers",
+            path_3d, SPEED_AXIS, SLOWDOWN_AXIS, "n_layers",
             state.all_params,
             trajectories=state.trajectories, codes=state.all_codes,
         )
