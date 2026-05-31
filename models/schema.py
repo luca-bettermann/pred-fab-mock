@@ -57,14 +57,12 @@ PARAM_ROUND_DIGITS: dict[str, int] = {
     ParamCode.PRINT_SPEED:        5,
 }
 
-# Per-print (static) params — one value per experiment.
-STATIC_PARAMS = (ParamCode.PATH_OFFSET, ParamCode.LAYER_HEIGHT, ParamCode.CALIBRATION_FACTOR)
-# Per-layer (trajectory) params — re-proposable along the layer axis.
-TRAJECTORY_PARAMS = (ParamCode.PRINT_SPEED,)
-
-# Fixed study constant (held at 0 for ADVEI; the corner-slowdown axis is not
-# part of this paper). Kept so the simulator's corner physics has a defined value.
-SLOWDOWN_FACTOR = 0.0
+# All four ADVEI parameters are per-print (one value per experiment). Per-layer
+# trajectory scheduling is out of scope for this study, so there are no
+# trajectory (runtime) params.
+STATIC_PARAMS = (ParamCode.PATH_OFFSET, ParamCode.LAYER_HEIGHT,
+                 ParamCode.CALIBRATION_FACTOR, ParamCode.PRINT_SPEED)
+TRAJECTORY_PARAMS: tuple[str, ...] = ()
 
 
 # === Features ================================================================

@@ -69,7 +69,4 @@ def build_agent(schema: DatasetSchema, fab: FabricationSystem, *, verbose: bool 
     )
     agent.calibration_system.dimension_derivations[AxisCode.NODES] = lambda p: N_NODES
 
-    # print_speed is the per-layer trajectory parameter.
-    agent.configure_trajectory(ParamCode.PRINT_SPEED, AxisCode.LAYERS)
-
     return agent

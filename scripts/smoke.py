@@ -19,7 +19,7 @@ from pred_fab.core import Dataset
 from cli.agent_setup import build_schema, build_fab, build_agent
 from models.schema import N_NODES, derive_n_layers, AttributeCode
 
-N_DISCOVERY = 8
+N_DISCOVERY = 18
 ROOT = "./.smoke_data"
 
 
