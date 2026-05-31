@@ -1,12 +1,19 @@
 [project]
 name = "pred-fab-mock"
 version = "0.1.0"
-requires-python = ">=3.12"
+description = "Runnable simulation companion for the ADVEI 2026 PFAB study — synthetic fabrication, no hardware."
+requires-python = ">=3.10"
 dependencies = [
-    "pred-fab[torch]",
-    "matplotlib>=3.9.4",
-    "numpy>=1.24",
+    "pred-fab",
+    "matplotlib>=3.8",
+    "numpy>=2.0",
 ]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+pred-fab = { path = "../pred-fab", editable = true }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
@@ -16,13 +23,7 @@ explicit = true
 [tool.uv.sources.torch]
 index = "pytorch-cpu"
 
-[tool.setuptools.packages.find]
-include = ["models*", "sensors*", "visualization*"]
-
 [dependency-groups]
 dev = [
     "pyright>=1.1.409",
 ]
-
-[tool.uv.sources]
-pred-fab = { path = "../pred-fab", editable = true }
