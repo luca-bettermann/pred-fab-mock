@@ -12,12 +12,13 @@ uv sync                                   # installs pred-fab + torch (CPU)
 
 uv run python -m cli.main discovery --n 18   # κ=1: space-filling seed experiments
 uv run python -m cli.main train              # fit StructuralMLP on what's collected
-uv run python -m cli.main exploration        # 0<κ<1: blend performance + evidence
-uv run python -m cli.main inference          # κ=0: predicted-optimal parameters
+uv run python -m cli.main exploration --plot # 0<κ<1: blend performance + evidence
+uv run python -m cli.main inference --plot   # κ=0: predicted-optimal parameters
+uv run python -m cli.main report             # showcase plots: acquisition topology + radar
 uv run python -m cli.main summary            # session status
 ```
 
-Each command persists its results, so the steps compose across invocations. `configure --kappa 0.4 --seed 1` sets defaults; `reset` clears the session.
+Each command persists its results, so the steps compose across invocations. `configure --kappa 0.4 --seed 1` sets defaults; `reset` clears the session. **`--plot`** (on discovery/exploration/inference, and always on `report`) renders the pred-fab acquisition topology and performance radar **inline in the terminal** (iTerm2/kitty) and saves them under `plots/`.
 
 ## What it demonstrates
 

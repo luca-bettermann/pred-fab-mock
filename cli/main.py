@@ -21,6 +21,10 @@ def _add_verbose(p: argparse.ArgumentParser) -> None:
     p.add_argument("--verbose", action="store_true", help="Show systems-init output")
 
 
+def _add_plot(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--plot", action="store_true", help="Render showcase plots inline + save to plots/")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mock",
@@ -32,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("discovery", help="Propose + simulate N space-filling experiments (κ=1)")
     p.add_argument("--n", type=int, default=18, help="Number of experiments")
+    _add_plot(p)
     _add_verbose(p)
     p.set_defaults(func=commands.discovery)
 
@@ -41,12 +46,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("exploration", help="Propose + simulate one exploration experiment")
     p.add_argument("--kappa", type=float, default=None, help="Exploration weight (default: session config)")
+    _add_plot(p)
     _add_verbose(p)
     p.set_defaults(func=commands.exploration)
 
     p = sub.add_parser("inference", help="Propose the predicted-optimal parameters (κ=0)")
+    _add_plot(p)
     _add_verbose(p)
     p.set_defaults(func=commands.inference)
+
+    p = sub.add_parser("report", help="Train + render showcase plots (acquisition topology + radar)")
+    p.set_defaults(func=commands.report)
 
     p = sub.add_parser("configure", help="Set + persist session config (kappa, seed)")
     p.add_argument("--kappa", type=float, default=None)
