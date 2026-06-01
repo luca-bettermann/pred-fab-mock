@@ -21,7 +21,7 @@ from cli.agent_setup import build_agent, build_fab
 
 SESSION_DIR = "local"
 SESSION_FILE = os.path.join(SESSION_DIR, "session.json")
-DATASETS = ("discovery", "exploration", "inference")
+DATASETS = ("reference", "test", "grid", "discovery", "exploration", "inference")
 
 DEFAULT_CONFIG: dict[str, Any] = {"kappa": 0.5, "seed": 0, "weights": None}
 

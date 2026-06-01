@@ -10,6 +10,11 @@ It mirrors the real study ([`learning-by-printing`](../learning-by-printing)) ex
 uv venv
 uv sync                                   # installs pred-fab + torch (CPU)
 
+# Passive comparison baselines — fixed CCF grids, no model, no active learning
+uv run python -m cli.main grid --dataset-code reference --fractional-x 1 --half-face-centers
+uv run python -m cli.main test-set           # held-out test grid
+
+# Active PFAB loop
 uv run python -m cli.main discovery --n 18   # κ=1: space-filling seed experiments
 uv run python -m cli.main train              # fit StructuralMLP on what's collected
 uv run python -m cli.main exploration --plot # 0<κ<1: blend performance + evidence
@@ -19,6 +24,10 @@ uv run python -m cli.main summary            # session status
 ```
 
 Each command persists its results, so the steps compose across invocations. `configure --kappa 0.4 --seed 1` sets defaults; `reset` clears the session. **`--plot`** (on discovery/exploration/inference, and always on `report`) renders the pred-fab acquisition topology and performance radar **inline in the terminal** (iTerm2/kitty) and saves them under `plots/`.
+
+### Datasets
+
+Mirrors the ADVEI study's split: the **passive** `reference` and `test` grids (fixed central-composite-face DoE, no model) are the comparison baselines, and the **active** loop — `discovery` (κ=1), `exploration` (κ-blend), `inference` (κ=0) — is what's measured against them. The paper's point: active learning reaches comparable quality with far fewer experiments than the reference grid.
 
 ## What it demonstrates
 

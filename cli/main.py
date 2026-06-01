@@ -58,6 +58,21 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("report", help="Train + render showcase plots (acquisition topology + radar)")
     p.set_defaults(func=commands.report)
 
+    p = sub.add_parser("grid", help="Generate a static CCF grid dataset (passive baseline: reference/test)")
+    p.add_argument("--dataset-code", type=str, default="reference", help="Tag for the runs (reference/test/grid)")
+    p.add_argument("--low-pct", type=float, default=0.25, help="Coded -1 level as fraction of each param range")
+    p.add_argument("--high-pct", type=float, default=0.75, help="Coded +1 level as fraction of each param range")
+    p.add_argument("--fractional-x", type=int, default=0, help="0 = full 2^k corners; 1 = Resolution-V half-fraction")
+    p.add_argument("--half-face-centers", action="store_true", help="k face points (alternating) instead of 2k")
+    p.add_argument("--n-center", type=int, default=1, help="Grand-center replicates")
+    _add_verbose(p)
+    p.set_defaults(func=commands.grid)
+
+    p = sub.add_parser("test-set", help="Generate the held-out test grid (CCF, test-set defaults)")
+    p.add_argument("--n-center", type=int, default=3)
+    _add_verbose(p)
+    p.set_defaults(func=commands.test_set)
+
     p = sub.add_parser("configure", help="Set + persist session config (kappa, seed)")
     p.add_argument("--kappa", type=float, default=None)
     p.add_argument("--seed", type=int, default=None)

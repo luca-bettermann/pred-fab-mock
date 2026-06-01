@@ -7,6 +7,7 @@ exploration simulate + evaluate in-process (no external "run the print" gap).
 """
 from __future__ import annotations
 
+import argparse
 import shutil
 from typing import Any
 
@@ -17,6 +18,8 @@ from cli.session import (
     params_from_spec, perf_dict, fmt_perf, SESSION_DIR,
 )
 from cli import plots
+from cli.doe import generate_ccf_design
+from models.schema import PARAM_BOUNDS
 
 _G = "\033[32m"; _C = "\033[36m"; _R = "\033[0m"
 
@@ -72,6 +75,35 @@ def discovery(args: Any) -> None:
     print(f"\n  {_G}✓{_R} {len(specs)} discovery experiments saved.\n")
     if getattr(args, "plot", False):
         _try_plot(plots.acquisition_topology, agent, dataset, None, 1.0, "discovery")
+
+
+def grid(args: Any) -> None:
+    """Generate a static CCF grid dataset (passive baseline — no model, no active learning).
+
+    Produces the fixed ``reference`` / ``test`` grids the active loop is compared against.
+    """
+    agent, fab, dataset, config = build_env(verbose=args.verbose)
+    runs = generate_ccf_design(
+        bounds=PARAM_BOUNDS, low_pct=args.low_pct, high_pct=args.high_pct,
+        fractional_x=args.fractional_x, half_face_centers=args.half_face_centers,
+        n_center=args.n_center,
+    )
+    ds = args.dataset_code
+    print(f"\n  {_C}Grid{_R} ▸ {ds} — {len(runs)}-point CCF (low={args.low_pct}, high={args.high_pct})\n")
+    for run_params in runs:
+        code = next_code(dataset, ds)
+        exp = simulate_and_evaluate(agent, fab, dataset, run_params, code, ds)
+        print(f"  {code:<16s}  {fmt_perf(perf_dict(exp))}")
+    print(f"\n  {_G}✓{_R} {len(runs)} {ds} experiments saved.\n")
+
+
+def test_set(args: Any) -> None:
+    """Held-out test grid — `grid` with the test-set defaults."""
+    grid(argparse.Namespace(
+        dataset_code="test", low_pct=0.15, high_pct=0.85,
+        fractional_x=0, half_face_centers=False, n_center=args.n_center,
+        verbose=getattr(args, "verbose", False),
+    ))
 
 
 def train(args: Any) -> None:
@@ -152,7 +184,7 @@ def summary(args: Any) -> None:
     agent, fab, dataset, config = build_env(verbose=False)
     codes = sorted(dataset.get_experiment_codes())
     print(f"\n  {_C}Session summary{_R} — {len(codes)} experiments  (κ={config.get('kappa')}, seed={config.get('seed')})\n")
-    for ds in ("discovery", "exploration", "inference"):
+    for ds in ("reference", "test", "discovery", "exploration", "inference"):
         members = [c for c in codes if c.startswith(ds + "/")]
         if members:
             print(f"  {ds:<12s} {len(members):>2d}  ({members[0]} … {members[-1]})")
