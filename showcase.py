@@ -26,7 +26,7 @@ from analysis import true_performance_grid
 from utils import params_from_spec, get_performance
 from visualization import (
     stage_average_field, plot_stage_print, plot_parameter_topology,
-    plot_performance_trajectory, plot_feature_heatmaps, plot_prediction_accuracy,
+    plot_performance_timeline, plot_feature_heatmaps, plot_prediction_accuracy,
     print_phase_header, print_section, print_experiment_row, print_phase_summary, print_done,
 )
 
@@ -64,6 +64,7 @@ class PrintingShowcase:
         self._records: List[Record] = []
         self._datamodule: Any = None
         self._seed_params: Dict[str, Any] = {}   # carry-forward for explore/infer
+        self._last_exp: Any = None               # most recent fabricated experiment
         self._last_baseline_exp: Any = None
 
     # ── Phases ────────────────────────────────────────────────────────────────
@@ -96,9 +97,14 @@ class PrintingShowcase:
         print_phase_summary(self._phase_log("exploration"))
 
     def infer(self, rounds: int = 3) -> None:
-        """Exploit the trained model to propose optimal parameters for the design intent."""
+        """Exploit the trained model to propose optimal parameters for the design intent.
+
+        Warm-starts from the model's proposed optimum so every inference print is a
+        recommendation (not the last exploration point), then refines each round.
+        """
         print_phase_header(4, "Inference", f"{rounds} rounds  ·  exploit (κ=0)  ·  intent {self.intent}")
-        params = self._seed_params
+        prime = self.agent.inference_step(self._last_exp, self._datamodule, w_explore=0.0, current_params=self._seed_params)
+        params = self._full_params(prime, self._seed_params)
         for i in range(rounds):
             code = f"infer_{i + 1:02d}"
             exp = self.dataset.create_experiment(code, parameters=params)
@@ -115,7 +121,7 @@ class PrintingShowcase:
         print_section("Rendering figures → ./plots/")
         plot_prediction_accuracy(self.agent, self._datamodule)
         plot_feature_heatmaps(self._last_baseline_exp)
-        plot_performance_trajectory(self._perf_history(), self._phases())
+        plot_performance_timeline(self._perf_history(), self._phases(), self.weights)
 
         water, speed, grid, optimum = true_performance_grid(
             self.intent["design"], self.intent["material"], self.fab, self.weights, self.bounds,
@@ -150,6 +156,7 @@ class PrintingShowcase:
         self.fab.run_experiment(params)
         self.agent.evaluate(exp)
         self.dataset.save_experiment(code)
+        self._last_exp = exp
         perf = self._record(phase, code, params, get_performance(exp))
         return exp, perf
 

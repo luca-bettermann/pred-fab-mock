@@ -20,7 +20,7 @@ from sensors.physics import FILAMENT_RADIUS
 from . import _style
 from ._style import (
     PHASE_COLORS, PHASE_LABELS, DEVIATION_CMAP, PERFORMANCE_CMAP, FONT,
-    ZINC_300, ZINC_400, ZINC_500, ZINC_700, STEEL_300, STEEL_500, EMERALD_500,
+    ZINC_300, ZINC_400, ZINC_500, ZINC_700, ZINC_800, STEEL_300, STEEL_500, EMERALD_500,
     clean_spines, clean_3d_panes, style_colorbar, light_grid, save_fig,
 )
 
@@ -158,18 +158,24 @@ def plot_parameter_topology(
     save_fig(name)
 
 
-# ── Performance trajectory ────────────────────────────────────────────────────
+# ── Performance timeline ──────────────────────────────────────────────────────
 
-def plot_performance_trajectory(
-    perf_history: List[Tuple[Dict[str, Any], Dict[str, float]]], phases: List[str],
+def plot_performance_timeline(
+    perf_history: List[Tuple[Dict[str, Any], Dict[str, float]]],
+    phases: List[str], weights: Dict[str, float],
 ) -> None:
-    """Path-accuracy + energy-efficiency across the campaign, with phase markers."""
-    path_acc = [pp[1].get("path_accuracy", float("nan")) for pp in perf_history]
-    energy_eff = [pp[1].get("energy_efficiency", float("nan")) for pp in perf_history]
-    xs = list(range(1, len(path_acc) + 1))
+    """System performance S across the campaign (bold), with the two component
+    scores faint behind it. S is the weighted objective the agent optimises —
+    matching the topology in the parameter-space figure."""
+    def comp(key: str) -> List[float]:
+        return [pp[1].get(key, float("nan")) for pp in perf_history]
+    path_acc, energy_eff = comp("path_accuracy"), comp("energy_efficiency")
+    w_p, w_e = weights.get("path_accuracy", 1.0), weights.get("energy_efficiency", 1.0)
+    system = [(w_p * a + w_e * e) / (w_p + w_e) for a, e in zip(path_acc, energy_eff)]
+    xs = list(range(1, len(system) + 1))
 
     fig, ax = plt.subplots(figsize=(10, 4.2))
-    fig.suptitle("Performance trajectory", fontsize=FONT["title"], color=ZINC_700, fontweight="bold")
+    fig.suptitle("Performance timeline", fontsize=FONT["title"], color=ZINC_700, fontweight="bold")
     for phase in ("baseline", "exploration", "inference"):
         idx = [i for i, ph in enumerate(phases) if ph == phase]
         if not idx:
@@ -179,15 +185,17 @@ def plot_performance_trajectory(
         ax.text((idx[0] + idx[-1]) / 2 + 1, 1.04, PHASE_LABELS[phase], ha="center", va="bottom",
                 color=PHASE_COLORS[phase], fontsize=FONT["legend"], fontweight="bold",
                 transform=ax.get_xaxis_transform())
-    ax.plot(xs, path_acc, marker="o", color=STEEL_500, linewidth=1.8, markersize=4.5,
-            markeredgecolor="white", markeredgewidth=0.4, label="Path accuracy")
-    ax.plot(xs, energy_eff, marker="o", color=EMERALD_500, linewidth=1.8, markersize=4.5,
-            markeredgecolor="white", markeredgewidth=0.4, label="Energy efficiency")
+    # Component scores — faint, behind.
+    ax.plot(xs, path_acc, color=STEEL_500, linewidth=1.3, alpha=0.35, label="Path accuracy")
+    ax.plot(xs, energy_eff, color=EMERALD_500, linewidth=1.3, alpha=0.35, label="Energy efficiency")
+    # System performance S — bold, in front.
+    ax.plot(xs, system, marker="o", color=ZINC_800, linewidth=2.2, markersize=4.5,
+            markeredgecolor="white", markeredgewidth=0.5, label="System performance $S$", zorder=5)
     ax.set_xlabel("Experiment #"); ax.set_ylabel("Score [0–1]")
     ax.set_ylim(0, 1.08); ax.set_xlim(0.5, len(xs) + 0.5)
     ax.legend(loc="lower right")
     clean_spines(ax); light_grid(ax, axis="y")
-    save_fig("performance_trajectory")
+    save_fig("performance_timeline")
 
 
 # ── Feature heatmaps & prediction accuracy ────────────────────────────────────

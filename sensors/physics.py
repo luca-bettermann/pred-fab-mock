@@ -14,14 +14,20 @@ BETA = 0.008      # water_ratio contribution to width
 GAMMA = 0.0002    # inverse print_speed contribution to width
 
 # Path-deviation physics. Deviation is minimal at a material/design-specific
-# operating point that lies in the interior of the calibration bounds, so the
-# best parameters must be *discovered* rather than read off a boundary.
+# operating point in the interior of the bounds, so the best parameters must be
+# *discovered*. The response is deliberately not a clean symmetric bowl:
+#   - a water×speed interaction tilts the valley (faster prints want more water),
+#   - over-speeding drags the bead harder than under-speeding (asymmetric),
+# so the landscape reads like a real process rather than a textbook quadratic.
 WATER_OPT = {"standard": 0.40, "reinforced": 0.44, "flexible": 0.37}  # within [0.30, 0.50]
 SPEED_OPT = {"A": 32.0, "B": 40.0, "C": 50.0}                         # within [20, 60] mm/s
-DEV_FLOOR = 0.00005   # m, residual deviation at the operating point
-K_WATER   = 0.045     # m per (water_ratio offset)^2
-K_SPEED   = 2.0e-6    # m per (mm/s offset)^2
-ZETA      = 0.00002   # design-complexity texture
+DEV_FLOOR  = 0.00005   # m, residual deviation at the operating point
+K_WATER    = 0.045     # m per (water_ratio offset)^2
+K_SPEED    = 2.0e-6    # m per (mm/s offset)^2
+K_CROSS    = 1.4e-4    # m per (water offset · mm/s offset) — tilts the valley
+OVER_SPEED = 1.6       # over-speed deviation penalty multiplier
+UNDER_SPEED = 0.7      # under-speed penalty multiplier (gentler)
+ZETA       = 0.00002   # design-complexity texture
 
 # Geometry for 3-D filament rendering
 FILAMENT_RADIUS = 0.004   # m, nominal extruded bead radius
@@ -58,12 +64,12 @@ def path_deviation(
     Minimised at (WATER_OPT[material], SPEED_OPT[design]); rises quadratically as
     either calibration parameter moves off that operating point.
     """
-    wr_opt = WATER_OPT[material]
-    ps_opt = SPEED_OPT[design]
-    curv = segment_curvature(segment_idx)
-    bowl = K_WATER * (water_ratio - wr_opt) ** 2 + K_SPEED * (print_speed - ps_opt) ** 2
-    texture = ZETA * DESIGN_COMPLEXITY[design] * curv
-    return DEV_FLOOR + bowl + texture
+    dw = water_ratio - WATER_OPT[material]
+    ds = print_speed - SPEED_OPT[design]
+    speed_k = K_SPEED * (OVER_SPEED if ds > 0 else UNDER_SPEED)
+    bowl = K_WATER * dw * dw + speed_k * ds * ds + K_CROSS * dw * ds
+    texture = ZETA * DESIGN_COMPLEXITY[design] * segment_curvature(segment_idx)
+    return DEV_FLOOR + max(bowl, 0.0) + texture
 
 
 def energy_per_segment(
