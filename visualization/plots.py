@@ -1,7 +1,7 @@
 """Per-stage plotting helpers for the extrusion printing showcase."""
 
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import matplotlib
@@ -12,6 +12,8 @@ from matplotlib.cm import ScalarMappable
 
 from pred_fab.core import ExperimentData, DataModule
 from pred_fab import PfabAgent
+
+from sensors.physics import FILAMENT_RADIUS
 
 os.makedirs("./plots", exist_ok=True)
 
@@ -38,109 +40,128 @@ def _annotate_heatmap(ax: Any, grid: np.ndarray, fmt: str = "{:.4f}") -> None:
             )
 
 
-# ── Phase 1: As-Printed vs As-Designed (3-D stacked layers) ──────────────────
+# ── Phase 1: As-Printed vs As-Designed (3-D filament tubes) ──────────────────
+
+def _make_filament_tube(
+    xs: List[float],
+    ys: List[float],
+    z_center: float,
+    radius: float,
+    n_circ: int = 24,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return (X, Y, Z) surface arrays for a cylindrical tube following (xs, ys) at z_center."""
+    phi = np.linspace(0, 2.0 * np.pi, n_circ, endpoint=True)
+    PHI = phi[:, np.newaxis]                        # (n_circ, 1)
+    XS  = np.array(xs, dtype=float)[np.newaxis, :]  # (1, n_pts)
+    YS  = np.array(ys, dtype=float)[np.newaxis, :]  # (1, n_pts)
+    X = np.repeat(XS, n_circ, axis=0)
+    Y = YS + radius * np.cos(PHI)
+    Z = z_center + radius * np.sin(PHI)
+    return X, Y, Z
+
 
 def plot_path_comparison(
-    exp_data: ExperimentData,
     camera: Any,
     params: Dict[str, Any],
-) -> None:
-    """3-D stacked-layer view: designed (grey dashed) vs as-printed (coloured by deviation)."""
+    exp_code: str = "",
+    name: str = "path_comparison",
+    vmax: Optional[float] = None,
+) -> float:
+    """3-D stacked tube view: designed (blue wireframe ghost) vs as-printed (solid, coloured by deviation).
+
+    Pass a shared `vmax` to keep the deviation colour scale comparable across a
+    before/after pair; returns this plot's own max deviation so the caller can
+    derive that shared scale. Lateral offset is exaggerated ×3 to read clearly.
+    """
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 — registers 3-D projection
 
-    N_LAYERS, N_SEGMENTS, N_PTS = 5, 4, 5
-    SEG_LENGTH  = (N_PTS - 1) * 0.01   # 0.04 m per segment
-    SEG_GAP     = 0.008                 # gap between segments
+    n_layers   = int(params.get("n_layers", 5))
+    n_segments = int(params.get("n_segments", 4))
+    n_pts      = 5
+    seg_length = (n_pts - 1) * 0.01
+    seg_gap    = 0.008
+    radius     = FILAMENT_RADIUS
+    layer_step = radius * 2.6
+    Y_SCALE    = 3.0
 
-    # Pre-fetch all segment data and collect deviations for colormap range
+    # Pre-fetch all segment data and find the deviation range
     cache: Dict[Tuple[int, int], Dict] = {}
     all_devs: List[float] = []
-    for li in range(N_LAYERS):
-        for si in range(N_SEGMENTS):
+    for li in range(n_layers):
+        for si in range(n_segments):
             data = camera.get_segment_data(params, li, si)
             cache[(li, si)] = data
             for mp, dp in zip(data["measured_path"], data["designed_path"]):
                 all_devs.append(abs(mp[1] - dp[1]))
 
-    vmax = max(all_devs) * 1.1 if all_devs else 1e-4
-    norm = Normalize(vmin=0.0, vmax=vmax)
+    own_vmax = max(all_devs) * 1.1 if all_devs else 1e-4
+    norm = Normalize(vmin=0.0, vmax=vmax if vmax is not None else own_vmax)
     cmap = plt.cm.RdYlGn_r  # type: ignore[attr-defined]
-    sm   = ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
 
-    fig = plt.figure(figsize=(13, 7))
+    fig = plt.figure(figsize=(15, 8))
     ax = fig.add_subplot(111, projection="3d")
 
-    first_d, first_m = True, True
-
-    for li in range(N_LAYERS):
-        z = float(li)
+    for li in range(n_layers):
+        z_center = li * layer_step
         x_off = 0.0
-
-        all_dx, all_dy, all_mx, all_my = [], [], [], []
-
-        for si in range(N_SEGMENTS):
+        for si in range(n_segments):
             data = cache[(li, si)]
-            dp   = data["designed_path"]
-            mp   = data["measured_path"]
+            dp = data["designed_path"]
+            mp = data["measured_path"]
+            xs = [p[0] + x_off for p in dp]
+            ys_des    = [0.0] * len(dp)
+            ys_meas_r = [p[1] for p in mp]
+            ys_meas_v = [y * Y_SCALE for y in ys_meas_r]
 
-            dx = [p[0] + x_off for p in dp]
-            dy = [p[1]          for p in dp]   # always 0
-            mx = [p[0] + x_off for p in mp]
-            my = [p[1]          for p in mp]
+            mean_dev   = float(np.mean([abs(ym) for ym in ys_meas_r]))
+            tube_color = cmap(norm(mean_dev))
 
-            all_dx.extend(dx)
-            all_dy.extend(dy)
-            all_mx.extend(mx)
-            all_my.extend(my)
+            # Designed — blue wireframe ghost at y=0
+            Xd, Yd, Zd = _make_filament_tube(xs, ys_des, z_center, radius, n_circ=16)
+            ax.plot_wireframe(  # type: ignore[union-attr]
+                Xd, Yd, Zd, color="#6699CC", alpha=0.35, linewidth=0.4, rstride=4, cstride=1,
+            )
+            ax.plot(  # type: ignore[union-attr]
+                xs, ys_des, [z_center] * len(xs),
+                color="#AACCFF", linestyle="--", linewidth=1.0, alpha=0.80, zorder=4,
+            )
 
-            # Connector lines coloured by local deviation magnitude
-            for x_d, x_m, y_d, y_m in zip(dx, mx, dy, my):
-                dev   = abs(y_m - y_d)
-                color = cmap(norm(dev))
-                ax.plot(  # type: ignore[union-attr]
-                    [x_d, x_m], [y_d, y_m], [z, z],
-                    color=color, alpha=0.55, linewidth=0.9,
-                )
+            # Measured — solid coloured tube (lateral offset exaggerated)
+            Xm, Ym, Zm = _make_filament_tube(xs, ys_meas_v, z_center, radius, n_circ=20)
+            ax.plot_surface(  # type: ignore[union-attr]
+                Xm, Ym, Zm, color=tube_color, alpha=0.88, linewidth=0, antialiased=True, shade=True,
+            )
 
-            x_off += SEG_LENGTH + SEG_GAP
+            x_off += seg_length + seg_gap
 
-        # Designed path — grey dashed
-        kw_d: Dict[str, Any] = dict(color="#999999", linestyle="--", linewidth=1.5)
-        if first_d:
-            kw_d["label"] = "Designed"
-            first_d = False
-        ax.plot(all_dx, all_dy, [z] * len(all_dx), **kw_d)  # type: ignore[union-attr]
+    ax.set_box_aspect([9, 2.5, 2.2])  # type: ignore[union-attr]
 
-        # Measured path — solid, coloured by mean layer deviation
-        mean_dev = float(exp_data.features.get_value("path_deviation")[li].mean())  # type: ignore[index]
-        kw_m: Dict[str, Any] = dict(color=cmap(norm(mean_dev)), linewidth=2.2)
-        if first_m:
-            kw_m["label"] = "Measured"
-            first_m = False
-        ax.plot(all_mx, all_my, [z] * len(all_mx), **kw_m)  # type: ignore[union-attr]
-
-    # Colorbar
-    cb = fig.colorbar(sm, ax=ax, pad=0.08, shrink=0.55, aspect=18)
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cb = fig.colorbar(sm, ax=ax, pad=0.09, shrink=0.52, aspect=16)
     cb.set_label("Path Deviation [m]", fontsize=9)
-
-    ax.set_xlabel("Along-path [m]", labelpad=8)   # type: ignore[union-attr]
-    ax.set_ylabel("Lateral offset [m]", labelpad=8)  # type: ignore[union-attr]
-    ax.set_zticks(list(range(N_LAYERS)))           # type: ignore[union-attr]
-    ax.set_zticklabels([f"L{i}" for i in range(N_LAYERS)])  # type: ignore[union-attr]
 
     design   = params.get("design",      "?")
     material = params.get("material",    "?")
     speed    = params.get("print_speed", 0.0)
-    ax.set_title(  # type: ignore[union-attr]
-        f"As-Printed vs As-Designed  ·  {exp_data.code}\n"
-        f"design={design}   material={material}   speed={speed:.1f} mm/s",
-        pad=14, fontsize=11,
-    )
-    ax.legend(loc="upper left", framealpha=0.75)  # type: ignore[union-attr]
-    ax.view_init(elev=28, azim=-55)               # type: ignore[union-attr]
+    water    = params.get("water_ratio", 0.0)
+    ax.set_xlabel("Along-path [m]", labelpad=10, fontsize=9)        # type: ignore[union-attr]
+    ax.set_ylabel(f"Lateral offset [m ×{Y_SCALE:.0f}]", labelpad=10, fontsize=9)  # type: ignore[union-attr]
+    ax.set_zticks([i * layer_step for i in range(n_layers)])        # type: ignore[union-attr]
+    ax.set_zticklabels([f"L{i}" for i in range(n_layers)])          # type: ignore[union-attr]
 
-    _save_and_show("path_comparison")
+    title = "As-Printed vs As-Designed"
+    if exp_code:
+        title += f"  ·  {exp_code}"
+    title += (
+        f"\ndesign={design}   material={material}   water_ratio={water:.2f}   speed={speed:.1f} mm/s"
+        f"\nWireframe = designed   Solid = as-printed   Colour = deviation"
+    )
+    ax.set_title(title, pad=12, fontsize=10)  # type: ignore[union-attr]
+    ax.view_init(elev=28, azim=-62)           # type: ignore[union-attr]
+
+    _save_and_show(name)
+    return own_vmax
 
 
 # ── Phase 1: Feature heatmaps ─────────────────────────────────────────────────

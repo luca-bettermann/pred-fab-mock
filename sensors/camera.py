@@ -53,8 +53,8 @@ class CameraSystem:
             params["print_speed"], params["design"], params["material"],
         )
         d = path_deviation(
-            params["print_speed"], params["layer_time"],
-            params["design"], segment_idx,
+            params["water_ratio"], params["print_speed"],
+            params["design"], params["material"], segment_idx,
         )
 
         # 10 width readings per segment

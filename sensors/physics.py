@@ -8,12 +8,23 @@ DESIGN_SCALE = {"A": 0.9, "B": 1.0, "C": 1.1}
 MATERIAL_VISCOSITY = {"standard": 1.0, "reinforced": 1.4, "flexible": 0.7}
 MATERIAL_FACTOR = {"standard": 1.0, "reinforced": 1.05, "flexible": 0.95}
 
-# Physics constants
+# Filament-width physics constants
 ALPHA = 0.5       # layer_height contribution to width
 BETA = 0.008      # water_ratio contribution to width
 GAMMA = 0.0002    # inverse print_speed contribution to width
-DELTA = 0.00003   # print_speed/layer_time contribution to deviation
-ZETA = 0.00005    # design_complexity contribution to deviation
+
+# Path-deviation physics. Deviation is minimal at a material/design-specific
+# operating point that lies in the interior of the calibration bounds, so the
+# best parameters must be *discovered* rather than read off a boundary.
+WATER_OPT = {"standard": 0.40, "reinforced": 0.44, "flexible": 0.37}  # within [0.30, 0.50]
+SPEED_OPT = {"A": 32.0, "B": 40.0, "C": 50.0}                         # within [20, 60] mm/s
+DEV_FLOOR = 0.00005   # m, residual deviation at the operating point
+K_WATER   = 0.045     # m per (water_ratio offset)^2
+K_SPEED   = 2.0e-6    # m per (mm/s offset)^2
+ZETA      = 0.00002   # design-complexity texture
+
+# Geometry for 3-D filament rendering
+FILAMENT_RADIUS = 0.004   # m, nominal extruded bead radius
 
 
 def segment_curvature(segment_idx: int) -> float:
@@ -36,15 +47,23 @@ def filament_width(
 
 
 def path_deviation(
+    water_ratio: float,
     print_speed: float,
-    layer_time: float,
     design: str,
+    material: str,
     segment_idx: int,
 ) -> float:
-    """Deterministic lateral path deviation [m]."""
-    complexity = DESIGN_COMPLEXITY[design]
+    """Deterministic lateral path deviation [m] — a bowl with an interior optimum.
+
+    Minimised at (WATER_OPT[material], SPEED_OPT[design]); rises quadratically as
+    either calibration parameter moves off that operating point.
+    """
+    wr_opt = WATER_OPT[material]
+    ps_opt = SPEED_OPT[design]
     curv = segment_curvature(segment_idx)
-    return (DELTA * print_speed / layer_time + ZETA * complexity) * curv
+    bowl = K_WATER * (water_ratio - wr_opt) ** 2 + K_SPEED * (print_speed - ps_opt) ** 2
+    texture = ZETA * DESIGN_COMPLEXITY[design] * curv
+    return DEV_FLOOR + bowl + texture
 
 
 def energy_per_segment(

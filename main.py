@@ -59,6 +59,10 @@ def main() -> None:
         shutil.rmtree("./pfab_data")
     os.makedirs("./plots", exist_ok=True)
 
+    # Design intent held fixed across the whole campaign — the study calibrates
+    # the two continuous process parameters for this design + material.
+    DESIGN_INTENT = {"design": "B", "material": "reinforced"}
+
     # ── Phase 0: Setup ────────────────────────────────────────────────────────
     print_phase_header(0, "Setup")
     schema = build_schema()
@@ -71,30 +75,35 @@ def main() -> None:
             "print_speed": (20.0, 60.0),
         },
         performance_weights={"path_accuracy": 0.75, "energy_efficiency": 0.25},
+        fixed_params=DESIGN_INTENT,
     )
 
     dataset = Dataset(schema=schema)
 
+    def params_for(spec: Any, base: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge fixed design intent + proposed params + derived dimensions."""
+        return _with_dimensions({**base, **DESIGN_INTENT, **params_from_spec(spec)}, fab)
+
     # ── Phase 1: Baseline ─────────────────────────────────────────────────────
-    print_phase_header(1, "Baseline Sampling", "8 Latin-hypercube experiments")
-    baseline_specs = agent.baseline_step(n=8)
+    print_phase_header(1, "Baseline Sampling", "10 Latin-hypercube experiments")
+    baseline_specs = agent.baseline_step(n=10)
 
     baseline_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
     baseline_exps = []
-    last_params: Dict[str, Any] = {}
+    first_params: Dict[str, Any] = {}
 
     for i, spec in enumerate(baseline_specs):
-        params   = _with_dimensions(params_from_spec(spec), fab)
+        params   = params_for(spec, {})
         exp_code = f"baseline_{i+1:02d}"
         exp_data = _run_and_evaluate(dataset, agent, fab, params, exp_code)
         perf     = get_performance(exp_data)
         baseline_exps.append(exp_data)
         baseline_log.append((exp_code, params, perf))
-        last_params = params
+        if i == 0:
+            first_params = params
         print_experiment_row(exp_code, params, perf)
 
     print_phase_summary(baseline_log)
-    plot_path_comparison(baseline_exps[-1], fab.camera, last_params)
     plot_feature_heatmaps(baseline_exps[-1])
 
     # ── Phase 2: Initial Training ──────────────────────────────────────────────
@@ -114,13 +123,13 @@ def main() -> None:
     ]
 
     # ── Phase 3: Exploration ───────────────────────────────────────────────────
-    print_phase_header(3, "Exploration", "4 rounds  (w_explore=0.7)")
-    prev_params = _with_dimensions(params_from_spec(baseline_specs[-1]), fab)
+    print_phase_header(3, "Exploration", "8 rounds  (w_explore=0.7)")
+    prev_params = params_for(baseline_specs[-1], {})
     explore_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
 
-    for i in range(4):
+    for i in range(8):
         spec     = agent.exploration_step(datamodule, w_explore=0.7, current_params=prev_params)
-        params   = _with_dimensions({**prev_params, **params_from_spec(spec)}, fab)
+        params   = params_for(spec, prev_params)
         exp_code = f"explore_{i+1:02d}"
         exp_data = _run_and_evaluate(dataset, agent, fab, params, exp_code)
         datamodule.update()
@@ -137,19 +146,18 @@ def main() -> None:
     plot_parameter_space(all_params, all_phases)
 
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
-    DESIGN_INTENT = {"design": "B", "material": "reinforced"}
-    print_phase_header(4, "Inference", f"3 rounds  ·  intent fixed: {DESIGN_INTENT}")
-    agent.configure_calibration(fixed_params=DESIGN_INTENT)
-    params = _with_dimensions({**prev_params, **DESIGN_INTENT}, fab)
+    print_phase_header(4, "Inference", f"3 rounds  ·  exploit (κ=0)  ·  intent {DESIGN_INTENT}")
+    params = prev_params
 
     infer_log: List[Tuple[str, Dict[str, Any], Dict[str, float]]] = []
+    last_infer_params: Dict[str, Any] = params
 
     for i in range(3):
         exp_code = f"infer_{i+1:02d}"
         exp_data = dataset.create_experiment(exp_code, parameters=params)
         fab.run_experiment(params)
         spec       = agent.inference_step(exp_data, datamodule, w_explore=0.0, current_params=params)
-        next_params = _with_dimensions({**params, **params_from_spec(spec)}, fab)
+        next_params = params_for(spec, params)
         dataset.save_experiment(exp_code)
         datamodule.update()
         agent.train(datamodule, validate=False)
@@ -159,10 +167,20 @@ def main() -> None:
         perf_history.append((params, perf))
         infer_log.append((exp_code, params, perf))
         print_experiment_row(exp_code, params, perf)
+        last_infer_params = params
         params = next_params
 
     print_phase_summary(infer_log)
     plot_performance_trajectory(perf_history, all_phases)
+
+    # As-printed vs as-designed: first random print vs final optimised print,
+    # on a shared deviation colour scale so the improvement reads directly.
+    vmax = plot_path_comparison(
+        fab.camera, first_params, exp_code="baseline_01 (initial)", name="path_comparison_before",
+    )
+    plot_path_comparison(
+        fab.camera, last_infer_params, exp_code="infer_03 (optimised)", name="path_comparison_after", vmax=vmax,
+    )
 
     print_done()
 
