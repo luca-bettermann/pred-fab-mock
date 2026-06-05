@@ -357,11 +357,11 @@ def run_and_record(
     extra_params: dict[str, Any] | None = None,
     dataset_code: str | None = None,
 ) -> tuple[Any, dict[str, Any], list[dict[str, Any]] | None]:
-    """Run an experiment from a spec, apply schedules, persist parameter_updates to disk.
+    """Run an experiment from a spec, apply trajectories, persist parameter_updates to disk.
 
-    run_and_evaluate() saves the experiment before apply_schedules can populate
-    parameter_updates, so a second save_experiment is required after apply_schedules to
-    persist the schedule across sessions. Without this, reload-from-disk strips the
+    run_and_evaluate() saves the experiment before apply_trajectories can populate
+    parameter_updates, so a second save_experiment is required after apply_trajectories to
+    persist the trajectory across sessions. Without this, reload-from-disk strips the
     parameter_updates and the KDE never sees trajectory segments. Returns (exp_data,
     params, sched_data).
     """
@@ -371,7 +371,7 @@ def run_and_record(
     params = with_dimensions(merged)
     exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code, dataset_code=dataset_code)
     if spec.trajectories:
-        spec.apply_schedules(exp_data)
+        spec.apply_trajectories(exp_data)
         # run_and_evaluate saved pre-apply state; persist parameter_updates now.
         dataset.save_experiment(exp_code)
     sched_data = extract_schedule_steps(spec, params) if spec.trajectories else None
