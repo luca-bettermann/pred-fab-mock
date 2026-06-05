@@ -149,7 +149,6 @@ def main() -> None:
         print_experiment_row(exp_code, params, perf)
 
     print_phase_summary(explore_log)
-    plot_parameter_space(all_params, all_phases)
 
     # ── Phase 4: Inference ─────────────────────────────────────────────────────
     print_phase_header(4, "Inference", f"3 rounds  ·  exploit (κ=0)  ·  intent {DESIGN_INTENT}")
@@ -178,6 +177,7 @@ def main() -> None:
 
     print_phase_summary(infer_log)
     plot_performance_trajectory(perf_history, all_phases)
+    plot_parameter_space(all_params, all_phases)  # incl. inference → shows convergence
 
     # As-printed vs as-designed: first random print vs final optimised print,
     # on a shared deviation colour scale so the improvement reads directly.

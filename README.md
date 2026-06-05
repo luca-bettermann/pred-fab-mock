@@ -8,19 +8,20 @@ A self-contained showcase of the full [PFAB](../pred-fab) journey using a simula
 
 | Phase | Description |
 |---|---|
-| 0 — Setup | Schema, sensors, agent, calibration config |
-| 1 — Baseline | 8 space-filling experiments (greedy maximin) |
+| 0 — Setup | Schema, sensors, agent, calibration config (design intent fixed: design B, reinforced) |
+| 1 — Baseline | 10 space-filling experiments (greedy maximin) |
 | 2 — Initial Training | Fit prediction model; plot predicted vs actual |
-| 3 — Exploration | 4 UCB rounds with w_explore=0.7; parameter space plot |
-| 4 — Inference | 3 rounds optimising performance; trajectory plot |
-| 5 — Online Adaptation | Layer-by-layer print_speed tuning; adaptation plot |
+| 3 — Exploration | 8 UCB rounds with w_explore=0.7; parameter-space plot |
+| 4 — Inference | 3 rounds optimising performance; trajectory + before/after path plots |
+
+The calibration target is the two continuous process parameters (`water_ratio`, `print_speed`); inference converges to the interior optimum and the before/after path plot shows the as-printed deviation collapsing from red to green.
 
 ## Simulated process
 
 Each experiment = one print run: **5 layers × 4 segments = 20 evaluation steps**.
 
 - `FabricationSystem` coordinates `CameraSystem` + `EnergySensor`, iterating layer by layer
-- `CameraSystem` → `PrintingFeatureModel` → `layer_width`, `path_deviation`
+- `CameraSystem` → `PrintingFeatureModel` → `path_deviation`
 - `EnergySensor` → `EnergyFeatureModel` → `energy_per_segment`
 - `PathAccuracyModel` + `EnergyConsumptionModel` → `path_accuracy`, `energy_efficiency`
 - `PrintingPredictionModel` (sklearn RandomForest) predicts features from process parameters
