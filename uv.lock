@@ -895,7 +895,7 @@ wheels = [
 [[package]]
 name = "pred-fab"
 version = "0.1.0"
-source = { editable = "../pred-fab" }
+source = { git = "ssh://git@github.com/luca-bettermann/pred-fab.git?tag=advei-2026#5f109a23d10a53c646e9fa4e5f44a60be43f154d" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -904,18 +904,6 @@ dependencies = [
     { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "matplotlib", specifier = ">=3.8" },
-    { name = "numpy", specifier = ">=2.0.2" },
-    { name = "pandas", specifier = ">=2.3.1" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.1" },
-    { name = "salib", marker = "extra == 'diagnostics'", specifier = ">=1.5" },
-    { name = "torch", specifier = ">=2.0", index = "https://download.pytorch.org/whl/cpu" },
-]
-provides-extras = ["diagnostics", "dev"]
 
 [[package]]
 name = "pred-fab-mock"
@@ -937,7 +925,7 @@ dev = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=2.0" },
-    { name = "pred-fab", editable = "../pred-fab" },
+    { name = "pred-fab", git = "ssh://git@github.com/luca-bettermann/pred-fab.git?tag=advei-2026" },
 ]
 
 [package.metadata.requires-dev]

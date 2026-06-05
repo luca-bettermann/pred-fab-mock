@@ -13,7 +13,7 @@ dependencies = [
 package = false
 
 [tool.uv.sources]
-pred-fab = { path = "../pred-fab", editable = true }
+pred-fab = { git = "ssh://git@github.com/luca-bettermann/pred-fab.git", tag = "advei-2026" }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
