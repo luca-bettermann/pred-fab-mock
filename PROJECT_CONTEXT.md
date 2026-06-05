@@ -23,7 +23,7 @@ Public, runnable simulation companion to the ADVEI 2026 PFAB study. Drives the f
 - **Single canonical schema** in `models/schema.py` — every code/constant referenced from there; the simulator and evals share naming.
 - **Persistence**: experiments (features + performance) persist via pred-fab `LocalData` under `local/`; each CLI command rebuilds the agent and reloads prior experiments from disk.
 - **Validated**: the loop runs against pred-fab@`advei-2026`; with ≥~18 discovery experiments the MLP learns the predictable features well (R² ~0.9), `loadcell_residual` stays intentionally hard.
-- **pred-fab consumption**: editable `../pred-fab` for dev; pinned to `@advei-2026` at release (the freeze step).
+- **pred-fab consumption**: dep follows the branch — this ADVEI branch pins pred-fab tag `advei-2026` (frozen for reproduction); `main` tracks pred-fab `main`. Source of truth: `[tool.uv.sources]` in `pyproject.toml`.
 
 ## Dev note
 This box's system Python 3.12 lacks `_ctypes`; use a uv-managed interpreter (`UV_PYTHON_PREFERENCE=only-managed uv venv`). Readers with a normal Python are unaffected.
