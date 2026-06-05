@@ -78,6 +78,12 @@ def main() -> None:
         fixed_params=DESIGN_INTENT,
     )
 
+    # The spatial domain axes (n_layers, n_segments) are fixed constants, not
+    # optimization params, so calibration candidates don't carry them. Expose
+    # them via the context snapshot so the prediction grid can be sized.
+    _nl, _ns = fab.get_dimensions(DESIGN_INTENT["design"])
+    agent.update_context_snapshot({"n_layers": _nl, "n_segments": _ns})
+
     dataset = Dataset(schema=schema)
 
     def params_for(spec: Any, base: Dict[str, Any]) -> Dict[str, Any]:

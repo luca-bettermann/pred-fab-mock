@@ -36,8 +36,8 @@ class PathAccuracyModel(IEvaluationModel):
 class EnergyConsumptionModel(IEvaluationModel):
     """Scores energy_per_segment against a target energy consumption."""
 
-    TARGET_ENERGY = 0.15  # J — efficient low-energy operating point
-    MAX_ENERGY = 1.2      # J — energy at which score = 0
+    TARGET_ENERGY = 0.38  # J — energy at the path-optimal speed, so both
+    MAX_ENERGY = 1.0      # J — objectives peak together (one sharp optimum)
 
     def __init__(self, logger: PfabLogger) -> None:
         super().__init__(logger)

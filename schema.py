@@ -38,8 +38,9 @@ def build_schema() -> DatasetSchema:
     domains = Domains([spatial])
 
     # --- Features (tied to domain; depth=None means full domain depth) ---
+    # Order must match PrintingPredictionModel.outputs (the datamodule builds the
+    # target matrix in this order).
     features = Features([
-        Feature.array("layer_width",        domain=spatial),
         Feature.array("path_deviation",     domain=spatial),
         Feature.array("energy_per_segment", domain=spatial),
     ])
