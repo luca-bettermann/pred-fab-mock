@@ -895,7 +895,7 @@ wheels = [
 [[package]]
 name = "pred-fab"
 version = "0.1.0"
-source = { git = "ssh://git@github.com/luca-bettermann/pred-fab.git?tag=advei-2026#5f109a23d10a53c646e9fa4e5f44a60be43f154d" }
+source = { git = "https://github.com/luca-bettermann/pred-fab.git?rev=advei-2026#5f109a23d10a53c646e9fa4e5f44a60be43f154d" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -925,7 +925,7 @@ dev = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=2.0" },
-    { name = "pred-fab", git = "ssh://git@github.com/luca-bettermann/pred-fab.git?tag=advei-2026" },
+    { name = "pred-fab", git = "https://github.com/luca-bettermann/pred-fab.git?rev=advei-2026" },
 ]
 
 [package.metadata.requires-dev]

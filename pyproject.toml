@@ -4,16 +4,13 @@ version = "0.1.0"
 description = "Runnable simulation companion for the ADVEI 2026 PFAB study — synthetic fabrication, no hardware."
 requires-python = ">=3.10"
 dependencies = [
-    "pred-fab",
+    "pred-fab @ git+https://github.com/luca-bettermann/pred-fab.git@advei-2026",
     "matplotlib>=3.8",
     "numpy>=2.0",
 ]
 
 [tool.uv]
 package = false
-
-[tool.uv.sources]
-pred-fab = { git = "ssh://git@github.com/luca-bettermann/pred-fab.git", tag = "advei-2026" }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
