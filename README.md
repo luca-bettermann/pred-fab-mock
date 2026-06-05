@@ -1,6 +1,6 @@
 # pred-fab-mock
 
-> ⚠️ **Frozen snapshot — ISARC 2026.** This branch is preserved exactly as it accompanied the ISARC 2026 paper, for reproducibility, and is **not maintained**. It targets an early version of `pred-fab` and uses older terminology and APIs. For the current version and newer studies, see the [latest version on the default branch](https://github.com/luca-bettermann/pred-fab-mock).
+> ⚠️ **ISARC 2026 release.** This branch is the reference implementation accompanying the ISARC 2026 paper, pinned to `pred-fab@isarc-2026` for exact reproducibility. It is a frozen release — **not maintained**; for the current version and newer studies see the [default branch](https://github.com/luca-bettermann/pred-fab-mock).
 
 A self-contained showcase of the full [PFAB](../pred-fab) journey using a simulated robotic extrusion printing process (clay / concrete AM).
 
