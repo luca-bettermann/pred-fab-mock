@@ -46,7 +46,7 @@ DEVIATION_CMAP = _truncate("RdYlGn_r", 0.12, 0.88, "deviation_soft")
 # System performance over a landscape: red = poor, green = good.
 PERFORMANCE_CMAP = _truncate("RdYlGn", 0.18, 0.85, "performance_soft")
 
-PUBLICATION_DPI = 300
+PUBLICATION_DPI = 600
 
 FONT = {"title": 13, "subtitle": 8, "axis": 10, "tick": 9, "annotation": 8, "legend": 8}
 
