@@ -122,10 +122,12 @@ def plot_stage_print(field: StageField, phase: str, vmax: float, name: str) -> N
 def plot_parameter_topology(
     all_params: List[Dict[str, Any]], phases: List[str],
     water: np.ndarray, speed: np.ndarray, perf_grid: np.ndarray,
-    optimum: Tuple[float, float, float], name: str = "parameter_space",
+    optimum: Tuple[float, float, float], stages_shown: Tuple[str, ...] = ("baseline", "exploration", "inference"),
+    name: str = "parameter_space",
 ) -> None:
     """Sampled points over the true-physics performance landscape, with the
-    theoretical optimum marked — shows the agent converging on the truth."""
+    theoretical optimum marked. `stages_shown` selects which phases to overlay,
+    so it can be called repeatedly for an additive, stage-by-stage reveal."""
     fig, ax = plt.subplots(figsize=(8, 6))
     fig.suptitle("Parameter space over true performance topology",
                  fontsize=FONT["title"], color=ZINC_700, fontweight="bold")
@@ -137,18 +139,21 @@ def plot_parameter_topology(
         idx = [i for i, ph in enumerate(phases) if ph == phase]
         return ([all_params[i]["water_ratio"] for i in idx], [all_params[i]["print_speed"] for i in idx])
 
-    bx, by = _xy("baseline")
-    ax.scatter(bx, by, facecolors="white", edgecolors=ZINC_700, linewidths=0.7, s=46,
-               label=PHASE_LABELS["baseline"], zorder=3)
-    ex, ey = _xy("exploration")
-    ax.scatter(ex, ey, c=STEEL_500, edgecolors="white", linewidths=0.5, s=50,
-               label=PHASE_LABELS["exploration"], zorder=3)
-    ix, iy = _xy("inference")
-    ax.scatter(ix, iy, c=EMERALD_500, edgecolors="white", linewidths=0.6, s=58,
-               label=PHASE_LABELS["inference"], zorder=4)
+    if "baseline" in stages_shown:
+        bx, by = _xy("baseline")
+        ax.scatter(bx, by, facecolors="white", edgecolors=ZINC_700, linewidths=1.0, s=95,
+                   label=PHASE_LABELS["baseline"], zorder=3)
+    if "exploration" in stages_shown:
+        ex, ey = _xy("exploration")
+        ax.scatter(ex, ey, c=STEEL_500, edgecolors="white", linewidths=0.9, s=105,
+                   label=PHASE_LABELS["exploration"], zorder=4)
+    if "inference" in stages_shown:
+        ix, iy = _xy("inference")
+        ax.scatter(ix, iy, c=EMERALD_500, edgecolors="white", linewidths=1.0, s=135,
+                   label=PHASE_LABELS["inference"], zorder=5)
 
     w_opt, s_opt, _ = optimum
-    ax.scatter([w_opt], [s_opt], marker="x", c="white", s=110, linewidths=1.8, zorder=6, label="Theoretical optimum")
+    ax.scatter([w_opt], [s_opt], marker="x", c="white", s=150, linewidths=2.2, zorder=6, label="Theoretical optimum")
 
     ax.set_xlabel("Water ratio"); ax.set_ylabel("Print speed [mm/s]")
     ax.set_xlim(water.min(), water.max()); ax.set_ylim(speed.min(), speed.max())
@@ -161,18 +166,12 @@ def plot_parameter_topology(
 # ── Performance timeline ──────────────────────────────────────────────────────
 
 def plot_performance_timeline(
-    perf_history: List[Tuple[Dict[str, Any], Dict[str, float]]],
-    phases: List[str], weights: Dict[str, float],
+    perf_history: List[Tuple[Dict[str, Any], Dict[str, float]]], phases: List[str],
 ) -> None:
-    """System performance S across the campaign (bold), with the two component
-    scores faint behind it. S is the weighted objective the agent optimises —
-    matching the topology in the parameter-space figure."""
-    def comp(key: str) -> List[float]:
-        return [pp[1].get(key, float("nan")) for pp in perf_history]
-    path_acc, energy_eff = comp("path_accuracy"), comp("energy_efficiency")
-    w_p, w_e = weights.get("path_accuracy", 1.0), weights.get("energy_efficiency", 1.0)
-    system = [(w_p * a + w_e * e) / (w_p + w_e) for a, e in zip(path_acc, energy_eff)]
-    xs = list(range(1, len(system) + 1))
+    """Path-accuracy and energy-efficiency across the campaign, with phase markers."""
+    path_acc = [pp[1].get("path_accuracy", float("nan")) for pp in perf_history]
+    energy_eff = [pp[1].get("energy_efficiency", float("nan")) for pp in perf_history]
+    xs = list(range(1, len(path_acc) + 1))
 
     fig, ax = plt.subplots(figsize=(10, 4.2))
     fig.suptitle("Performance timeline", fontsize=FONT["title"], color=ZINC_700, fontweight="bold")
@@ -185,12 +184,10 @@ def plot_performance_timeline(
         ax.text((idx[0] + idx[-1]) / 2 + 1, 1.04, PHASE_LABELS[phase], ha="center", va="bottom",
                 color=PHASE_COLORS[phase], fontsize=FONT["legend"], fontweight="bold",
                 transform=ax.get_xaxis_transform())
-    # Component scores — faint, behind.
-    ax.plot(xs, path_acc, color=STEEL_500, linewidth=1.3, alpha=0.35, label="Path accuracy")
-    ax.plot(xs, energy_eff, color=EMERALD_500, linewidth=1.3, alpha=0.35, label="Energy efficiency")
-    # System performance S — bold, in front.
-    ax.plot(xs, system, marker="o", color=ZINC_800, linewidth=2.2, markersize=4.5,
-            markeredgecolor="white", markeredgewidth=0.5, label="System performance $S$", zorder=5)
+    ax.plot(xs, path_acc, marker="o", color=STEEL_500, linewidth=1.8, markersize=4.5,
+            markeredgecolor="white", markeredgewidth=0.4, label="Path accuracy")
+    ax.plot(xs, energy_eff, marker="o", color=EMERALD_500, linewidth=1.8, markersize=4.5,
+            markeredgecolor="white", markeredgewidth=0.4, label="Energy efficiency")
     ax.set_xlabel("Experiment #"); ax.set_ylabel("Score [0–1]")
     ax.set_ylim(0, 1.08); ax.set_xlim(0.5, len(xs) + 0.5)
     ax.legend(loc="lower right")

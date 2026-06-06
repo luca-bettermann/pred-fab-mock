@@ -121,12 +121,16 @@ class PrintingShowcase:
         print_section("Rendering figures → ./plots/")
         plot_prediction_accuracy(self.agent, self._datamodule)
         plot_feature_heatmaps(self._last_baseline_exp)
-        plot_performance_timeline(self._perf_history(), self._phases(), self.weights)
+        plot_performance_timeline(self._perf_history(), self._phases())
 
         water, speed, grid, optimum = true_performance_grid(
             self.intent["design"], self.intent["material"], self.fab, self.weights, self.bounds,
         )
-        plot_parameter_topology(self._all_params(), self._phases(), water, speed, grid, optimum)
+        # Additive stage-by-stage reveal: each plot keeps the previous stages' points.
+        order = ("baseline", "exploration", "inference")
+        for k, phase in enumerate(order):
+            plot_parameter_topology(self._all_params(), self._phases(), water, speed, grid, optimum,
+                                    stages_shown=order[: k + 1], name=f"parameter_space_{phase}")
 
         # Average print per stage — define once, render per stage on a shared scale.
         fields = {ph: stage_average_field(self.fab.camera, self._stage_params(ph))
