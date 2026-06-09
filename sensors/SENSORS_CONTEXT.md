@@ -13,5 +13,5 @@ Simulates the two sensor systems of the extrusion printing rig. All physics is d
 
 ## Key Points
 - Both sensors cache results by a tuple key of all relevant params + position; re-calls are free.
-- `run_experiment()` populates the full cache; `run_layer()` fills one layer for online adaptation.
+- `run_experiment()` populates the full cache, layer by layer via `run_layer()`.
 - Feature models read from these caches via `get_segment_data()` / `get_segment_energy()`.
