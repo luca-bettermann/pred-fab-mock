@@ -23,8 +23,8 @@ def run(args: argparse.Namespace) -> None:
 
     # Derive scheduled params and dimension from what was just configured
     cal = agent.calibration_system
-    sched_params = list(cal.schedule_configs.keys())
-    sched_dims = list(cal.schedule_configs.values())
+    sched_params = list(cal.trajectory_configs.keys())
+    sched_dims = list(cal.trajectory_configs.values())
     if not sched_params:
         print("  Error: no schedule configured. Run 'configure --schedule PARAM:DIM' first.")
         return
@@ -98,7 +98,10 @@ def run(args: argparse.Namespace) -> None:
             layer_dev = 0.0
 
         # Format table row
-        before_cols = "  ".join(f"{float(vals_before[p]):10.1f}" for p in sched_params)
+        before_cols = "  ".join(
+            f"{float(v):10.1f}" if (v := vals_before[p]) is not None else f"{'?':>10s}"
+            for p in sched_params
+        )
         after_cols = "  ".join(
             f"{float(params.get(p, 0)):10.1f}" if params.get(p) != vals_before[p] else f"{'—':>10s}"
             for p in sched_params

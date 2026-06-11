@@ -23,9 +23,6 @@ def run(args: argparse.Namespace) -> None:
     perf_weights = agent.calibration_system.performance_weights
     plot_dir = ensure_plot_dir()
 
-    if getattr(args, 'iterations', None) is not None:
-        agent.calibration_system.de_maxiter = args.iterations
-
     apply_schedule_args(agent, args, config)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
@@ -42,8 +39,7 @@ def run(args: argparse.Namespace) -> None:
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
 
-    current = with_dimensions(state.prev_params) if state.prev_params else None
-    spec = agent.acquisition_step(dm, kappa=0.0, current_params=current)
+    spec = agent.acquisition_step(dm, kappa=0.0)
     exp_code = next_code(state, "infer")
 
     # Merge design_intent into extra_params so it overrides schedule proposals if needed.
@@ -81,7 +77,7 @@ def run(args: argparse.Namespace) -> None:
         for j, spd in enumerate(speeds):
             try:
                 p = agent.predict_performance({"water_ratio": w, "print_speed": spd,
-                                                "n_layers": N_LAYERS, "n_segments": N_SEGMENTS})
+                                                "n_layers": n_layers, "n_segments": N_SEGMENTS})
                 pred_grid[j, i] = combined_score(p, perf_weights)
             except Exception:
                 pred_grid[j, i] = 0.0

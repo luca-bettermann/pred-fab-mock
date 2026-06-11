@@ -28,21 +28,21 @@ def run(args: argparse.Namespace) -> None:
     if getattr(args, "schedule", None):
         print_config_set("Default schedule", config.get("default_schedule"), args.schedule)
         config["default_schedule"] = list(args.schedule)
-    if args.radius is not None:
-        print_config_set("Exploration radius", config.get("exploration_radius"), args.radius)
-        config["exploration_radius"] = args.radius
     if getattr(args, "sigma", None) is not None:
-        print_config_set("Sigma override", config.get("sigma"), args.sigma)
+        print_config_set("Sigma", config.get("sigma"), args.sigma)
         config["sigma"] = args.sigma
-    if getattr(args, "mc_exp_offset", None) is not None:
-        print_config_set("MC exponent offset", config.get("mc_exponent_offset"), args.mc_exp_offset)
-        config["mc_exponent_offset"] = args.mc_exp_offset
-    if args.de_maxiter is not None:
-        print_config_set("DE max iterations", config.get("de_maxiter"), args.de_maxiter)
-        config["de_maxiter"] = args.de_maxiter
-    if args.de_popsize is not None:
-        print_config_set("DE population size", config.get("de_popsize"), args.de_popsize)
-        config["de_popsize"] = args.de_popsize
+    if getattr(args, "kappa", None) is not None:
+        print_config_set("Kappa default", config.get("kappa"), args.kappa)
+        config["kappa"] = args.kappa
+    if getattr(args, "n_starts", None) is not None:
+        print_config_set("Multi-start count", config.get("n_starts"), args.n_starts)
+        config["n_starts"] = args.n_starts
+    if getattr(args, "n_sobol", None) is not None:
+        print_config_set("Sobol candidates", config.get("n_sobol"), args.n_sobol)
+        config["n_sobol"] = args.n_sobol
+    if getattr(args, "lr", None) is not None:
+        print_config_set("Learning rate", config.get("lr"), args.lr)
+        config["lr"] = args.lr
     print()
     save_session(config, state)
 

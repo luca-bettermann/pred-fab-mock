@@ -26,9 +26,6 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     plot_dir = ensure_plot_dir()
 
-    if getattr(args, 'iterations', None) is not None:
-        agent.calibration_system.de_maxiter = args.iterations
-
     apply_schedule_args(agent, args, config)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
@@ -36,7 +33,7 @@ def run(args: argparse.Namespace) -> None:
         agent.calibration_system.configure_fixed_params(design_intent, force=True)
 
     agent.console.print_phase_header(1, "Baseline", f"{args.n} experiments")
-    specs = agent.baseline_step(n=args.n)
+    specs = agent.discovery_step(n=args.n)
 
     exp_results: list[tuple[str, dict[str, Any], list[dict[str, Any]] | None, dict[str, float], float]] = []
     pw = agent.calibration_system.performance_weights
@@ -128,24 +125,22 @@ def run(args: argparse.Namespace) -> None:
     ])
     pred_cell_grid = np.zeros_like(true_cell_grid)
     mean_diff_grid = np.zeros_like(true_cell_grid)
-    for i, w in enumerate(waters):
-        for j, spd in enumerate(speeds):
-            try:
-                tensor = agent.pred_system._predict_from_params(  # type: ignore[attr-defined]
-                    params={"water_ratio": w, "print_speed": spd,
-                            "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
-                )
-                pred_dev = tensor["path_deviation"]
-                pred_cell_grid[j, i] = float(pred_dev[mid_layer, mid_seg])
-                # Truth tensor at this (w, spd) for all cells
-                true_dev = np.array([
-                    [physics_path_deviation(spd, s, w, k) for s in range(N_SEGMENTS)]
-                    for k in range(N_LAYERS)
-                ])
-                mean_diff_grid[j, i] = float(np.mean(np.abs(true_dev - pred_dev)))
-            except Exception:
-                pred_cell_grid[j, i] = 0.0
-                mean_diff_grid[j, i] = 0.0
+    grid_params = [
+        {"water_ratio": float(w), "print_speed": float(spd),
+         "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
+        for spd in speeds for w in waters
+    ]
+    grid_preds = agent.pred_system._predict_from_params_tensor(grid_params)  # type: ignore[attr-defined]
+    for j, spd in enumerate(speeds):
+        for i, w in enumerate(waters):
+            t = grid_preds[j * len(waters) + i]["path_deviation"]
+            pred_dev = t.detach().cpu().numpy() if hasattr(t, "detach") else np.asarray(t)
+            pred_cell_grid[j, i] = float(pred_dev[mid_layer, mid_seg])
+            true_dev = np.array([
+                [physics_path_deviation(spd, s, w, k) for s in range(N_SEGMENTS)]
+                for k in range(N_LAYERS)
+            ])
+            mean_diff_grid[j, i] = float(np.mean(np.abs(true_dev - pred_dev)))
 
     cell_path = os.path.join(plot_dir, "01_baseline_per_cell.png")
     cell_label = f"layer={mid_layer}, segment={mid_seg}  ·  path_deviation"
@@ -181,18 +176,14 @@ def run(args: argparse.Namespace) -> None:
     path_val = os.path.join(plot_dir, "01_phase_validation.png")
     validation_panels: list[tuple] = []
 
-    # Compute uncertainty grid for process/schedule panels (what the optimizer sees)
+    # Compute evidence grid for process/schedule panels (what the optimizer sees)
     unc_grid_data = None
     if cal.last_process_points is not None:
-        unc_res = 30
-        unc_waters = np.linspace(0.30, 0.50, unc_res)
-        unc_speeds = np.linspace(20.0, 60.0, unc_res)
-        unc_grid = np.zeros((unc_res, unc_res))
-        for i_w, w in enumerate(unc_waters):
-            for j_s, spd in enumerate(unc_speeds):
-                p = {"water_ratio": w, "print_speed": spd, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
-                unc_grid[j_s, i_w] = agent.predict_uncertainty(p, dm)
-        unc_grid_data = (unc_waters, unc_speeds, unc_grid, "Blues")
+        unc_waters, unc_speeds, _density, evidence_grid = cal.compute_evidence_grids(
+            X_AXIS.key, Y_AXIS.key, X_AXIS.bounds, Y_AXIS.bounds,
+            fixed_params=dict(FIXED_DIMS), resolution=30,
+        )
+        unc_grid_data = (unc_waters, unc_speeds, evidence_grid, "Blues")
 
     if cal.last_domain_values is not None:
         validation_panels.append(("Domain", LAYER_AXIS, SEGMENT_AXIS, cal.last_domain_values, None))
@@ -207,7 +198,7 @@ def run(args: argparse.Namespace) -> None:
     )
     if has_schedule:
         sched_pts_raw = cal.last_trajectory_points
-        sched_ids = cal.last_trajectory_exp_ids
+        sched_ids = cal.last_trajectory_exp_ids or []
         sched_dicts: list[dict[str, Any]] = []
         for j, eid in enumerate(sched_ids):
             water = cal.last_process_points[eid].get("water_ratio", 0.4)  # type: ignore[index]

@@ -11,7 +11,7 @@ import numpy as np
 
 import sensors.physics as phys
 from sensors.physics import N_LAYERS, N_SEGMENTS
-from pred_fab import combined_score
+from pred_fab.utils.metrics import combined_score
 
 
 # ── Inline plot display ───────────────────────────────────────────────────────

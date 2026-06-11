@@ -8,7 +8,7 @@ from steps._common import load_session, combined_score
 def run(args: argparse.Namespace) -> None:
     config, state = load_session()
     perf_weights = config.get("performance_weights") or {
-        "path_accuracy": 1, "energy_efficiency": 1, "production_rate": 1,
+        "path_accuracy": 1.0, "energy_efficiency": 1.0, "production_rate": 1.0,
     }
 
     print(f"\n  Run Summary:")

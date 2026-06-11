@@ -543,7 +543,7 @@ wheels = [
 [[package]]
 name = "pred-fab"
 version = "0.1.0"
-source = { git = "https://github.com/luca-bettermann/pred-fab.git?rev=main#c527b0c527918a9788c13680dc91a59b148edebd" }
+source = { git = "https://github.com/luca-bettermann/pred-fab.git?rev=main#85539582a4ab6008bbf6b687de797020c06b1bdd" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
@@ -571,7 +571,7 @@ dev = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "numpy", specifier = ">=1.24" },
-    { name = "pred-fab", extras = ["torch"], git = "https://github.com/luca-bettermann/pred-fab.git?rev=main" },
+    { name = "pred-fab", git = "https://github.com/luca-bettermann/pred-fab.git?rev=main" },
 ]
 
 [package.metadata.requires-dev]

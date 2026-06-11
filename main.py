@@ -9,11 +9,12 @@ Configure the parameters below, then run: python main.py
 import numpy as np
 
 from pred_fab.core import Dataset
-from pred_fab import combined_score
+from pred_fab.utils.metrics import combined_score
 
 from schema import build_schema
 from agent_setup import build_agent
 from sensors import CameraSystem, EnergySensor, FabricationSystem
+from sensors.physics import N_LAYERS, N_SEGMENTS
 from workflow import (
     JourneyState, clean_artifacts, with_dimensions,
     run_and_evaluate, get_physics_optimum,
@@ -37,10 +38,6 @@ EXPLORATION_RADIUS  = 0.15
 
 # Exploration
 KAPPA = 0.7
-
-# DE optimizer
-DE_MAXITER = 100
-DE_POPSIZE = 10
 
 PLOT_DIR = "./plots"
 
@@ -90,7 +87,11 @@ def main() -> None:
     # Old `radius` knob (radius·√D σ scaling) was dropped; configure σ directly.
     if EXPLORATION_RADIUS is not None:
         agent.configure_exploration(sigma=EXPLORATION_RADIUS)
-    agent.configure_optimizer(de_maxiter=DE_MAXITER, de_popsize=DE_POPSIZE)
+    # Single-design showcase: pin the spatial domain so acquisition does not
+    # sample n_layers (variable-length sequences unsupported by DevTransformer).
+    agent.calibration_system.configure_fixed_params(
+        {"n_layers": N_LAYERS, "n_segments": N_SEGMENTS}, force=True,
+    )
 
     print()
 
@@ -98,7 +99,7 @@ def main() -> None:
     agent.console.print_phase_header(1, "Baseline",
                        f"{N_BASELINE} Sobol experiments — space-filling, no model")
 
-    specs = agent.baseline_step(n=N_BASELINE)
+    specs = agent.discovery_step(n=N_BASELINE)
     for i, spec in enumerate(specs):
         params = with_dimensions(params_from_spec(spec))
         exp_code = f"baseline_{i+1:02d}"
@@ -137,9 +138,9 @@ def main() -> None:
         state.record("exploration", exp_code, params, perf)
         prev_params = params
 
-        u = agent.predict_uncertainty(params, datamodule)
+        e = agent.calibration_system.evidence(params)
         print(f"  {exp_code}  w={params['water_ratio']:.3f}  spd={params['print_speed']:.1f}  "
-              f"{_perf_str(perf, perf_keys)}  u={u:.3f}")
+              f"{_perf_str(perf, perf_keys)}  E={e:.3f}")
 
         datamodule.update()
         agent.train(datamodule, validate=False)

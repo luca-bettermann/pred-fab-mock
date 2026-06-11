@@ -3,7 +3,7 @@ name = "pred-fab-mock"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "pred-fab[torch] @ git+https://github.com/luca-bettermann/pred-fab.git@main",
+    "pred-fab @ git+https://github.com/luca-bettermann/pred-fab.git@main",
     "matplotlib>=3.9.4",
     "numpy>=1.24",
 ]

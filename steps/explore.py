@@ -18,9 +18,6 @@ def run(args: argparse.Namespace) -> None:
     agent, dataset, fab = rebuild(config)
     plot_dir = ensure_plot_dir()
 
-    if getattr(args, 'iterations', None) is not None:
-        agent.calibration_system.de_maxiter = args.iterations
-
     apply_schedule_args(agent, args, config)
 
     design_intent = json.loads(args.design_intent) if args.design_intent else {}
@@ -37,17 +34,15 @@ def run(args: argparse.Namespace) -> None:
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=args.validate)
 
-    all_convergence: dict[str, list[float]] = {}
+    all_convergence: dict[str, list[list[float]]] = {}
 
     for i in range(args.n):
         round_num = n_existing + i + 1
-        # Pass current_params so schedule dimensions are resolved
-        current = with_dimensions(state.prev_params) if state.prev_params else None
-        spec = agent.acquisition_step(dm, kappa=args.kappa, current_params=current)
+        spec = agent.acquisition_step(dm, kappa=args.kappa)
         exp_code = next_code(state, "explore")
 
         if args.plot:
-            acq_data = compute_acquisition_grid(agent, dm, args.kappa, res=30)
+            acq_data = compute_acquisition_grid(agent, args.kappa, res=30)
 
         exp_data, params, sched_data = run_and_record(
             dataset, agent, fab, spec, exp_code,

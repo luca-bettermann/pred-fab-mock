@@ -84,8 +84,6 @@ Quick start:
     # init-agent
     p = sub.add_parser("init-agent", help="Initialize the agent",
                        formatter_class=_wide_formatter)
-    p.add_argument("--model", choices=["mlp", "rf"], default="mlp",
-                   help="Prediction model type (default: mlp)")
     p.set_defaults(func=init_agent.run)
 
     # init-physics
@@ -110,16 +108,16 @@ Quick start:
     p.add_argument("--schedule", action="append", metavar="PARAM:DIM",
                    help="Default schedule (e.g. print_speed:n_layers). Repeatable. "
                         "Per-command --schedule overrides.")
-    p.add_argument("--radius", type=float, default=None,
-                   help="Evidence decay radius (default: 0.09). σ = radius · √n_active_dims")
     p.add_argument("--sigma", type=float, default=None,
-                   help="Direct σ override (bypasses radius × √D scaling)")
-    p.add_argument("--mc-exp-offset", type=float, default=None, dest="mc_exp_offset",
-                   help="Sobol MC exponent offset; M = round(2^(D + offset)), default 3.0")
-    p.add_argument("--de-maxiter", type=int, default=None,
-                   help="Phase 1 DE max generations (default: 30)")
-    p.add_argument("--de-popsize", type=int, default=None,
-                   help="Phase 1 DE population size (default: 64)")
+                   help="Evidence kernel σ (per normalized dimension)")
+    p.add_argument("--kappa", type=float, default=None,
+                   help="Default exploration weight κ (0=exploit, 1=explore)")
+    p.add_argument("--n-starts", type=int, default=None, dest="n_starts",
+                   help="Optimizer multi-start count")
+    p.add_argument("--n-sobol", type=int, default=None, dest="n_sobol",
+                   help="Optimizer Sobol candidate count")
+    p.add_argument("--lr", type=float, default=None,
+                   help="Optimizer learning rate")
     p.set_defaults(func=configure.run)
 
     # baseline
@@ -131,7 +129,6 @@ Quick start:
                    help="Override the configured schedule (e.g. print_speed:n_layers). Repeatable.")
     p.add_argument("--design-intent", type=str, default=None,
                    help="JSON: fix parameters (required for schedule). Example: '{\"n_layers\":5}'")
-    p.add_argument("--iterations", type=int, default=None, help="DE max iterations for this run")
     p.set_defaults(func=baseline.run)
 
     # explore
@@ -146,7 +143,6 @@ Quick start:
                    help="Override the configured schedule. Repeatable.")
     p.add_argument("--design-intent", type=str, default=None,
                    help="JSON: fix parameters for schedule mode")
-    p.add_argument("--iterations", type=int, default=None, help="DE max iterations for this run")
     p.set_defaults(func=explore.run)
 
     # analyse — folds the old standalone test-set step
@@ -166,7 +162,6 @@ Quick start:
     p.add_argument("--plot", action="store_true", help="Show plots inline")
     p.add_argument("--schedule", action="append", metavar="PARAM:DIM",
                    help="Override the configured schedule. Repeatable.")
-    p.add_argument("--iterations", type=int, default=None, help="DE max iterations for this run")
     p.set_defaults(func=inference.run)
 
     # ── Advanced commands ──

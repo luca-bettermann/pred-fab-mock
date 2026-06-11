@@ -5,7 +5,7 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.plotting import plot_performance_radar, plot_dimensional_trajectories, AxisSpec
+from pred_fab.plotting import plot_radar_panels, RadarPanel, plot_dimensional_trajectories, AxisSpec
 from visualization import plot_path_comparison_3d
 from steps._common import (
     load_session, rebuild, ensure_plot_dir, show_plot_with_header, combined_score,
@@ -52,15 +52,18 @@ def run(args: argparse.Namespace) -> None:
     dataset_avg = float(np.mean(dataset_scores))
 
     path_radar = os.path.join(report_dir, f"{exp_code}_performance.png")
-    plot_performance_radar(
-        path_radar,
-        performance=perf,
-        dataset_performances=all_perfs,
-        weights=perf_weights,
-        combined_score=score,
-        dataset_combined=dataset_avg,
-        exp_code=exp_code,
+    attr_names = list(perf.keys())
+    ref_values = [float(np.mean([p[a] for p in all_perfs if a in p])) for a in attr_names]
+    panel = RadarPanel(
+        attribute_names=attr_names,
+        values=[perf[a] for a in attr_names],
+        ref_values=ref_values,
+        score=score,
+        title=exp_code,
+        label=exp_code,
+        ref_label=f"dataset avg ({dataset_avg:.3f})",
     )
+    plot_radar_panels([panel], save_path=path_radar)
     show_plot_with_header(path_radar, f"Report ({exp_code}): Performance Radar", inline=args.plot)
 
     # ── 3. Dimensional trajectories (highlighted) ──

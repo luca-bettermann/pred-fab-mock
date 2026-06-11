@@ -73,7 +73,7 @@ def save_session(config: dict[str, Any], journey: JourneyState) -> None:
 
 def load_session() -> tuple[dict[str, Any], JourneyState]:
     if not os.path.exists(SESSION_FILE):
-        print("No session found. Run 'uv run main.py init-schema' first.")
+        print("No session found. Run 'uv run cli.py init-schema' first.")
         sys.exit(1)
     with open(SESSION_FILE) as f:
         data = json.load(f)
@@ -106,20 +106,17 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
             agent.configure_performance(weights=config["performance_weights"])
 
         explore_kwargs: dict[str, Any] = {}
-        if config.get("exploration_radius") is not None:
-            explore_kwargs["radius"] = config["exploration_radius"]
         if config.get("sigma") is not None:
             explore_kwargs["sigma"] = config["sigma"]
-        if config.get("mc_exponent_offset") is not None:
-            explore_kwargs["mc_exponent_offset"] = config["mc_exponent_offset"]
+        if config.get("kappa") is not None:
+            explore_kwargs["kappa"] = config["kappa"]
         if explore_kwargs:
             agent.configure_exploration(**explore_kwargs)
 
         opt_kwargs: dict[str, Any] = {}
-        if config.get("de_maxiter") is not None:
-            opt_kwargs["de_maxiter"] = config["de_maxiter"]
-        if config.get("de_popsize") is not None:
-            opt_kwargs["de_popsize"] = config["de_popsize"]
+        for key in ("n_starts", "n_sobol", "lr"):
+            if config.get(key) is not None:
+                opt_kwargs[key] = config[key]
         if opt_kwargs:
             agent.configure_optimizer(**opt_kwargs)
 
@@ -160,33 +157,20 @@ def get_physics_optimum(perf_weights=None, n_layers=N_LAYERS):
     return (phys_waters[opt_idx[1]], phys_speeds[opt_idx[0]])
 
 
-def compute_acquisition_grid(agent, dm, kappa, res=30):
-    """Compute normalized performance, uncertainty, and combined grids."""
-    waters = np.linspace(0.30, 0.50, res)
-    speeds = np.linspace(20.0, 60.0, res)
-    perf_grid = np.zeros((res, res))
-    unc_grid = np.zeros((res, res))
-    for i, w in enumerate(waters):
-        for j, spd in enumerate(speeds):
-            p = {"water_ratio": w, "print_speed": spd, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
-            try:
-                perf = agent.predict_performance(p)
-                pw = agent.calibration_system.performance_weights
-                perf_grid[j, i] = combined_score(perf, pw)
-            except Exception:
-                perf_grid[j, i] = 0.0
-            unc_grid[j, i] = agent.predict_uncertainty(p, dm)
+def compute_acquisition_grid(agent, kappa, res=30):
+    """Slice the agent's own acquisition into 2D grids over (water, speed).
 
-    cal = agent.calibration_system
-    if cal._perf_range_min is not None and cal._perf_range_max is not None:
-        p_min, p_max = cal._perf_range_min, cal._perf_range_max
-    else:
-        p_min, p_max = perf_grid.min(), perf_grid.max()
-    span = max(p_max - p_min, 1e-10)
-    p_norm = np.clip((perf_grid - p_min) / span, 0, 1)
-
-    combined_grid = (1 - kappa) * p_norm + kappa * unc_grid
-    return waters, speeds, p_norm, unc_grid, combined_grid
+    Returns (waters, speeds, perf_grid, evidence_gain_grid, acq_grid) —
+    the same evidence_gain() / system_performance() path the optimizer uses.
+    """
+    xs, ys, evidence_grid, perf_grid, acq_grid = agent.calibration_system.compute_acquisition_grids(
+        X_AXIS.key, Y_AXIS.key,
+        X_AXIS.bounds, Y_AXIS.bounds,
+        fixed_params=dict(FIXED_DIMS),
+        kappa=kappa,
+        resolution=res,
+    )
+    return xs, ys, perf_grid, evidence_grid, acq_grid
 
 
 # Schema-specific axis definitions used across all steps
@@ -241,13 +225,13 @@ def print_config_show(config: dict[str, Any]) -> None:
             ("performance_weights", "Weights", {"path_accuracy": 1, "energy_efficiency": 1, "production_rate": 1}),
         ]),
         ("Exploration", [
-            ("exploration_radius", "Radius", 0.09),
-            ("sigma", "Sigma override", None),
-            ("mc_exponent_offset", "MC exp offset", 3.0),
+            ("sigma", "Sigma", None),
+            ("kappa", "Kappa default", None),
         ]),
         ("Optimizer", [
-            ("de_maxiter", "Phase 1 DE max iterations", 30),
-            ("de_popsize", "Phase 1 DE population size", 64),
+            ("n_starts", "Multi-start count", None),
+            ("n_sobol", "Sobol candidates", None),
+            ("lr", "Learning rate", None),
         ]),
         ("Trajectory", [
             ("default_schedule", "Default schedule", None),
