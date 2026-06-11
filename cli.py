@@ -8,11 +8,11 @@ Quick start:
     uv run cli.py reset
     uv run cli.py init-schema
     uv run cli.py init-agent
-    uv run cli.py init-physics --seed 42 --plot
     uv run cli.py configure \\
         --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}' \\
         --schedule print_speed:n_layers \\
         --trust-regions '{"print_speed":5.0}'
+    uv run cli.py init-physics --seed 42 --plot
 
     # System discovery
     uv run cli.py baseline --n 5 --plot
@@ -51,11 +51,11 @@ Quick start:
   uv run cli.py reset
   uv run cli.py init-schema
   uv run cli.py init-agent
-  uv run cli.py init-physics --seed 42 --plot
   uv run cli.py configure \\
       --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}' \\
       --schedule print_speed:n_layers \\
       --trust-regions '{"print_speed":5.0}'
+  uv run cli.py init-physics --seed 42 --plot
 
   # System discovery
   uv run cli.py baseline --n 5 --plot
@@ -176,6 +176,7 @@ Quick start:
     # summary
     p = sub.add_parser("summary", help="Show run summary across all phases",
                        formatter_class=_wide_formatter)
+    p.add_argument("--plot", action="store_true", help="Show journey plot inline")
     p.set_defaults(func=summary.run)
 
     # report

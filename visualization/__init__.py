@@ -7,10 +7,12 @@ Generic PFAB plots live in ``pred_fab.plotting``. This module provides only:
 
 from .helpers import save_fig, physics_combined_at, evaluate_physics_grid
 from .process import plot_path_comparison_3d
+from .journey import plot_journey
 
 __all__ = [
     "save_fig",
     "physics_combined_at",
     "evaluate_physics_grid",
     "plot_path_comparison_3d",
+    "plot_journey",
 ]

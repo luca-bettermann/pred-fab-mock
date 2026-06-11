@@ -1,8 +1,13 @@
 """Show run summary across all phases."""
 import argparse
+import os
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from steps._common import load_session, combined_score
+from visualization import plot_journey, physics_combined_at
+from steps._common import (
+    load_session, combined_score, ensure_plot_dir, show_plot_with_header,
+    get_physics_optimum, load_physics_from_session,
+)
 
 
 def run(args: argparse.Namespace) -> None:
@@ -16,7 +21,7 @@ def run(args: argparse.Namespace) -> None:
     print(f"  {'Phase':<15s}  {'Experiments':>11s}  {'Best Combined':>14s}")
     print(f"  {'─' * 60}")
 
-    for phase in ["baseline", "exploration", "schedule", "inference", "adaptation"]:
+    for phase in ["baseline", "exploration", "inference", "adaptation"]:
         indices = [i for i, p in enumerate(state.all_phases) if p == phase]
         if not indices:
             continue
@@ -31,9 +36,20 @@ def run(args: argparse.Namespace) -> None:
     print(f"  Total: {total} training experiments + {test_n} test experiments")
     print()
 
+    if state.perf_history:
+        load_physics_from_session(config)
+        all_scores = [combined_score(perf, perf_weights) for _, perf in state.perf_history]
+        opt_w, opt_s = get_physics_optimum(perf_weights)
+        opt_score = physics_combined_at(opt_w, opt_s, perf_weights)
+        path = os.path.join(ensure_plot_dir(), "06_journey.png")
+        plot_journey(path, state.all_phases, all_scores, optimum_score=opt_score)
+        show_plot_with_header(path, "Journey: Score vs Experiments",
+                              inline=getattr(args, "plot", False))
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Show run summary across all phases")
+    parser.add_argument("--plot", action="store_true")
     return parser.parse_args()
 
 
