@@ -42,7 +42,7 @@ def run(args: argparse.Namespace) -> None:
         exp_code = next_code(state, "explore")
 
         if args.plot:
-            acq_data = compute_acquisition_grid(agent, args.kappa, res=30)
+            acq_data = compute_acquisition_grid(agent, args.kappa, res=50)
 
         exp_data, params, sched_data = run_and_record(
             dataset, agent, fab, spec, exp_code,
