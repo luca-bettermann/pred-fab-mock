@@ -18,8 +18,8 @@ uv run python -m cli.main test-set           # held-out test grid
 uv run python -m cli.main discovery --n 18   # κ=1: space-filling seed experiments
 uv run python -m cli.main train              # fit StructuralMLP on what's collected
 uv run python -m cli.main exploration --plot # 0<κ<1: blend performance + evidence
-uv run python -m cli.main inference --plot   # κ=0: predicted-optimal parameters
-uv run python -m cli.main report             # showcase plots: acquisition topology + radar
+uv run python -m cli.main inference --plot   # κ=0: propose, then fabricate + score it (first-time-right)
+uv run python -m cli.main report             # showcase plots: journey + acquisition topology + radar
 uv run python -m cli.main summary            # session status
 ```
 
