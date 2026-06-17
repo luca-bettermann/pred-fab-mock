@@ -543,7 +543,7 @@ wheels = [
 [[package]]
 name = "pred-fab"
 version = "0.1.0"
-source = { git = "https://github.com/luca-bettermann/pred-fab.git?rev=main#85539582a4ab6008bbf6b687de797020c06b1bdd" }
+source = { git = "https://github.com/luca-bettermann/pred-fab.git?rev=main#bf2842abee6dba7446815169540f5a599fad3899" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },

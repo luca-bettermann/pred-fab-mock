@@ -4,8 +4,6 @@ import json
 
 import numpy as np
 
-from pred_fab.utils import Mode
-
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from steps._common import (
     load_session, save_session, rebuild, next_code,
@@ -75,7 +73,6 @@ def run(args: argparse.Namespace) -> None:
                 dimension=adapt_dim,
                 step_index=step_idx + 1,
                 exp_data=exp_data,
-                mode=Mode.INFERENCE,
                 kappa=0.0,
                 record=True,
             )
