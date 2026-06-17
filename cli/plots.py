@@ -14,9 +14,13 @@ from typing import Any
 
 import matplotlib
 matplotlib.use("Agg")
+from matplotlib.lines import Line2D
 
 from pred_fab.plotting import AxisSpec, radar_chart, subplot_topology, save_fig, apply_style
-from pred_fab.plotting._style import ACCENT_YELLOW, FONT
+from pred_fab.plotting._style import (
+    ACCENT_YELLOW, ACCENT_RED, STEEL_500, EMERALD_500, ZINC_300, ZINC_400,
+    ZINC_500, ZINC_600, ZINC_700, FONT, clean_spines,
+)
 
 from models.schema import (
     ParamCode, AttributeCode, PARAM_BOUNDS, N_NODES,
@@ -100,6 +104,78 @@ def acquisition_topology(agent: Any, dataset: Any, proposal: dict[str, Any] | No
                      markeredgewidth=2, zorder=8, label="Proposed")
         axes[2].legend(fontsize=FONT["legend"], loc="upper left", framealpha=0.8)
     path = os.path.join(PLOTS_DIR, f"acquisition_{tag}.png")
+    save_fig(path)
+    return path
+
+
+_ACTIVE_PHASES = (
+    ("discovery", ZINC_400, "o", "Discovery"),
+    ("exploration", EMERALD_500, "o", "Exploration"),
+    ("inference", ACCENT_YELLOW, "x", "Inference"),
+)
+
+
+def journey(active: list[tuple[str, float]], reference_best: float | None,
+            reference_label: str) -> str:
+    """Combined score vs experiment count for the active loop, with running best.
+
+    ``active`` is an ordered ``[(phase, score), …]`` list across discovery →
+    exploration → inference. ``reference_best`` is the best combined score the
+    passive CCF grid reaches — the baseline the active loop is measured against.
+    The headline ADVEI claim: the active loop matches it in far fewer runs.
+    """
+    import matplotlib.pyplot as plt
+
+    ensure_plots_dir()
+    apply_style()
+    xs = list(range(1, len(active) + 1))
+    scores = [s for _, s in active]
+
+    best, running = -1.0, []
+    for s in scores:
+        best = max(best, s)
+        running.append(best)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.step(xs, running, where="post", color=STEEL_500, lw=1.8, zorder=2)
+    seen: set[str] = set()
+    for x, (phase, score) in zip(xs, active):
+        style = next((p for p in _ACTIVE_PHASES if p[0] == phase), None)
+        color, marker = (style[1], style[2]) if style else (ZINC_400, "o")
+        seen.add(phase)
+        if marker == "x":
+            ax.scatter(x, score, c=color, marker="x", s=80, linewidths=1.4, zorder=4)
+        else:
+            ax.scatter(x, score, c=color, marker="o", s=24, edgecolors="white",
+                       linewidths=0.5, zorder=3)
+
+    if reference_best is not None:
+        ax.axhline(reference_best, color=ACCENT_RED, ls="--", lw=1.0, alpha=0.7, zorder=1)
+        ax.annotate(f"{reference_label}  {reference_best:.2f}",
+                    xy=(1, reference_best), xytext=(0, 4), textcoords="offset points",
+                    fontsize=FONT["annotation"], color=ACCENT_RED)
+        crossed = next((i + 1 for i, b in enumerate(running) if b >= reference_best), None)
+        if crossed is not None:
+            ax.annotate(f"matched in {crossed}", xy=(crossed, reference_best),
+                        xytext=(4, -12), textcoords="offset points",
+                        fontsize=FONT["annotation"], color=ZINC_600)
+
+    handles = [Line2D([], [], color=STEEL_500, lw=1.8, label="best so far")] + [
+        Line2D([], [], color=c, marker=m, ls="", markersize=6, label=lab)
+        for key, c, m, lab in _ACTIVE_PHASES if key in seen
+    ]
+    if reference_best is not None:
+        handles.append(Line2D([], [], color=ACCENT_RED, ls="--", lw=1.0, label=reference_label))
+    ax.legend(handles=handles, loc="lower right", fontsize=FONT["legend"], frameon=False)
+
+    ax.set_xlabel("Experiment", fontsize=FONT["axis_label"], color=ZINC_600)
+    ax.set_ylabel("Combined score", fontsize=FONT["axis_label"], color=ZINC_600)
+    ax.set_title("Journey: active learning vs passive grid", fontsize=FONT["title"], color=ZINC_700)
+    ax.grid(alpha=0.2, lw=0.8)
+    ax.set_xticks([x for x in xs if x == 1 or x % 5 == 0])
+    clean_spines(ax)
+
+    path = os.path.join(PLOTS_DIR, "journey.png")
     save_fig(path)
     return path
 

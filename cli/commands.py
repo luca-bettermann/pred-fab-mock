@@ -46,9 +46,28 @@ def _mean_perf(dataset: Any, prefix: str = "discovery") -> dict[str, float] | No
     return {k: float(np.mean(v)) for k, v in acc.items()}
 
 
-def _best_experiment(dataset: Any) -> Any:
+def _active_journey(dataset: Any) -> list[tuple[str, float]]:
+    """Ordered (phase, combined_score) across the active loop: discovery → exploration → inference."""
+    out: list[tuple[str, float]] = []
+    for phase in ("discovery", "exploration", "inference"):
+        codes = sorted(c for c in dataset.get_experiment_codes() if c.startswith(phase + "/"))
+        for c in codes:
+            out.append((phase, _combined(perf_dict(dataset.get_experiment(c)))))
+    return out
+
+
+def _reference_best(dataset: Any) -> float | None:
+    """Best combined score across the passive CCF reference grid, if present."""
+    scores = [_combined(perf_dict(dataset.get_experiment(c)))
+              for c in dataset.get_experiment_codes() if c.startswith("reference/")]
+    return max(scores) if scores else None
+
+
+def _best_experiment(dataset: Any, exclude_prefix: str | None = None) -> Any:
     best, best_score = None, -1.0
     for c in dataset.get_experiment_codes():
+        if exclude_prefix is not None and c.startswith(exclude_prefix + "/"):
+            continue
         exp = dataset.get_experiment(c)
         p = perf_dict(exp)
         s = sum(p.values()) / len(p) if p else -1.0
@@ -137,6 +156,11 @@ def exploration(args: Any) -> None:
         _try_plot(plots.performance_radar, perf_dict(exp), _mean_perf(dataset), "exploration", code)
 
 
+def _combined(perf: dict[str, float]) -> float:
+    """Mean of the available performance attributes (equal weights)."""
+    return sum(perf.values()) / len(perf) if perf else 0.0
+
+
 def inference(args: Any) -> None:
     agent, fab, dataset, config = build_env(verbose=args.verbose)
     if not dataset.get_experiment_codes():
@@ -146,7 +170,25 @@ def inference(args: Any) -> None:
     spec = agent.acquisition_step(dm, kappa=0.0)
     proposal = params_from_spec(spec)
     print(f"\n  {_C}Inference{_R} (κ=0) — predicted-optimal parameters")
-    print(f"  proposal:  {_round(proposal)}\n")
+    print(f"  proposal:  {_round(proposal)}")
+
+    # First-time-right: fabricate the proposed optimum once and score it, so the
+    # model's prediction can be checked against the measured outcome and the gap
+    # to the best experiment seen so far is explicit.
+    predicted = {k: float(v) for k, v in agent.predict_performance(proposal).items() if v is not None}
+    code = next_code(dataset, "inference")
+    exp = simulate_and_evaluate(agent, fab, dataset, proposal, code, "inference")
+    measured = perf_dict(exp)
+
+    best = _best_experiment(dataset, exclude_prefix="inference")
+    best_score = _combined(perf_dict(best)) if best is not None else 0.0
+    measured_score = _combined(measured)
+
+    print(f"\n  predicted: {fmt_perf(predicted)}   (S≈{_combined(predicted):.2f})")
+    print(f"  measured:  {fmt_perf(measured)}   (S={measured_score:.2f})")
+    gap = measured_score - best_score
+    ref = best.code if best is not None else "—"
+    print(f"  first-time-right: S={measured_score:.2f} vs best seen {best_score:.2f} ({ref}) → {gap:+.2f}\n")
     if getattr(args, "plot", False):
         _try_plot(plots.acquisition_topology, agent, dataset, proposal, 0.0, "inference")
 
@@ -159,7 +201,13 @@ def report(args: Any) -> None:
         return
     dm = _train(agent, dataset, val_size=0.0)
     kappa = float(config.get("kappa", 0.5))
-    print(f"\n  {_C}Report{_R} — acquisition topology (κ={kappa}) + best-experiment radar\n")
+    print(f"\n  {_C}Report{_R} — journey + acquisition topology (κ={kappa}) + best-experiment radar\n")
+
+    active = _active_journey(dataset)
+    if active:
+        ref_best = _reference_best(dataset)
+        _try_plot(plots.journey, active, ref_best, "reference grid")
+
     _try_plot(plots.acquisition_topology, agent, dataset, None, kappa, "report")
     best = _best_experiment(dataset)
     if best is not None:
