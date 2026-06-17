@@ -65,10 +65,15 @@ def feature_node_overlap(*, path_offset_mm: float, calibration_factor: float,
     ``path_offset`` spreads the paths apart and shrinks it; corners accumulate
     a little more; slow clay creep adds a small drift over height.
     """
+    # Coefficients sized so the corners of the parameter box drive overlap
+    # across most of the [0, 2·target] scoring band (≈1.5–12.5 mm), so
+    # StructuralIntegrity actually discriminates instead of saturating near 1.
+    # path_offset feeds only this feature — a strong coefficient gives it a
+    # real role in the trade-off rather than leaving it nearly inert.
     curv = _node_curvature(node_idx, n_nodes)
     base = (TARGET_FILAMENT_WIDTH_MM
-            + 9.0 * (calibration_factor - _CALIB_MID)
-            - 1.6 * (path_offset_mm - _OFFSET_MID))
+            + 12.0 * (calibration_factor - _CALIB_MID)
+            - 3.0 * (path_offset_mm - _OFFSET_MID))
     corner = 1.0 + 0.10 * (curv - 1.0)
     creep = 0.04 * layer_idx
     return max(0.0, base * corner + creep)
