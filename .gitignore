@@ -20,3 +20,6 @@ dev/plots/
 
 # Test artifacts from run_test.sh
 test_results/
+# dev scratch
+.probe_data/
+scripts/_probe.py

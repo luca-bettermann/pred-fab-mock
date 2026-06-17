@@ -1,14 +1,16 @@
 """MLP prediction model for the ADVEI structural domain.
 
-Predicts 4 layer-level features from process parameters + context.
-Right-sized for the ADVEI data regime (10-22 experiments, 100-220 rows).
+Predicts the 4 genuinely-uncertain layer-level features from process
+parameters + context. Right-sized for the ADVEI data regime (10-22
+experiments, 100-220 rows).
 
 Input: [path_offset, layer_height, calibration_factor, print_speed,
         material_age, temperature, humidity, layer_pos]
-Output: [loadcell_residual, robot_energy,
-         mean_overlap, mean_width]
+Output: [loadcell_residual, robot_energy, mean_overlap, mean_width]
 
-printing_duration is handled by DeterministicDuration (experiment-level).
+printing_duration is closed-form (path_length / print_speed), so it is
+predicted by DeterministicDuration rather than learned here — keeping its
+large magnitude out of the shared multi-output loss.
 """
 from __future__ import annotations
 
@@ -68,7 +70,6 @@ class StructuralMLP(MLPModel):
         return [
             FeatureCode.LOADCELL_RESIDUAL,
             FeatureCode.ROBOT_ENERGY,
-            FeatureCode.PRINTING_DURATION,
             FeatureCode.NODE_OVERLAP_MEAN,
             FeatureCode.FILAMENT_WIDTH_MEAN,
         ]

@@ -24,7 +24,7 @@ from models.evaluations import (
     StructuralIntegrityEval, MaterialDepositionEval, ExtrusionStabilityEval,
     EnergyFootprintEval, FabricationTimeEval,
 )
-from models.predictions import StructuralMLP
+from models.predictions import StructuralMLP, DeterministicDuration
 
 _LH_DEFAULT = 2.5  # layer-height fallback when deriving n_layers
 
@@ -58,8 +58,10 @@ def build_agent(schema: DatasetSchema, fab: FabricationSystem, *, verbose: bool 
     agent.register_evaluation_model(EnergyFootprintEval, target_energy=ENERGY_MIN_J, max_energy=ENERGY_MAX_J)
     agent.register_evaluation_model(FabricationTimeEval, duration_min_s=DURATION_MIN_S, duration_max_s=DURATION_MAX_S)
 
-    # Prediction — the paper's MLP (predicts the 5 depth-1 features).
+    # Prediction — the paper's MLP (4 uncertain depth-1 features) plus the
+    # closed-form duration model.
     agent.register_prediction_model(StructuralMLP)
+    agent.register_prediction_model(DeterministicDuration)
 
     agent.initialize_systems(schema, verbose_flag=verbose)
 
