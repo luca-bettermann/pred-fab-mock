@@ -45,6 +45,27 @@ def ensure_plots_dir() -> str:
     return PLOTS_DIR
 
 
+def _smooth(grid, passes: int = 6):
+    """Light separable 3-tap blur — cosmetic only.
+
+    The passive CCF reference points sit on a regular lattice, so pred-fab's
+    evidence KDE shows a visible bump at each one (a checkerboard). The
+    optimizer uses the true field; this only cleans the *display* of the
+    evidence / acquisition surfaces.
+    """
+    import numpy as np
+
+    g = np.asarray(grid, dtype=float)
+    for _ in range(passes):
+        out = g.copy()
+        out[1:-1, :] = 0.25 * g[:-2, :] + 0.5 * g[1:-1, :] + 0.25 * g[2:, :]
+        g = out
+        out = g.copy()
+        out[:, 1:-1] = 0.25 * g[:, :-2] + 0.5 * g[:, 1:-1] + 0.25 * g[:, 2:]
+        g = out
+    return g
+
+
 def show_inline(path: str) -> None:
     """Render an image inline (iTerm2 protocol); always print the path as fallback."""
     try:
@@ -92,13 +113,17 @@ def acquisition_topology(agent: Any, dataset: Any, proposal: dict[str, Any] | No
 
     apply_style()
     fig, axes = plt.subplots(1, 3, figsize=(16, 5))
-    for ax, grid, label, cmap_name in [
-        (axes[0], perf, "Performance", "performance"),
-        (axes[1], ev, "Evidence", "evidence"),
-        (axes[2], acq, f"Acquisition (κ={kappa:g})", "acquisition"),
+    # Evidence/acquisition are KDE surfaces over lattice points → smooth + drop
+    # the iso-line overlay so they read clean. Performance is already smooth and
+    # keeps its contours to mark the optimum.
+    for ax, grid, label, cmap_name, overlay in [
+        (axes[0], perf, "Performance", "performance", True),
+        (axes[1], _smooth(ev), "Evidence", "evidence", False),
+        (axes[2], _smooth(acq), f"Acquisition (κ={kappa:g})", "acquisition", False),
     ]:
         subplot_topology(ax, x_axis, y_axis, xs, ys, grid, cmap_name=cmap_name,
-                         label=label, points=points, codes=codes, point_size=18)
+                         label=label, points=points, codes=codes, point_size=18,
+                         contour_overlay=overlay)
     if proposal is not None:
         axes[2].plot(proposal[_X], proposal[_Y], "x", color=ACCENT_YELLOW, ms=10,
                      markeredgewidth=2, zorder=8, label="Proposed")
