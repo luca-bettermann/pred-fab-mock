@@ -8,10 +8,11 @@ import numpy as np
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import plot_inference_result
 from visualization.helpers import physics_combined_at
+from visualization.helpers import get_physics_optimum
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot_with_header, with_dimensions, params_from_spec, get_performance,
-    run_and_evaluate, run_and_record, combined_score, get_physics_optimum,
+    run_and_evaluate, run_and_record, combined_score,
     N_LAYERS, N_SEGMENTS,
     X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
 )

@@ -17,8 +17,9 @@ from sensors import CameraSystem, EnergySensor, FabricationSystem
 from sensors.physics import N_LAYERS, N_SEGMENTS
 from workflow import (
     JourneyState, clean_artifacts, with_dimensions,
-    run_and_evaluate, get_physics_optimum,
+    run_and_evaluate,
 )
+from visualization import get_physics_optimum
 from utils import params_from_spec
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -163,7 +164,7 @@ def main() -> None:
           f"{_perf_str(perf, perf_keys)}  combined={_combined(perf):.3f}")
 
     # ── Summary ──────────────────────────────────────────────────────────────
-    spd_opt, w_opt = get_physics_optimum()
+    w_opt, spd_opt = get_physics_optimum(PERFORMANCE_WEIGHTS)
     print(f"\n  \033[2m{'─' * 58}\033[0m")
     print(f"  Physics optimum:   speed={spd_opt:.1f} mm/s, water={w_opt:.2f}")
     print(f"  Inference result:  speed={params['print_speed']:.1f} mm/s, "

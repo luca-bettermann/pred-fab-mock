@@ -3,10 +3,10 @@ import argparse
 import os
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from visualization import plot_journey, physics_combined_at
+from visualization import plot_journey, physics_combined_at, get_physics_optimum
 from steps._common import (
     load_session, combined_score, ensure_plot_dir, show_plot_with_header,
-    get_physics_optimum, load_physics_from_session,
+    load_physics_from_session,
 )
 
 

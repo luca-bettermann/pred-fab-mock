@@ -11,9 +11,9 @@ import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import plot_topology_comparison, plot_parameter_space_3d
-from visualization.helpers import physics_combined_at
+from visualization.helpers import physics_combined_at, get_physics_optimum
 from steps._common import (
-    load_session, save_session, rebuild, ensure_plot_dir, show_plot_with_header, get_physics_optimum,
+    load_session, save_session, rebuild, ensure_plot_dir, show_plot_with_header,
     combined_score, compute_local_sensitivity, N_LAYERS, N_SEGMENTS,
     X_AXIS, Y_AXIS, Z_AXIS, FIXED_DIMS,
     generate_test_params, with_dimensions, run_and_evaluate, load_physics_from_session,

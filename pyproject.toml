@@ -17,7 +17,7 @@ explicit = true
 index = "pytorch-cpu"
 
 [tool.setuptools.packages.find]
-include = ["models*", "sensors*", "visualization*"]
+include = ["models*", "sensors*", "visualization*", "steps*"]
 
 [dependency-groups]
 dev = [

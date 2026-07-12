@@ -11,7 +11,7 @@ from pred_fab.core import Dataset
 from pred_fab.utils.metrics import combined_score
 from pred_fab.plotting import AxisSpec
 
-from schema import build_schema
+from schema import build_schema, PLOT_DIR
 from agent_setup import build_agent
 from sensors import CameraSystem, EnergySensor, FabricationSystem
 from sensors.physics import N_LAYERS, N_SEGMENTS
@@ -24,7 +24,6 @@ from cli_helpers import (
 
 
 SESSION_FILE = ".pfab_session.json"
-PLOT_DIR = "./plots"
 
 
 def show_plot_with_header(path: str, title: str, *, inline: bool = True) -> None:
@@ -144,17 +143,6 @@ def rebuild(config: dict[str, Any], verbose: bool = False) -> tuple[Any, Dataset
 def ensure_plot_dir() -> str:
     os.makedirs(PLOT_DIR, exist_ok=True)
     return PLOT_DIR
-
-
-def get_physics_optimum(perf_weights=None, n_layers=N_LAYERS):
-    """Find the physics optimum location."""
-    from visualization.helpers import evaluate_physics_grid
-    _, _, phys_metrics = evaluate_physics_grid(50, perf_weights, n_layers=n_layers)
-    combined = list(phys_metrics.values())[-1]
-    opt_idx = np.unravel_index(np.argmax(combined), combined.shape)
-    phys_waters = np.linspace(0.30, 0.50, 50)
-    phys_speeds = np.linspace(20.0, 60.0, 50)
-    return (phys_waters[opt_idx[1]], phys_speeds[opt_idx[0]])
 
 
 def compute_acquisition_grid(agent, kappa, res=30):

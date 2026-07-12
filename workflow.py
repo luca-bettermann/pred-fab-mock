@@ -8,16 +8,12 @@ import os
 import shutil
 from typing import Any
 
-import numpy as np
-
 from pred_fab.core import Dataset
 from pred_fab.orchestration import PfabAgent
 
+from schema import LOCAL_DIR, PLOT_DIR
 from sensors import FabricationSystem
-from sensors.physics import DELTA, THETA, SAG, COMPLEXITY, W_OPTIMAL, N_LAYERS, N_SEGMENTS
-
-
-ExperimentLog = list[tuple[str, dict[str, Any], dict[str, float]]]
+from sensors.physics import N_LAYERS, N_SEGMENTS
 
 
 class JourneyState:
@@ -49,12 +45,12 @@ class JourneyState:
             self.trajectories[code] = trajectory
 
 
-def clean_artifacts(plot_dirs: list[str]) -> None:
+def clean_artifacts(plot_dirs: list[str] | None = None) -> None:
     """Remove previous run artefacts and create fresh plot directories."""
-    for d in ["./local", "./plots"]:
+    for d in [LOCAL_DIR, PLOT_DIR]:
         if os.path.exists(d):
             shutil.rmtree(d)
-    for d in plot_dirs:
+    for d in plot_dirs or [PLOT_DIR]:
         os.makedirs(d, exist_ok=True)
 
 
@@ -88,9 +84,3 @@ def run_and_evaluate(
     agent.evaluate(exp_data)
     dataset.save_experiment(exp_code)
     return exp_data
-
-
-def get_physics_optimum() -> tuple[float, float]:
-    """Return (optimal_speed, optimal_water) for the single design configuration."""
-    spd_opt = float(np.clip(np.sqrt(THETA * SAG / (DELTA * COMPLEXITY)), 20.0, 60.0))
-    return spd_opt, W_OPTIMAL
