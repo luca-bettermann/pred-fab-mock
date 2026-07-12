@@ -11,7 +11,9 @@ from pred_fab.core import Dataset
 from pred_fab.utils.metrics import combined_score
 from pred_fab.plotting import AxisSpec
 
-from schema import build_schema, PLOT_DIR
+from schema import (
+    build_schema, PLOT_DIR, WATER_RATIO_BOUNDS, PRINT_SPEED_BOUNDS, DEFAULT_PERF_WEIGHTS,
+)
 from agent_setup import build_agent
 from sensors import CameraSystem, EnergySensor, FabricationSystem
 from sensors.physics import N_LAYERS, N_SEGMENTS
@@ -25,11 +27,26 @@ from cli_helpers import (
 
 SESSION_FILE = ".pfab_session.json"
 
+# ANSI styles shared by all step console output
+_B = "\033[1m"   # bold
+_C = "\033[36m"  # cyan
+_D = "\033[2m"   # dim
+_G = "\033[32m"  # green
+_R = "\033[0m"   # reset
+
+
+def print_phase_banner(phase: str, title: str, subtitle: str = "") -> None:
+    """Print the boxed phase banner used by the setup steps."""
+    bar = "━" * 58
+    print(f"\n{_B}{_C}{bar}{_R}")
+    print(f"{_B}{_C}  PHASE {phase}{_R}{_B} ▸ {title}{_R}")
+    if subtitle:
+        print(f"  {_D}{subtitle}{_R}")
+    print(f"{_B}{_C}{bar}{_R}")
+
 
 def show_plot_with_header(path: str, title: str, *, inline: bool = True) -> None:
     """Print a dim-styled title line, then display the plot."""
-    _D = "\033[2m"
-    _R = "\033[0m"
     print(f"\n  {_D}{title}{_R}")
     show_plot(path, inline=inline)
 
@@ -84,7 +101,7 @@ def load_session() -> tuple[dict[str, Any], JourneyState]:
     state.all_codes = j["all_codes"]
     state.perf_history = [(p, pf) for p, pf in j["perf_history"]]
     state.prev_params = j["prev_params"]
-    state.trajectories = j.get("trajectories", j.get("schedules", {}))  # back-compat with pre-rename sessions
+    state.trajectories = j["trajectories"]
     return config, state
 
 
@@ -162,8 +179,8 @@ def compute_acquisition_grid(agent, kappa, res=30):
 
 
 # Schema-specific axis definitions used across all steps
-X_AXIS = AxisSpec("water_ratio", "Water Ratio", bounds=(0.30, 0.50))
-Y_AXIS = AxisSpec("print_speed", "Print Speed", unit="mm/s", bounds=(20.0, 60.0))
+X_AXIS = AxisSpec("water_ratio", "Water Ratio", bounds=WATER_RATIO_BOUNDS)
+Y_AXIS = AxisSpec("print_speed", "Print Speed", unit="mm/s", bounds=PRINT_SPEED_BOUNDS)
 Z_AXIS = AxisSpec("n_layers", "Layers", integer=True)
 LAYER_AXIS = AxisSpec("n_layers", "Layers", integer=True, bounds=(4.0, 8.0))
 # n_segments is currently fixed at 4 in the schema; the padded bounds give the
@@ -172,11 +189,40 @@ SEGMENT_AXIS = AxisSpec("n_segments", "Segments", integer=True, bounds=(3.0, 5.0
 FIXED_DIMS = {"n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
 
 
+def predict_score_grid(
+    agent: Any,
+    perf_weights: dict[str, float],
+    n_layers: int = N_LAYERS,
+    resolution: int = 40,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Predicted combined-score grid over the schema's (water_ratio, print_speed) bounds.
+
+    Returns (waters, speeds, grid) with grid[j, i] = score at (waters[i], speeds[j]).
+    Failed predictions are recorded as NaN and reported in one aggregate warning.
+    """
+    waters = np.linspace(WATER_RATIO_BOUNDS[0], WATER_RATIO_BOUNDS[1], resolution)
+    speeds = np.linspace(PRINT_SPEED_BOUNDS[0], PRINT_SPEED_BOUNDS[1], resolution)
+    grid = np.full((resolution, resolution), np.nan)
+    n_failed = 0
+    first_exc: Exception | None = None
+    for i, w in enumerate(waters):
+        for j, spd in enumerate(speeds):
+            try:
+                perf = agent.predict_performance({"water_ratio": float(w), "print_speed": float(spd),
+                                                  "n_layers": n_layers, "n_segments": N_SEGMENTS})
+                grid[j, i] = combined_score(perf, perf_weights)
+            except Exception as exc:
+                n_failed += 1
+                if first_exc is None:
+                    first_exc = exc
+    if n_failed:
+        print(f"  Warning: {n_failed}/{resolution * resolution} grid predictions failed "
+              f"(first: {first_exc})")
+    return waters, speeds, grid
+
+
 def print_config_set(label: str, old: Any, new: Any) -> None:
     """Print a configuration change line showing old → new."""
-    _G = "\033[32m"
-    _D = "\033[2m"
-    _R = "\033[0m"
     if isinstance(new, dict):
         print(f"\n  {_D}{label}{_R}")
         old_d = old if isinstance(old, dict) else {}
@@ -195,10 +241,6 @@ def print_config_set(label: str, old: Any, new: Any) -> None:
 
 def print_config_show(config: dict[str, Any]) -> None:
     """Print all current configuration values, including defaults and schema bounds."""
-    _D = "\033[2m"
-    _R = "\033[0m"
-    _B = "\033[1m"
-
     # Bounds from schema (stored at init) + user overrides
     all_bounds: dict[str, tuple[float, float]] = {}
     for k, v in (config.get("schema_bounds", {}) or {}).items():
@@ -210,7 +252,7 @@ def print_config_show(config: dict[str, Any]) -> None:
     # Config groups
     groups: list[tuple[str, list[tuple[str, str, Any]]]] = [
         ("Performance", [
-            ("performance_weights", "Weights", {"path_accuracy": 1, "energy_efficiency": 1, "production_rate": 1}),
+            ("performance_weights", "Weights", DEFAULT_PERF_WEIGHTS),
         ]),
         ("Exploration", [
             ("sigma", "Sigma", None),
@@ -256,16 +298,16 @@ def default_trust_regions(agent: Any) -> dict[str, float]:
     """Default trust region per runtime parameter: 1/10 of the bounds span.
 
     Iterates the schema's runtime-flagged parameters and computes
-    `(max_val − min_val) / 10` for each. Non-runtime parameters are skipped
-    (they have no concept of mid-run adjustability). Schema params with
-    infinite/missing bounds are skipped.
+    `(max − min) / 10` from each parameter's constraints. Non-runtime
+    parameters are skipped (they have no concept of mid-run adjustability),
+    as are params with infinite/missing bounds.
     """
     regions: dict[str, float] = {}
     for code, p in agent.schema.parameters.data_objects.items():
-        if not getattr(p, "runtime_adjustable", False):
+        if not p.runtime_adjustable:
             continue
-        lo = getattr(p, "min_val", None)
-        hi = getattr(p, "max_val", None)
+        lo = p.constraints.get("min")
+        hi = p.constraints.get("max")
         if lo is None or hi is None or not np.isfinite(lo) or not np.isfinite(hi):
             continue
         regions[code] = (float(hi) - float(lo)) / 10.0

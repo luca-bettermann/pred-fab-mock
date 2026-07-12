@@ -77,9 +77,6 @@ class EnergyFeature(IFeatureModel):
 class RateFeature(IFeatureModel):
     """Effective production rate, accounting for nozzle-slip at high water ratios."""
 
-    def __init__(self, logger: PfabLogger) -> None:
-        super().__init__(logger)
-
     @property
     def input_parameters(self) -> list[str]:
         return ["print_speed", "water_ratio"]

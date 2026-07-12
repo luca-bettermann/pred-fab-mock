@@ -14,9 +14,9 @@ from pred_fab.plotting import plot_topology_comparison, plot_parameter_space_3d
 from visualization.helpers import physics_combined_at, get_physics_optimum
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, show_plot_with_header,
-    combined_score, compute_local_sensitivity, N_LAYERS, N_SEGMENTS,
+    combined_score, compute_local_sensitivity, predict_score_grid, N_LAYERS, N_SEGMENTS,
     X_AXIS, Y_AXIS, Z_AXIS, FIXED_DIMS,
-    generate_test_params, with_dimensions, run_and_evaluate, load_physics_from_session,
+    generate_test_params, with_dimensions, run_and_evaluate,
 )
 
 
@@ -41,21 +41,22 @@ def _evaluate_test_set(agent, dataset, fab, n: int, perf_weights) -> None:
         true_score = combined_score(true_perf, perf_weights)
         try:
             pred_perf = agent.predict_performance(params)
-            pred_score = combined_score(pred_perf, perf_weights)
-        except Exception:
-            pred_score = 0.0
-        errors.append(abs(true_score - pred_score))
+        except Exception as exc:
+            print(f"  Warning: prediction failed for {code}; excluded from MAE ({exc})")
+            continue
+        errors.append(abs(true_score - combined_score(pred_perf, perf_weights)))
 
-    mae = float(np.mean(errors))
-    print(f"  Test-set evaluation ({len(test_codes)} experiments):")
-    print(f"    MAE (combined score): {mae:.4f}")
+    if not errors:
+        print("  Warning: all test-set predictions failed; no MAE to report")
+        return
+    print(f"  Test-set evaluation ({len(errors)}/{len(test_codes)} experiments):")
+    print(f"    MAE (combined score): {float(np.mean(errors)):.4f}")
     print(f"    Max error:            {max(errors):.4f}")
 
 
 def run(args: argparse.Namespace) -> None:
     config, state = load_session()
     agent, dataset, fab = rebuild(config)
-    load_physics_from_session(config)
     perf_weights = agent.calibration_system.performance_weights
     plot_dir = ensure_plot_dir()
 
@@ -64,18 +65,8 @@ def run(args: argparse.Namespace) -> None:
     agent.train(dm, validate=False)
 
     # Visual comparison: ground truth vs. model prediction
-    waters = np.linspace(0.30, 0.50, 40)
-    speeds = np.linspace(20.0, 60.0, 40)
+    waters, speeds, pred_grid = predict_score_grid(agent, perf_weights)
     true_grid = np.array([[physics_combined_at(w, spd, perf_weights) for w in waters] for spd in speeds])
-    pred_grid = np.zeros_like(true_grid)
-    for i, w in enumerate(waters):
-        for j, spd in enumerate(speeds):
-            try:
-                perf = agent.predict_performance({"water_ratio": w, "print_speed": spd,
-                                                   "n_layers": N_LAYERS, "n_segments": N_SEGMENTS})
-                pred_grid[j, i] = combined_score(perf, perf_weights)
-            except Exception:
-                pred_grid[j, i] = 0.0
 
     path = os.path.join(plot_dir, "05_analysis_topology.png")
     plot_topology_comparison(path, X_AXIS, Y_AXIS, waters, speeds,

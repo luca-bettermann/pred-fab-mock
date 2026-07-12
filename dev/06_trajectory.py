@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 from visualization import plot_trajectory_comparison
-from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
+from shared import make_env, run_baseline, train_models, with_dimensions, run_and_evaluate, ensure_plot_dir
 from pred_fab import combined_score
 from utils import params_from_spec
 
@@ -74,8 +74,8 @@ def main():
     for i in range(N_EXPLORE_FIXED):
         spec = agent.exploration_step(dm, kappa=KAPPA)
         proposed = params_from_spec(spec)
-        params = with_dims({**prev, **proposed})
-        exp = run_experiment(dataset, agent, fab, params, f"fixed_{i+1:02d}")
+        params = with_dimensions({**prev, **proposed})
+        exp = run_and_evaluate(dataset, agent, fab, params, f"fixed_{i+1:02d}")
         perf = {k: float(v) for k, v in exp.performance.get_values_dict().items() if v is not None}
         score = _combined(perf)
         fixed_scores.append(score)
@@ -99,12 +99,12 @@ def main():
         # Pass current_params so _build_step_grid constructs the multi-step grid
         spec = agent.exploration_step(dm, kappa=KAPPA, current_params=prev)
         proposed = params_from_spec(spec)
-        params = with_dims({**prev, **proposed})
+        params = with_dimensions({**prev, **proposed})
 
         schedules = _extract_schedules(spec)
         traj_schedules.append(schedules)
 
-        exp = run_experiment(dataset, agent, fab, params, f"traj_{i+1:02d}")
+        exp = run_and_evaluate(dataset, agent, fab, params, f"traj_{i+1:02d}")
         perf = {k: float(v) for k, v in exp.performance.get_values_dict().items() if v is not None}
         score = _combined(perf)
         traj_scores.append(score)

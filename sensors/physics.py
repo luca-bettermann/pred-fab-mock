@@ -13,18 +13,26 @@ Three-way Pareto conflict:
     production_rate:  high rate    — needs high speed AND not too much water (nozzle slip)
 """
 
+import math
+
 # ── Segment curvature ────────────────────────────────────────────────────────
 # Non-linear pattern: alternating high/low creates segment-dependent behaviour
 # that makes the response surface more challenging than a monotonic profile.
-SEGMENT_CURVATURE = [0.85, 1.15, 0.95, 1.05]
+# DEFAULT_SEGMENT_CURVATURE is the immutable pristine default; the module-level
+# SEGMENT_CURVATURE may be rebound per session (e.g. randomised machine configs).
+DEFAULT_SEGMENT_CURVATURE = (0.85, 1.15, 0.95, 1.05)
+SEGMENT_CURVATURE = list(DEFAULT_SEGMENT_CURVATURE)
 
 # Fixed design/fabrication constants
 COMPLEXITY     = 1.0    # path complexity (inertia scaling)
 ENERGY_SCALE   = 1.0    # path length energy scaling
 N_LAYERS       = 5
 N_SEGMENTS     = 4
-TARGET_HEIGHT  = 0.040  # m
-PATH_LENGTH    = 0.40   # m
+
+# ── Segment sample geometry ──────────────────────────────────────────────────
+# Sample points along one segment's designed path (shared by camera + plots).
+PATH_SAMPLES   = 5
+SAMPLE_SPACING = 0.01   # m between consecutive samples
 
 # ── Material properties (clay) ────────────────────────────────────────────────
 SAG            = 1.6    # how much material droops at low speed
@@ -161,5 +169,4 @@ def _exp_safe(x: float) -> float:
         return float("inf")
     if x < -500:
         return 0.0
-    import math
     return math.exp(x)

@@ -81,18 +81,15 @@ def run(args: argparse.Namespace) -> None:
                 params = {**params, p: float(new_val)}
 
         # Compute layer deviation (mock-specific sensor data)
+        layer_dev: float | None = None
         dev_vals = exp_data.features.get_value("path_deviation")
-        if dev_vals is not None and hasattr(dev_vals, '__len__'):
-            flat = np.array(dev_vals).flatten()
+        flat = np.asarray(dev_vals).flatten() if dev_vals is not None else np.array([])
+        if flat.size:
             n_segs = int(params.get("n_segments", N_SEGMENTS))
             start_idx = step_idx * n_segs
-            end_idx = min(start_idx + n_segs, len(flat))
+            end_idx = min(start_idx + n_segs, flat.size)
             if end_idx > start_idx:
                 layer_dev = float(np.mean(flat[start_idx:end_idx]))
-            else:
-                layer_dev = 0.0
-        else:
-            layer_dev = 0.0
 
         # Format table row
         before_cols = "  ".join(
@@ -103,7 +100,8 @@ def run(args: argparse.Namespace) -> None:
             f"{float(params.get(p, 0)):10.1f}" if params.get(p) != vals_before[p] else f"{'—':>10s}"
             for p in sched_params
         )
-        print(f"    {step_idx+1:<6d}  {before_cols}  {after_cols}  {layer_dev:10.6f}")
+        dev_col = f"{layer_dev:10.6f}" if layer_dev is not None else f"{'n/a':>10s}"
+        print(f"    {step_idx+1:<6d}  {before_cols}  {after_cols}  {dev_col}")
 
     dataset.save_experiment(exp_code)
     perf = get_performance(exp_data)

@@ -1,7 +1,10 @@
 """Evaluation models for the extrusion printing simulation.
 
 Each model scores a single feature linearly against a target:
-``score = 1 − |feature − target| / scale``, clipped to [0, 1] by the framework.
+``score = 1 − |feature − target| / scale``, clipped to [0, 1]. Row scores
+are clipped by the framework; tensor scores are not
+(compute_performance_tensor does no clipping), so _score_tensor clamps
+itself — that in-model clamp is load-bearing.
 """
 
 from typing import Any
@@ -10,7 +13,8 @@ import torch
 
 from pred_fab import IEvaluationModel
 from pred_fab.core import Parameters
-from pred_fab.utils import PfabLogger
+
+from schema import PRINT_SPEED_BOUNDS
 
 
 class _LinearTargetScore(IEvaluationModel):
@@ -18,9 +22,6 @@ class _LinearTargetScore(IEvaluationModel):
 
     TARGET: float
     SCALE: float
-
-    def __init__(self, logger: PfabLogger) -> None:
-        super().__init__(logger)
 
     @property
     def input_parameters(self) -> list[str]:
@@ -86,11 +87,12 @@ class EnergyEfficiency(_LinearTargetScore):
 class ProductionRate(_LinearTargetScore):
     """Scores effective production_rate [mm/s] against the maximum achievable.
 
-    production_rate = print_speed × slip_factor, so MAX_RATE = 60 mm/s
-    (no slip, full speed). score = rate / MAX_RATE — higher is better.
+    production_rate = print_speed × slip_factor, so the max achievable rate
+    is the schema's print_speed upper bound (no slip, full speed).
+    score = rate / MAX_RATE — higher is better.
     """
 
-    MAX_RATE = 60.0  # mm/s — max achievable (no slip, print_speed=60)
+    MAX_RATE = PRINT_SPEED_BOUNDS[1]  # mm/s — max achievable (no slip, full speed)
     TARGET = MAX_RATE
     SCALE = MAX_RATE
 

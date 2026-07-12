@@ -20,8 +20,8 @@ from pred_fab.orchestration import PfabAgent
 from schema import build_schema
 from agent_setup import build_agent
 from sensors import CameraSystem, EnergySensor, FabricationSystem
-from sensors.physics import N_LAYERS, N_SEGMENTS
 from utils import params_from_spec
+from workflow import run_and_evaluate, with_dimensions
 
 PLOT_DIR = os.path.join(os.path.dirname(__file__), "plots")
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
@@ -45,27 +45,6 @@ def make_env(
     return agent, fab, dataset
 
 
-def with_dims(params: dict[str, Any]) -> dict[str, Any]:
-    """Add fixed n_layers and n_segments to params."""
-    return {**params, "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
-
-
-def run_experiment(
-    dataset: Dataset,
-    agent: PfabAgent,
-    fab: FabricationSystem,
-    params: dict[str, Any],
-    exp_code: str,
-    dataset_code: str | None = None,
-) -> Any:
-    """Create experiment, fabricate, evaluate, save. Returns ExperimentData."""
-    exp_data = dataset.create_experiment(exp_code, parameters=params, dataset_code=dataset_code)
-    fab.run_experiment(params)
-    agent.evaluate(exp_data)
-    dataset.save_experiment(exp_code)
-    return exp_data
-
-
 def run_baseline(
     agent: PfabAgent,
     fab: FabricationSystem,
@@ -76,8 +55,8 @@ def run_baseline(
     specs = agent.baseline_step(n=n)
     all_params = []
     for i, spec in enumerate(specs):
-        params = with_dims(params_from_spec(spec))
-        run_experiment(dataset, agent, fab, params, f"baseline_{i+1:02d}")
+        params = with_dimensions(params_from_spec(spec))
+        run_and_evaluate(dataset, agent, fab, params, f"baseline_{i+1:02d}")
         all_params.append(params)
     return all_params
 
@@ -102,7 +81,7 @@ def build_test_grid(
     test_params = []
     for w in waters:
         for spd in speeds:
-            test_params.append(with_dims({
+            test_params.append(with_dimensions({
                 "water_ratio": float(w),
                 "print_speed": float(spd),
             }))

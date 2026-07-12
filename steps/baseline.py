@@ -9,15 +9,16 @@ import numpy as np
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import (
     plot_parameter_space, plot_parameter_space_per_cell, plot_mean_error_topology,
-    plot_dimensional_trajectories, plot_convergence, plot_phase_proposals, AxisSpec,
+    plot_dimensional_trajectories, plot_convergence, plot_phase_proposals,
 )
 from visualization.helpers import physics_combined_at
 from sensors.physics import path_deviation as physics_path_deviation
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot_with_header, with_dimensions, params_from_spec, get_performance,
-    run_and_evaluate, run_and_record, combined_score, N_LAYERS, N_SEGMENTS,
-    X_AXIS, Y_AXIS, Z_AXIS, LAYER_AXIS, SEGMENT_AXIS, FIXED_DIMS, apply_schedule_args,
+    run_and_record, combined_score, predict_score_grid, N_LAYERS, N_SEGMENTS,
+    X_AXIS, Y_AXIS, LAYER_AXIS, SEGMENT_AXIS, FIXED_DIMS, apply_schedule_args,
+    _D, _R,
 )
 
 
@@ -49,8 +50,6 @@ def run(args: argparse.Namespace) -> None:
 
     # Per-experiment summary: process params (with scheduled ranges) + perf scores.
     # Domain axes are skipped — they were already shown in the Domain console block.
-    _D = "\033[2m"
-    _R = "\033[0m"
     _N = "\033[38;2;39;39;42m"  # Zinc-800
     scores = [s for *_, s in exp_results]
     s_min, s_max = min(scores), max(scores)
@@ -91,19 +90,8 @@ def run(args: argparse.Namespace) -> None:
     dm.prepare(val_size=0.0)
     agent.train(dm, validate=False)
 
-    waters = np.linspace(0.30, 0.50, 40)
-    speeds = np.linspace(20.0, 60.0, 40)
-    pw = agent.calibration_system.performance_weights
+    waters, speeds, pred_grid = predict_score_grid(agent, pw)
     true_grid = np.array([[physics_combined_at(w, spd, pw) for w in waters] for spd in speeds])
-    pred_grid = np.zeros_like(true_grid)
-    for i, w in enumerate(waters):
-        for j, spd in enumerate(speeds):
-            try:
-                perf = agent.predict_performance({"water_ratio": w, "print_speed": spd,
-                                                   "n_layers": N_LAYERS, "n_segments": N_SEGMENTS})
-                pred_grid[j, i] = combined_score(perf, pw)
-            except Exception:
-                pred_grid[j, i] = 0.0
 
     path = os.path.join(plot_dir, "01_baseline.png")
     plot_parameter_space(path, X_AXIS, Y_AXIS, waters, speeds,
@@ -188,9 +176,7 @@ def run(args: argparse.Namespace) -> None:
     if cal.last_domain_values is not None:
         validation_panels.append(("Domain", LAYER_AXIS, SEGMENT_AXIS, cal.last_domain_values, None))
 
-    # Second panel: the final post-Schedule trajectory if scheduling ran,
-    # otherwise the static Process points. The pre-Schedule Process panel was
-    # removed because its points are stale once Schedule refines them.
+    # Second panel: the post-Schedule trajectory when scheduling ran, else the static Process points.
     has_schedule = (
         cal.last_trajectory_points is not None
         and cal.last_trajectory_exp_ids is not None
@@ -198,12 +184,16 @@ def run(args: argparse.Namespace) -> None:
     )
     if has_schedule:
         sched_pts_raw = cal.last_trajectory_points
-        sched_ids = cal.last_trajectory_exp_ids or []
+        sched_ids: list[Any] = []
         sched_dicts: list[dict[str, Any]] = []
-        for j, eid in enumerate(sched_ids):
-            water = cal.last_process_points[eid].get("water_ratio", 0.4)  # type: ignore[index]
+        for j, eid in enumerate(cal.last_trajectory_exp_ids or []):
+            water = cal.last_process_points[eid].get("water_ratio")  # type: ignore[index]
+            if water is None:
+                print(f"  Warning: schedule point {eid} missing water_ratio; skipping in validation plot")
+                continue
             speed_norm = float(sched_pts_raw[j, 0])  # type: ignore[index]
             speed = Y_AXIS.bounds[0] + speed_norm * (Y_AXIS.bounds[1] - Y_AXIS.bounds[0])  # type: ignore[index]
+            sched_ids.append(eid)
             sched_dicts.append({"water_ratio": water, "print_speed": speed})
         validation_panels.append(("Process + Schedule", X_AXIS, Y_AXIS, sched_dicts, sched_ids, unc_grid_data))
     elif cal.last_process_points is not None:
@@ -225,8 +215,12 @@ def run(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run baseline experiments (space-filling)")
-    parser.add_argument("--n", type=int, default=10)
-    parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--n", type=int, default=5, help="Number of experiments")
+    parser.add_argument("--plot", action="store_true", help="Show plots inline")
+    parser.add_argument("--schedule", action="append", metavar="PARAM:DIM",
+                        help="Override the configured schedule (e.g. print_speed:n_layers). Repeatable.")
+    parser.add_argument("--design-intent", type=str, default=None,
+                        help="JSON: fix parameters (required for schedule). Example: '{\"n_layers\":5}'")
     return parser.parse_args()
 
 

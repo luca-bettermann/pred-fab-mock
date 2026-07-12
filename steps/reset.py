@@ -4,11 +4,12 @@ import os
 import shutil
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from schema import LOCAL_DIR, PLOT_DIR, LOGS_DIR
 from steps._common import SESSION_FILE
 
 
 def run(args: argparse.Namespace) -> None:
-    for path in [SESSION_FILE, "./local", "./plots", "./logs"]:
+    for path in [SESSION_FILE, LOCAL_DIR, PLOT_DIR, LOGS_DIR]:
         if os.path.exists(path):
             if os.path.isdir(path):
                 shutil.rmtree(path)

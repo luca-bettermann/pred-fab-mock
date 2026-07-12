@@ -3,17 +3,14 @@ import argparse
 import json
 import os
 
-import numpy as np
-
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import plot_inference_result
 from visualization.helpers import physics_combined_at
 from visualization.helpers import get_physics_optimum
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
-    show_plot_with_header, with_dimensions, params_from_spec, get_performance,
-    run_and_evaluate, run_and_record, combined_score,
-    N_LAYERS, N_SEGMENTS,
+    show_plot_with_header, get_performance, run_and_record, combined_score,
+    predict_score_grid, N_LAYERS,
     X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
 )
 
@@ -71,17 +68,7 @@ def run(args: argparse.Namespace) -> None:
     gap = opt_score - score
     print(f"\n  Physics optimum: combined={opt_score:.3f} (gap={gap:+.3f})")
 
-    waters = np.linspace(0.30, 0.50, 40)
-    speeds = np.linspace(20.0, 60.0, 40)
-    pred_grid = np.zeros((40, 40))
-    for i, w in enumerate(waters):
-        for j, spd in enumerate(speeds):
-            try:
-                p = agent.predict_performance({"water_ratio": w, "print_speed": spd,
-                                                "n_layers": n_layers, "n_segments": N_SEGMENTS})
-                pred_grid[j, i] = combined_score(p, perf_weights)
-            except Exception:
-                pred_grid[j, i] = 0.0
+    waters, speeds, pred_grid = predict_score_grid(agent, perf_weights, n_layers=n_layers)
 
     path = os.path.join(plot_dir, "05_inference.png")
     plot_inference_result(

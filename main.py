@@ -6,8 +6,6 @@ but realistic extrusion printing scenario (single design, single material).
 Configure the parameters below, then run: python main.py
 """
 
-import numpy as np
-
 from pred_fab.core import Dataset
 from pred_fab.utils.metrics import combined_score
 
@@ -20,7 +18,7 @@ from workflow import (
     run_and_evaluate,
 )
 from visualization import get_physics_optimum
-from utils import params_from_spec
+from utils import params_from_spec, get_performance
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CONFIGURATION
@@ -31,16 +29,13 @@ QUICK_TEST = False
 # Experiment counts
 N_BASELINE   = 2  if QUICK_TEST else 20
 N_EXPLORE    = 1  if QUICK_TEST else 10
-N_INFER      = 1  if QUICK_TEST else 1       # single-shot inference
 
 # Agent configuration (bounds default to schema min/max)
 PERFORMANCE_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
-EXPLORATION_RADIUS  = 0.15
+EXPLORATION_SIGMA   = 0.15
 
 # Exploration
 KAPPA = 0.7
-
-PLOT_DIR = "./plots"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -69,15 +64,11 @@ def _combined(perf: dict) -> float:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def main() -> None:
-    import os, shutil
-    for d in ["./local", PLOT_DIR]:
-        if os.path.exists(d):
-            shutil.rmtree(d)
-    os.makedirs(PLOT_DIR, exist_ok=True)
+    clean_artifacts()
 
     state = JourneyState()
     fab   = FabricationSystem(CameraSystem(), EnergySensor())
-    perf_keys = ["path_accuracy", "energy_efficiency", "production_rate"]
+    perf_keys = list(PERFORMANCE_WEIGHTS)
 
     # ── Phase 0: Setup ───────────────────────────────────────────────────────
     schema  = build_schema()
@@ -85,9 +76,7 @@ def main() -> None:
     dataset = Dataset(schema=schema)
 
     agent.configure_performance(weights=PERFORMANCE_WEIGHTS)
-    # Old `radius` knob (radius·√D σ scaling) was dropped; configure σ directly.
-    if EXPLORATION_RADIUS is not None:
-        agent.configure_exploration(sigma=EXPLORATION_RADIUS)
+    agent.configure_exploration(sigma=EXPLORATION_SIGMA)
     # Single-design showcase: pin the spatial domain so acquisition does not
     # sample n_layers (variable-length sequences unsupported by DevTransformer).
     agent.calibration_system.configure_fixed_params(
@@ -105,7 +94,7 @@ def main() -> None:
         params = with_dimensions(params_from_spec(spec))
         exp_code = f"baseline_{i+1:02d}"
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
-        perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
+        perf = get_performance(exp_data)
         state.record("baseline", exp_code, params, perf)
 
     best_idx = max(range(len(state.perf_history)),
@@ -121,23 +110,21 @@ def main() -> None:
 
     datamodule = agent.create_datamodule(dataset)
     datamodule.prepare(val_size=0.25)
-    results = agent.train(datamodule, validate=True)
+    agent.train(datamodule, validate=True)
 
     # ── Phase 3: Exploration ─────────────────────────────────────────────────
     agent.console.print_phase_header(3, "Exploration",
                        f"{N_EXPLORE} rounds (kappa={KAPPA})")
 
-    prev_params = with_dimensions(params_from_spec(specs[-1]))
     for i in range(N_EXPLORE):
         spec = agent.exploration_step(datamodule, kappa=KAPPA)
         proposed = params_from_spec(spec)
-        params = with_dimensions({**prev_params, **proposed})
+        params = with_dimensions({**state.prev_params, **proposed})
         exp_code = f"explore_{i+1:02d}"
 
         exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
-        perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
+        perf = get_performance(exp_data)
         state.record("exploration", exp_code, params, perf)
-        prev_params = params
 
         e = agent.calibration_system.evidence(params)
         print(f"  {exp_code}  w={params['water_ratio']:.3f}  spd={params['print_speed']:.1f}  "
@@ -153,11 +140,11 @@ def main() -> None:
     # Agent proposes the best parameters given current model
     spec = agent.exploration_step(datamodule, kappa=0.0)
     proposed = params_from_spec(spec)
-    params = with_dimensions({**prev_params, **proposed})
+    params = with_dimensions({**state.prev_params, **proposed})
     exp_code = "infer_01"
 
     exp_data = run_and_evaluate(dataset, agent, fab, params, exp_code)
-    perf = {k: float(v) for k, v in exp_data.performance.get_values_dict().items() if v is not None}
+    perf = get_performance(exp_data)
     state.record("inference", exp_code, params, perf)
 
     print(f"  {exp_code}  w={params['water_ratio']:.3f}  spd={params['print_speed']:.1f}  "

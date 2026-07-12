@@ -9,7 +9,9 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
 
-from sensors.physics import N_LAYERS, N_SEGMENTS, FILAMENT_RADIUS
+from sensors.physics import (
+    N_LAYERS, N_SEGMENTS, FILAMENT_RADIUS, PATH_SAMPLES, SAMPLE_SPACING,
+)
 from .helpers import save_fig
 
 
@@ -21,7 +23,6 @@ def _make_filament_tube(
     n_circ: int = 24,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return (X, Y, Z) surface arrays for a cylindrical tube following (xs, ys) at z_center."""
-    n_pts = len(xs)
     phi = np.linspace(0, 2.0 * np.pi, n_circ, endpoint=True)
     PHI = phi[:, np.newaxis]                        # (n_circ, 1)
     XS = np.array(xs, dtype=float)[np.newaxis, :]   # (1, n_pts)
@@ -50,8 +51,7 @@ def plot_path_comparison_3d(
 
     n_layers = int(params.get("n_layers", N_LAYERS))
     n_segments = int(params.get("n_segments", N_SEGMENTS))
-    n_pts = 5
-    seg_length = (n_pts - 1) * 0.01
+    seg_length = (PATH_SAMPLES - 1) * SAMPLE_SPACING
     seg_gap = 0.008
     radius = FILAMENT_RADIUS
     layer_step = radius * 2.6
@@ -124,8 +124,8 @@ def plot_path_comparison_3d(
 
     ax.set_xlabel("Along-path [m]", labelpad=10, fontsize=9)
     ax.set_ylabel(f"Lateral offset [m x{Y_SCALE:.0f}]", labelpad=10, fontsize=9)
-    ax.set_zticks([i * layer_step for i in range(n_layers)])
-    ax.set_zticklabels([f"L{i}" for i in range(n_layers)])
+    ax.zaxis.set_ticks([i * layer_step for i in range(n_layers)])
+    ax.zaxis.set_ticklabels([f"L{i}" for i in range(n_layers)])
 
     title = "As-Printed vs As-Designed"
     if exp_code:

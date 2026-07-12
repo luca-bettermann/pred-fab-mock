@@ -45,29 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pfab-mock",
         description="PFAB mock CLI — predictive fabrication workflow step by step",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Quick start:
-  # Setup
-  uv run cli.py reset
-  uv run cli.py init-schema
-  uv run cli.py init-agent
-  uv run cli.py configure \\
-      --weights '{"path_accuracy":2,"energy_efficiency":1,"production_rate":1}' \\
-      --schedule print_speed:n_layers \\
-      --trust-regions '{"print_speed":5.0}'
-  uv run cli.py init-physics --seed 42 --plot
-
-  # System discovery
-  uv run cli.py baseline --n 5 --plot
-  uv run cli.py report baseline_01 --plot
-  uv run cli.py explore --n 5 --kappa 0.5
-  uv run cli.py analyse --plot --test-set 20
-
-  # Production
-  uv run cli.py inference --design-intent '{"n_layers":5}' --plot
-  uv run cli.py adapt --design-intent '{"n_layers":5}'
-  uv run cli.py summary
-""",
+        epilog=__doc__,
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

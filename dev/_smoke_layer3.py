@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from pred_fab.utils import profiler
 
 from models.prediction_model import DevMLP, EnergyMLP
-from shared import make_env, run_baseline, train_models, with_dims
+from shared import make_env, run_baseline, train_models, with_dimensions
 from utils import params_from_spec
 
 PERF_WEIGHTS = {"path_accuracy": 2.0, "energy_efficiency": 1.0, "production_rate": 1.0}
@@ -48,7 +48,7 @@ def main(profile: bool = False) -> None:
     run_baseline(agent, fab, dataset, 3)
     dm, _ = train_models(agent, dataset, val_size=0.0)
 
-    sample = with_dims({"water_ratio": 0.4, "print_speed": 35.0})
+    sample = with_dimensions({"water_ratio": 0.4, "print_speed": 35.0})
     _ = agent.predict_performance(sample)
 
     gc.collect()

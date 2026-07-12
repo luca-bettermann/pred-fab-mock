@@ -1,17 +1,15 @@
 """CLI helper functions: inline plot display, physics randomization, test set generation."""
 
 import base64
-import json
-import os
-import subprocess
 import sys
 from typing import Any
 
 import numpy as np
 
 import sensors.physics as phys
-from sensors.physics import N_LAYERS, N_SEGMENTS
+from sensors.physics import N_LAYERS, N_SEGMENTS, DEFAULT_SEGMENT_CURVATURE
 from pred_fab.utils.metrics import combined_score
+from schema import WATER_RATIO_BOUNDS, PRINT_SPEED_BOUNDS
 
 
 # ── Inline plot display ───────────────────────────────────────────────────────
@@ -39,19 +37,6 @@ def show_plot(path: str, inline: bool = True) -> None:
 
 PHYSICS_CONFIG_KEY = "physics_config"
 
-# Default physics constants (from sensors/physics.py)
-DEFAULT_PHYSICS = {
-    "W_OPTIMAL": 0.42,
-    "W_ENERGY_OPT": 0.38,
-    "DELTA": 0.000011,
-    "THETA": 0.011,
-    "SAG": 1.6,
-    "COMPLEXITY": 1.0,
-    "LAYER_SPD_SHIFT": 0.40,
-    "W_SLIP": 0.45,
-    "SEGMENT_CURVATURE": [0.85, 1.15, 0.95, 1.05],
-}
-
 # Randomization ranges (fraction of default value, or absolute bounds)
 PHYSICS_RANGES = {
     "W_OPTIMAL": (0.36, 0.46),
@@ -74,7 +59,7 @@ def randomize_physics(seed: int | None = None) -> dict[str, Any]:
         config[key] = float(rng.uniform(lo, hi))
 
     # Randomize segment curvature: shuffle and slightly perturb
-    base_curv = np.array([0.85, 1.15, 0.95, 1.05])
+    base_curv = np.array(DEFAULT_SEGMENT_CURVATURE)
     perturb = rng.uniform(-0.05, 0.05, size=4)
     config["SEGMENT_CURVATURE"] = (base_curv + perturb).tolist()
     rng.shuffle(config["SEGMENT_CURVATURE"])
@@ -84,11 +69,14 @@ def randomize_physics(seed: int | None = None) -> dict[str, Any]:
 
 def apply_physics_config(config: dict[str, Any]) -> None:
     """Apply physics config to the sensors.physics module at runtime."""
+    known_keys = set(PHYSICS_RANGES) | {"SEGMENT_CURVATURE"}
     for key, val in config.items():
         if key == "SEGMENT_CURVATURE":
             phys.SEGMENT_CURVATURE = list(val)
-        elif hasattr(phys, key):
+        elif key in known_keys:
             setattr(phys, key, val)
+        else:
+            print(f"  Warning: unknown physics key '{key}' ignored")
 
 
 def load_physics_from_session(session_config: dict[str, Any]) -> None:
@@ -103,13 +91,17 @@ def load_physics_from_session(session_config: dict[str, Any]) -> None:
 def generate_test_params(n: int, seed: int = 99) -> list[dict[str, Any]]:
     """Generate n test parameter sets on a stratified grid.
 
-    Uses a separate seed from training to ensure independence.
-    Reads dimension bounds from the physics constants to respect schema constraints.
+    Uses a separate seed from training to ensure independence. The grid spans
+    the schema parameter bounds, inset slightly to stay off the edges.
     """
     rng = np.random.default_rng(seed)
+    inset_frac = 0.05
+    grid_size = max(int(np.ceil(np.sqrt(n))), 2)
 
-    waters = np.linspace(0.31, 0.49, max(int(np.ceil(np.sqrt(n))), 2))
-    speeds = np.linspace(21.0, 59.0, max(int(np.ceil(np.sqrt(n))), 2))
+    w_margin = (WATER_RATIO_BOUNDS[1] - WATER_RATIO_BOUNDS[0]) * inset_frac
+    s_margin = (PRINT_SPEED_BOUNDS[1] - PRINT_SPEED_BOUNDS[0]) * inset_frac
+    waters = np.linspace(WATER_RATIO_BOUNDS[0] + w_margin, WATER_RATIO_BOUNDS[1] - w_margin, grid_size)
+    speeds = np.linspace(PRINT_SPEED_BOUNDS[0] + s_margin, PRINT_SPEED_BOUNDS[1] - s_margin, grid_size)
 
     candidates = []
     for w in waters:
@@ -135,9 +127,6 @@ def compute_local_sensitivity(
     delta_frac: float = 0.02,
 ) -> dict[str, float]:
     """Compute local sensitivity |∂combined/∂param| at a point via finite differences."""
-    base_perf = agent.predict_performance(params)
-    base_score = combined_score(base_perf, perf_weights)
-
     sensitivities: dict[str, float] = {}
     for code in param_codes:
         val = params.get(code)
@@ -155,8 +144,9 @@ def compute_local_sensitivity(
             score_plus = combined_score(perf_plus, perf_weights)
             score_minus = combined_score(perf_minus, perf_weights)
             sensitivities[code] = abs(score_plus - score_minus) / (2 * delta)
-        except Exception:
-            sensitivities[code] = 0.0
+        except (ValueError, RuntimeError, KeyError) as exc:
+            print(f"  Warning: sensitivity for '{code}' failed ({exc}); recording nan")
+            sensitivities[code] = float("nan")
 
     return sensitivities
 

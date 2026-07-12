@@ -7,8 +7,7 @@ import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__)
 from pred_fab.plotting import plot_acquisition, plot_convergence
 from steps._common import (
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
-    show_plot_with_header, with_dimensions, params_from_spec, get_performance,
-    run_and_evaluate, run_and_record, compute_acquisition_grid,
+    show_plot_with_header, get_performance, run_and_record, compute_acquisition_grid,
     X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
 )
 
@@ -86,6 +85,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--kappa", type=float, default=0.5)
     parser.add_argument("--plot", action="store_true")
     parser.add_argument("--validate", action="store_true")
+    parser.add_argument("--schedule", action="append", metavar="PARAM:DIM",
+                        help="Override the configured schedule. Repeatable.")
+    parser.add_argument("--design-intent", type=str, default=None,
+                        help="JSON: fix parameters for schedule mode")
     return parser.parse_args()
 
 

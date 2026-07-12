@@ -19,16 +19,16 @@ from pred_fab.core import DataModule
 from pred_fab.core.dataset import Dataset
 from pred_fab.utils import SplitType
 from schema import build_schema
-from shared import make_env, with_dims, run_experiment
+from shared import make_env, with_dimensions, run_and_evaluate
 
 
 def main() -> None:
     agent, fab, dataset = make_env("smoke_dataset_code", verbose=False)
 
     # Two experiments tagged with distinct dataset_codes.
-    params = with_dims({"water_ratio": 0.40, "print_speed": 40.0})
-    run_experiment(dataset, agent, fab, params, "baseline_01", dataset_code="baseline")
-    run_experiment(dataset, agent, fab, params, "test_01",     dataset_code="test")
+    params = with_dimensions({"water_ratio": 0.40, "print_speed": 40.0})
+    run_and_evaluate(dataset, agent, fab, params, "baseline_01", dataset_code="baseline")
+    run_and_evaluate(dataset, agent, fab, params, "test_01",     dataset_code="test")
 
     # Inline-tag check.
     assert dataset.get_experiment("baseline_01").dataset_code == "baseline"

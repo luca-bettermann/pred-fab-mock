@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sensors.physics import DELTA, THETA, SAG, COMPLEXITY, W_OPTIMAL, N_LAYERS, N_SEGMENTS
 from visualization import plot_inference_convergence
-from shared import make_env, run_baseline, train_models, with_dims, run_experiment, ensure_plot_dir
+from shared import make_env, run_baseline, train_models, with_dimensions, run_and_evaluate, ensure_plot_dir
 from pred_fab import combined_score
 from utils import params_from_spec
 
@@ -44,8 +44,8 @@ def main():
     prev = baseline_params[-1]
     for i in range(N_EXPLORE):
         spec = agent.exploration_step(dm, kappa=KAPPA)
-        prev = with_dims({**prev, **params_from_spec(spec)})
-        run_experiment(dataset, agent, fab, prev, f"explore_{i+1:02d}")
+        prev = with_dimensions({**prev, **params_from_spec(spec)})
+        run_and_evaluate(dataset, agent, fab, prev, f"explore_{i+1:02d}")
         dm.update()
         agent.train(dm, validate=False)
 
@@ -58,8 +58,8 @@ def main():
 
     spec = agent.exploration_step(dm, kappa=0.0)
     proposed = params_from_spec(spec)
-    params = with_dims({**prev, **proposed})
-    exp = run_experiment(dataset, agent, fab, params, "infer_01")
+    params = with_dimensions({**prev, **proposed})
+    exp = run_and_evaluate(dataset, agent, fab, params, "infer_01")
     perf = {k: float(v) for k, v in exp.performance.get_values_dict().items() if v is not None}
     score = _combined(perf)
 

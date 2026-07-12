@@ -5,7 +5,13 @@
   "include": ["*.py", "sensors", "models", "visualization", "steps", "dev"],
   "exclude": [
     "dev/_smoke_layer3.py",
-    "dev/03_prediction.py"
+    "dev/01_physics.py",
+    "dev/02_baseline.py",
+    "dev/03_prediction.py",
+    "dev/04_uncertainty.py",
+    "dev/06_trajectory.py",
+    "dev/07_inference.py",
+    "dev/shared.py"
   ],
   "typeCheckingMode": "basic"
 }

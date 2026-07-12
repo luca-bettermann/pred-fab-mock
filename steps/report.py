@@ -5,11 +5,11 @@ import os
 import numpy as np
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from pred_fab.plotting import plot_radar_panels, RadarPanel, plot_dimensional_trajectories, AxisSpec
+from pred_fab.plotting import plot_radar_panels, RadarPanel, plot_dimensional_trajectories
 from visualization import plot_path_comparison_3d
 from steps._common import (
     load_session, rebuild, ensure_plot_dir, show_plot_with_header, combined_score,
-    N_LAYERS, N_SEGMENTS, X_AXIS, Y_AXIS,
+    X_AXIS, Y_AXIS,
 )
 
 
@@ -27,11 +27,9 @@ def run(args: argparse.Namespace) -> None:
     params = state.all_params[idx]
     phase = state.all_phases[idx]
     _, perf = state.perf_history[idx]
-    perf_weights: dict[str, float] = config.get("performance_weights") or {
-        "path_accuracy": 1.0, "energy_efficiency": 1.0, "production_rate": 1.0,
-    }
 
     agent, dataset, fab = rebuild(config)
+    perf_weights = agent.calibration_system.performance_weights
     plot_dir = ensure_plot_dir()
     report_dir = os.path.join(plot_dir, "report")
     os.makedirs(report_dir, exist_ok=True)

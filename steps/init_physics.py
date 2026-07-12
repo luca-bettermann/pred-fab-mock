@@ -8,20 +8,15 @@ from visualization.helpers import evaluate_physics_grid
 from steps._common import (
     load_session, save_session, ensure_plot_dir, show_plot_with_header,
     randomize_physics, apply_physics_config, PHYSICS_CONFIG_KEY,
-    X_AXIS, Y_AXIS, FIXED_DIMS,
+    X_AXIS, Y_AXIS, FIXED_DIMS, print_phase_banner,
 )
 
 
 def run(args: argparse.Namespace) -> None:
     config, state = load_session()
     plot_dir = ensure_plot_dir()
-    _B = "\033[1m"; _C = "\033[36m"; _R = "\033[0m"; _D = "\033[2m"
-    bar = "\u2501" * 58
-    print(f"\n{_B}{_C}{bar}{_R}")
-    print(f"{_B}{_C}  PHASE 0.3{_R}{_B} \u25b8 Physics{_R}")
     seed_str = f"seed={args.seed}" if args.seed is not None else "random"
-    print(f"  {_D}Randomize ground truth ({seed_str}){_R}")
-    print(f"{_B}{_C}{bar}{_R}")
+    print_phase_banner("0.3", "Physics", f"Randomize ground truth ({seed_str})")
     seed = args.seed
     physics = randomize_physics(seed)
     config[PHYSICS_CONFIG_KEY] = physics

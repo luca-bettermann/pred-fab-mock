@@ -3,6 +3,7 @@ import argparse
 import os
 
 import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from schema import DEFAULT_PERF_WEIGHTS
 from visualization import plot_journey, physics_combined_at, get_physics_optimum
 from steps._common import (
     load_session, combined_score, ensure_plot_dir, show_plot_with_header,
@@ -12,9 +13,7 @@ from steps._common import (
 
 def run(args: argparse.Namespace) -> None:
     config, state = load_session()
-    perf_weights = config.get("performance_weights") or {
-        "path_accuracy": 1.0, "energy_efficiency": 1.0, "production_rate": 1.0,
-    }
+    perf_weights = config.get("performance_weights") or DEFAULT_PERF_WEIGHTS
 
     print(f"\n  Run Summary:")
     print(f"  {'─' * 60}")
