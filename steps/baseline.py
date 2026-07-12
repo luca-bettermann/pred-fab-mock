@@ -118,7 +118,7 @@ def run(args: argparse.Namespace) -> None:
          "n_layers": N_LAYERS, "n_segments": N_SEGMENTS}
         for spd in speeds for w in waters
     ]
-    grid_preds = agent.pred_system._predict_from_params_tensor(grid_params)  # type: ignore[attr-defined]
+    grid_preds = agent.pred_system.predict_for_calibration(grid_params)
     for j, spd in enumerate(speeds):
         for i, w in enumerate(waters):
             t = grid_preds[j * len(waters) + i]["path_deviation"]
@@ -165,8 +165,9 @@ def run(args: argparse.Namespace) -> None:
     validation_panels: list[tuple] = []
 
     # Compute evidence grid for process/schedule panels (what the optimizer sees)
+    specs = cal.last_global_specs or []
     unc_grid_data = None
-    if cal.last_process_points is not None:
+    if specs:
         unc_waters, unc_speeds, _density, evidence_grid = cal.compute_evidence_grids(
             X_AXIS.key, Y_AXIS.key, X_AXIS.bounds, Y_AXIS.bounds,
             fixed_params=dict(FIXED_DIMS), resolution=30,
@@ -177,27 +178,25 @@ def run(args: argparse.Namespace) -> None:
         validation_panels.append(("Domain", LAYER_AXIS, SEGMENT_AXIS, cal.last_domain_values, None))
 
     # Second panel: the post-Schedule trajectory when scheduling ran, else the static Process points.
-    has_schedule = (
-        cal.last_trajectory_points is not None
-        and cal.last_trajectory_exp_ids is not None
-        and cal.last_process_points is not None
-    )
-    if has_schedule:
-        sched_pts_raw = cal.last_trajectory_points
+    traj_series = cal.last_acquisition_trajectories()
+    if any(traj_series):
         sched_ids: list[Any] = []
         sched_dicts: list[dict[str, Any]] = []
-        for j, eid in enumerate(cal.last_trajectory_exp_ids or []):
-            water = cal.last_process_points[eid].get("water_ratio")  # type: ignore[index]
-            if water is None:
-                print(f"  Warning: schedule point {eid} missing water_ratio; skipping in validation plot")
+        for i, (spec, series) in enumerate(zip(specs, traj_series)):
+            water = spec.initial_params.to_dict().get("water_ratio")
+            speed_series = series.get(Y_AXIS.key, [])
+            if water is None or not speed_series:
+                print(f"  Warning: schedule point {i} missing water_ratio or {Y_AXIS.key} series; "
+                      "skipping in validation plot")
                 continue
-            speed_norm = float(sched_pts_raw[j, 0])  # type: ignore[index]
-            speed = Y_AXIS.bounds[0] + speed_norm * (Y_AXIS.bounds[1] - Y_AXIS.bounds[0])  # type: ignore[index]
-            sched_ids.append(eid)
-            sched_dicts.append({"water_ratio": water, "print_speed": speed})
+            # Series layer 0 is the initial proposal; the first scheduled value follows it.
+            speed = speed_series[1] if len(speed_series) > 1 else speed_series[0]
+            sched_ids.append(i)
+            sched_dicts.append({"water_ratio": float(water), "print_speed": float(speed)})
         validation_panels.append(("Process + Schedule", X_AXIS, Y_AXIS, sched_dicts, sched_ids, unc_grid_data))
-    elif cal.last_process_points is not None:
-        validation_panels.append(("Process", X_AXIS, Y_AXIS, cal.last_process_points, None, unc_grid_data))
+    elif specs:
+        process_points = [s.initial_params.to_dict() for s in specs]
+        validation_panels.append(("Process", X_AXIS, Y_AXIS, process_points, None, unc_grid_data))
 
     if validation_panels:
         plot_phase_proposals(path_val, validation_panels)

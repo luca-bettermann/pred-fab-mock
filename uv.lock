@@ -542,8 +542,8 @@ wheels = [
 
 [[package]]
 name = "pred-fab"
-version = "0.3.0"
-source = { git = "https://github.com/luca-bettermann/pred-fab.git?rev=main#750c8f47a84c29d7d808a993f0fc1d59302a1891" }
+version = "0.3.1"
+source = { git = "https://github.com/luca-bettermann/pred-fab.git?rev=main#8061e507f734b73098bf62bd652741d455db1266" }
 dependencies = [
     { name = "numpy" },
 ]
