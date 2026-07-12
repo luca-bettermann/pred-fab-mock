@@ -3,9 +3,9 @@ import argparse
 import json
 import os
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import plot_acquisition, plot_convergence
 from steps._common import (
+    run_step,
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot_with_header, get_performance, run_and_record, compute_acquisition_grid,
     X_AXIS, Y_AXIS, FIXED_DIMS, apply_schedule_args,
@@ -79,18 +79,17 @@ def run(args: argparse.Namespace) -> None:
     save_session(config, state)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run exploration rounds (incremental)")
-    parser.add_argument("--n", type=int, default=5)
-    parser.add_argument("--kappa", type=float, default=0.5)
-    parser.add_argument("--plot", action="store_true")
-    parser.add_argument("--validate", action="store_true")
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--n", type=int, default=5, help="Number of rounds to add")
+    parser.add_argument("--kappa", type=float, default=0.5,
+                        help="Exploration weight (0=exploit, 1=explore)")
+    parser.add_argument("--plot", action="store_true", help="Show per-round plots inline")
+    parser.add_argument("--validate", action="store_true", help="Validate model during training")
     parser.add_argument("--schedule", action="append", metavar="PARAM:DIM",
                         help="Override the configured schedule. Repeatable.")
     parser.add_argument("--design-intent", type=str, default=None,
                         help="JSON: fix parameters for schedule mode")
-    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)

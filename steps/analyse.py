@@ -9,10 +9,10 @@ import os
 
 import numpy as np
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import plot_topology_comparison, plot_parameter_space_3d
 from visualization.helpers import physics_combined_at, get_physics_optimum
 from steps._common import (
+    run_step,
     load_session, save_session, rebuild, ensure_plot_dir, show_plot_with_header,
     combined_score, compute_local_sensitivity, predict_score_grid, N_LAYERS, N_SEGMENTS,
     X_AXIS, Y_AXIS, Z_AXIS, FIXED_DIMS,
@@ -100,13 +100,12 @@ def run(args: argparse.Namespace) -> None:
         print(f"    {code:<20s}  {val:.4f}")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Analyse model: visual + optional test-set numerics")
-    parser.add_argument("--plot", action="store_true")
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--plot", action="store_true", help="Show plots inline")
     parser.add_argument("--test-set", type=int, default=0, dest="test_set",
-                        help="Generate N test experiments inline and report MAE / max error")
-    return parser.parse_args()
+                        help="Generate N test experiments inline and report MAE / max error "
+                             "(default: 0 = visual only)")
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)

@@ -1,7 +1,7 @@
 # steps/ — Context
 
 ## Purpose
-One module per CLI command. `cli.py` only parses arguments and dispatches; each step is also runnable standalone (`python steps/baseline.py --n 5`).
+One module per CLI command. `cli.py` only parses arguments and dispatches; each step owns its argument spec (`add_arguments`) and is also runnable standalone from the repo root (`python -m steps.baseline --n 5`).
 
 ## Structure
 

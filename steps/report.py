@@ -4,10 +4,10 @@ import os
 
 import numpy as np
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import plot_radar_panels, RadarPanel, plot_dimensional_trajectories
 from visualization import plot_path_comparison_3d
 from steps._common import (
+    run_step,
     load_session, rebuild, ensure_plot_dir, show_plot_with_header, combined_score,
     X_AXIS, Y_AXIS,
 )
@@ -79,12 +79,10 @@ def run(args: argparse.Namespace) -> None:
     print()
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate visual report for an experiment")
+def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("exp_code", type=str, help="Experiment code (e.g. base_01, explore_03)")
     parser.add_argument("--plot", action="store_true", help="Show plots inline in terminal")
-    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)

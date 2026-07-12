@@ -2,10 +2,10 @@
 import argparse
 import os
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from schema import DEFAULT_PERF_WEIGHTS
 from visualization import plot_journey, physics_combined_at, get_physics_optimum
 from steps._common import (
+    run_step,
     load_session, combined_score, ensure_plot_dir, show_plot_with_header,
     load_physics_from_session,
 )
@@ -46,11 +46,9 @@ def run(args: argparse.Namespace) -> None:
                               inline=getattr(args, "plot", False))
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Show run summary across all phases")
-    parser.add_argument("--plot", action="store_true")
-    return parser.parse_args()
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--plot", action="store_true", help="Show journey plot inline")
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)

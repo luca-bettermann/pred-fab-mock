@@ -6,7 +6,6 @@ from typing import Any
 
 import numpy as np
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import (
     plot_parameter_space, plot_parameter_space_per_cell, plot_mean_error_topology,
     plot_dimensional_trajectories, plot_convergence, plot_phase_proposals,
@@ -14,6 +13,7 @@ from pred_fab.plotting import (
 from visualization.helpers import physics_combined_at
 from sensors.physics import path_deviation as physics_path_deviation
 from steps._common import (
+    run_step,
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot_with_header, with_dimensions, params_from_spec, get_performance,
     run_and_record, combined_score, predict_score_grid, N_LAYERS, N_SEGMENTS,
@@ -213,16 +213,14 @@ def run(args: argparse.Namespace) -> None:
     save_session(config, state)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run baseline experiments (space-filling)")
+def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--n", type=int, default=5, help="Number of experiments")
     parser.add_argument("--plot", action="store_true", help="Show plots inline")
     parser.add_argument("--schedule", action="append", metavar="PARAM:DIM",
                         help="Override the configured schedule (e.g. print_speed:n_layers). Repeatable.")
     parser.add_argument("--design-intent", type=str, default=None,
                         help="JSON: fix parameters (required for schedule). Example: '{\"n_layers\":5}'")
-    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)

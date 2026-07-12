@@ -3,11 +3,11 @@ import argparse
 import json
 import os
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import plot_inference_result
 from visualization.helpers import physics_combined_at
 from visualization.helpers import get_physics_optimum
 from steps._common import (
+    run_step,
     load_session, save_session, rebuild, ensure_plot_dir, next_code,
     show_plot_with_header, get_performance, run_and_record, combined_score,
     predict_score_grid, N_LAYERS,
@@ -85,12 +85,13 @@ def run(args: argparse.Namespace) -> None:
     save_session(config, state)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Single-shot first-time-right manufacturing")
-    parser.add_argument("--design-intent", type=str, default=None)
-    parser.add_argument("--plot", action="store_true")
-    return parser.parse_args()
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--design-intent", type=str, default=None,
+                        help="JSON: fix parameters for inference. Example: '{\"n_layers\":5}'")
+    parser.add_argument("--plot", action="store_true", help="Show plots inline")
+    parser.add_argument("--schedule", action="append", metavar="PARAM:DIM",
+                        help="Override the configured schedule. Repeatable.")
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)

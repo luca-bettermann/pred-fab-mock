@@ -2,10 +2,10 @@
 import argparse
 import os
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from pred_fab.plotting import plot_metric_topology
 from visualization.helpers import evaluate_physics_grid
 from steps._common import (
+    run_step,
     load_session, save_session, ensure_plot_dir, show_plot_with_header,
     randomize_physics, apply_physics_config, PHYSICS_CONFIG_KEY,
     X_AXIS, Y_AXIS, FIXED_DIMS, print_phase_banner,
@@ -45,12 +45,10 @@ def run(args: argparse.Namespace) -> None:
     save_session(config, state)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Randomize physics constants and show topology")
-    parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--plot", action="store_true")
-    return parser.parse_args()
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    parser.add_argument("--plot", action="store_true", help="Show plots inline in terminal")
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)

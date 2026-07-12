@@ -1,8 +1,7 @@
 """Initialize the agent and show its state."""
 import argparse
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from steps._common import load_session, save_session, rebuild, print_phase_banner
+from steps._common import load_session, save_session, rebuild, print_phase_banner, run_step
 
 
 def run(args: argparse.Namespace) -> None:
@@ -13,10 +12,9 @@ def run(args: argparse.Namespace) -> None:
     save_session(config, state)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Initialize the agent")
-    return parser.parse_args()
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """No arguments."""
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)

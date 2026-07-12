@@ -3,9 +3,8 @@ import argparse
 import os
 import shutil
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from schema import LOCAL_DIR, PLOT_DIR, LOGS_DIR
-from steps._common import SESSION_FILE
+from steps._common import SESSION_FILE, run_step
 
 
 def run(args: argparse.Namespace) -> None:
@@ -19,10 +18,9 @@ def run(args: argparse.Namespace) -> None:
     print("  Session reset.")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Clear all session state and data")
-    return parser.parse_args()
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """No arguments."""
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)

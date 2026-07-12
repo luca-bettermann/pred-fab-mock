@@ -2,8 +2,7 @@
 import argparse
 import json
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from steps._common import load_session, save_session, print_config_set, print_config_show
+from steps._common import load_session, save_session, print_config_set, print_config_show, run_step
 
 
 def run(args: argparse.Namespace) -> None:
@@ -47,5 +46,30 @@ def run(args: argparse.Namespace) -> None:
     save_session(config, state)
 
 
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--show", action="store_true",
+                        help="Show all current configuration values")
+    parser.add_argument("--weights", type=str, default=None, metavar="JSON",
+                        help='Performance weights — e.g. \'{"path_accuracy":2,"energy_efficiency":1}\'')
+    parser.add_argument("--bounds", type=str, default=None, metavar="JSON",
+                        help='Parameter bounds — e.g. \'{"water_ratio":[0.35,0.45]}\'')
+    parser.add_argument("--trust-regions", type=str, default=None, metavar="JSON", dest="trust_regions",
+                        help='Per-param max change per step (used by both schedule and adaptation). '
+                             'Default = bounds_span / 10. Override e.g. \'{"print_speed":5.0}\'')
+    parser.add_argument("--schedule", action="append", metavar="PARAM:DIM",
+                        help="Default schedule (e.g. print_speed:n_layers). Repeatable. "
+                             "Per-command --schedule overrides.")
+    parser.add_argument("--sigma", type=float, default=None,
+                        help="Evidence kernel σ (per normalized dimension)")
+    parser.add_argument("--kappa", type=float, default=None,
+                        help="Default exploration weight κ (0=exploit, 1=explore)")
+    parser.add_argument("--n-starts", type=int, default=None, dest="n_starts",
+                        help="Optimizer multi-start count")
+    parser.add_argument("--n-sobol", type=int, default=None, dest="n_sobol",
+                        help="Optimizer Sobol candidate count")
+    parser.add_argument("--lr", type=float, default=None,
+                        help="Optimizer learning rate")
+
+
 if __name__ == "__main__":
-    raise SystemExit("Run via cli.py: uv run cli.py configure ...")
+    run_step(__doc__, add_arguments, run)

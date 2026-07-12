@@ -1,9 +1,10 @@
 """Shared infrastructure for workflow steps: session, rebuild, helpers."""
 
+import argparse
 import json
 import os
 import sys
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -33,6 +34,17 @@ _C = "\033[36m"  # cyan
 _D = "\033[2m"   # dim
 _G = "\033[32m"  # green
 _R = "\033[0m"   # reset
+
+
+def run_step(
+    doc: str | None,
+    add_arguments: Callable[[argparse.ArgumentParser], None],
+    run_fn: Callable[[argparse.Namespace], None],
+) -> None:
+    """Direct-run entry for a step module (``python -m steps.<name>`` from the repo root)."""
+    parser = argparse.ArgumentParser(description=(doc or "").strip().splitlines()[0])
+    add_arguments(parser)
+    run_fn(parser.parse_args())
 
 
 def print_phase_banner(phase: str, title: str, subtitle: str = "") -> None:

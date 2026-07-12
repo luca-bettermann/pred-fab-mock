@@ -4,8 +4,8 @@ import json
 
 import numpy as np
 
-import sys as _sys; _sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from steps._common import (
+    run_step,
     load_session, save_session, rebuild, next_code,
     with_dimensions, params_from_spec, get_performance,
     combined_score, N_LAYERS, N_SEGMENTS, apply_schedule_args,
@@ -116,11 +116,10 @@ def run(args: argparse.Namespace) -> None:
     save_session(config, state)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Online inference with layer-by-layer adaptation")
-    parser.add_argument("--design-intent", type=str, default=None)
-    return parser.parse_args()
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--design-intent", type=str, default=None,
+                        help="JSON: fix parameters. Example: '{\"n_layers\":5}'")
 
 
 if __name__ == "__main__":
-    run(parse_args())
+    run_step(__doc__, add_arguments, run)
